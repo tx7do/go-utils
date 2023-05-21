@@ -1,4 +1,4 @@
-module tx7do.github.com/kratos-utils
+module github.com/tx7do/kratos-utils
 
 go 1.20
 
