@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	entgo.io/contrib v0.4.5
-	entgo.io/ent v0.12.3
+	entgo.io/ent v0.12.4
 	github.com/go-kratos/kratos/v2 v2.7.0
 	github.com/google/uuid v1.3.1
 	github.com/oschwald/geoip2-golang v1.9.0
@@ -14,7 +14,7 @@ require (
 )
 
 require (
-	ariga.io/atlas v0.14.0 // indirect
+	ariga.io/atlas v0.14.1 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/bufbuild/protocompile v0.6.0 // indirect
