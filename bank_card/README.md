@@ -13,3 +13,5 @@
 - [bcbc](https://github.com/hexindai/bcbc)
 - [banks-db](https://github.com/ramoona/banks-db)
 - [SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes)
+- [BanksDataWorldWide](https://github.com/abdalrhman-alajlouni/BanksDataWorldWide)
+- [bankcard](https://github.com/caijf/bankcard)
