@@ -18,12 +18,20 @@ type Database struct {
 	db *sql.DB
 }
 
-func NewDatabase() *Database {
-	return &Database{}
+func NewDatabase(openFile bool) *Database {
+	db := &Database{}
+
+	if openFile {
+		db.openFromFile()
+	} else {
+		_ = db.openFromEmbed()
+	}
+
+	return db
 }
 
-// OpenFromFile 从文件打开数据库
-func (d *Database) OpenFromFile() {
+// openFromFile 从文件打开数据库
+func (d *Database) openFromFile() {
 	db, err := sql.Open("sqlite3", "bank_card.db")
 	if err != nil {
 		panic("failed to connect database")
@@ -34,8 +42,8 @@ func (d *Database) OpenFromFile() {
 	d.initTables()
 }
 
-// OpenFromEmbed 从内嵌文件打开数据库
-func (d *Database) OpenFromEmbed() error {
+// openFromEmbed 从内嵌文件打开数据库
+func (d *Database) openFromEmbed() error {
 	db, err := sql.Open("sqlite3", "file::memory:?mode=ro&cache=shared")
 	if err != nil {
 		panic("failed to connect database")
@@ -110,9 +118,17 @@ func (d *Database) insertDataToBankCardTable(data *BankCard) {
 	}
 }
 
+func (d *Database) UpdateBankCardTableCardName(bin uint32, cardName string) {
+	strSql := fmt.Sprintf("UPDATE bank_cards SET card_name = '%s' WHERE bin = '%d';", cardName, bin)
+	_, err := d.db.Exec(strSql)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
 // queryBank 查询银行信息
 func (d *Database) queryBank(bankCode string) *Bank {
-	strSql := fmt.Sprintf("SELECT * FROM banks WHERE bank_code = '%s' LIMIT 1;", bankCode)
+	strSql := fmt.Sprintf("SELECT id, bank_code, bank_name FROM banks WHERE bank_code = '%s' LIMIT 1;", bankCode)
 	rows, err := d.db.Query(strSql)
 	if err != nil {
 		log.Fatal("query bank failed:", err)
@@ -134,7 +150,7 @@ func (d *Database) queryBank(bankCode string) *Bank {
 
 // queryBankCard 查询银行卡信息
 func (d *Database) queryBankCard(bin uint32) *BankCard {
-	strSql := fmt.Sprintf("SELECT * FROM bank_cards WHERE bin = '%d' LIMIT 1;", bin)
+	strSql := fmt.Sprintf("SELECT bin, bank_code, card_name, card_type, card_length FROM bank_cards WHERE bin = '%d' LIMIT 1;", bin)
 	rows, err := d.db.Query(strSql)
 	if err != nil {
 		log.Fatal("query bank card failed:", err)

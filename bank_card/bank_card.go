@@ -1,6 +1,9 @@
 package bank_card
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 var BANKBIN = []string{
 	"621098", "622150", "622151",
@@ -650,4 +653,23 @@ func GetNameOfBank(cardNo string) string {
 	}
 
 	return BANKNAME[index]
+}
+
+var defaultDatabase *Database = NewDatabase(false)
+
+func QueryBankByCardNumber(cardNo string) *BankCard {
+	if len(cardNo) < 6 {
+		return nil
+	}
+
+	for i := 6; i <= 8; i++ {
+		cardBin := cardNo[0:i]
+		bin, _ := strconv.Atoi(cardBin)
+		bank := defaultDatabase.queryBankCard(uint32(bin))
+		if bank != nil {
+			return bank
+		}
+	}
+
+	return nil
 }
