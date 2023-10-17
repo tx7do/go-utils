@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"errors"
 	"fmt"
 	"log"
 
@@ -129,16 +130,16 @@ func (d *Database) UpdateBankCardTableCardName(bin uint32, cardName string) {
 // queryBank 查询银行信息
 func (d *Database) queryBank(bankCode string) *Bank {
 	strSql := fmt.Sprintf("SELECT id, bank_code, bank_name FROM banks WHERE bank_code = '%s' LIMIT 1;", bankCode)
-	rows, err := d.db.Query(strSql)
-	if err != nil {
-		log.Fatal("query bank failed:", err)
+	row := d.db.QueryRow(strSql)
+	if row == nil {
 		return nil
 	}
-	defer rows.Close()
 
-	rows.Next()
 	var bank Bank
-	if err = rows.Scan(&bank.Id, &bank.BankCode, &bank.BankName); err != nil {
+	if err := row.Scan(&bank.Id, &bank.BankCode, &bank.BankName); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
 		log.Fatal("scan bank failed:", err)
 		return nil
 	}
@@ -151,20 +152,19 @@ func (d *Database) queryBank(bankCode string) *Bank {
 // queryBankCard 查询银行卡信息
 func (d *Database) queryBankCard(bin uint32) *BankCard {
 	strSql := fmt.Sprintf("SELECT bin, bank_code, card_name, card_type, card_length FROM bank_cards WHERE bin = '%d' LIMIT 1;", bin)
-	rows, err := d.db.Query(strSql)
-	if err != nil {
-		log.Fatal("query bank card failed:", err)
+	row := d.db.QueryRow(strSql)
+	if row == nil {
 		return nil
 	}
-	defer rows.Close()
 
-	rows.Next()
 	var bankCard BankCard
-	if err = rows.Scan(&bankCard.BIN, &bankCard.BankCode, &bankCard.CardName, &bankCard.CardType, &bankCard.CardLength); err != nil {
+	if err := row.Scan(&bankCard.BIN, &bankCard.BankCode, &bankCard.CardName, &bankCard.CardType, &bankCard.CardLength); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
 		log.Fatal("scan bank card failed:", err)
 		return nil
 	}
-	rows.Close()
 
 	bank := d.queryBank(bankCard.BankCode)
 	if bank != nil {

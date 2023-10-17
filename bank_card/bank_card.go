@@ -662,7 +662,7 @@ func QueryBankByCardNumber(cardNo string) *BankCard {
 		return nil
 	}
 
-	for i := 6; i <= 8; i++ {
+	for i := 8; i >= 6; i-- {
 		cardBin := cardNo[0:i]
 		bin, _ := strconv.Atoi(cardBin)
 		bank := defaultDatabase.queryBankCard(uint32(bin))
