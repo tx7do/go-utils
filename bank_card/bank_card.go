@@ -1,4 +1,4 @@
-package common
+package bank_card
 
 import "strings"
 
@@ -627,58 +627,6 @@ var BANKNAME = []string{
 	"重庆农村商业银行·银联标准贷记卡", "重庆农村商业银行·公务卡", "南阳村镇银行·玉都卡",
 	"晋中市榆次融信村镇银行·魏榆卡", "三水珠江村镇银行·珠江太阳卡", "东营莱商村镇银行·绿洲卡", "建设银行·单位结算卡",
 	"玉溪市商业银行·红塔卡",
-}
-
-// IsValidLuhn 使用Luhn算法校验银行卡号码
-// @see https://en.wikipedia.org/wiki/Luhn_algorithm
-// @see https://www.geeksforgeeks.org/luhn-algorithm/
-// @see https://medium.com/@akshaymohite/luhns-algorithm-to-validate-credit-debit-card-numbers-1952e6c7a9d0
-// @see https://www.woshipm.com/pd/371041.html
-func IsValidLuhn(cardNo string) bool {
-	length := len(cardNo)
-	if length == 0 {
-		return false
-	}
-
-	if !isNumberString(cardNo) {
-		return false
-	}
-
-	sum := 0
-	second := false
-	for i := length - 1; i >= 0; i-- {
-		d := cardNo[i] - '0'
-
-		if second == true {
-			d = d * 2
-		}
-
-		sum += int(d) / 10
-		sum += int(d) % 10
-
-		second = !second
-	}
-
-	return sum%10 == 0
-}
-
-func isNumberString(s string) bool {
-	length := len(s)
-	for i := 0; i < length; i++ {
-		if s[i] < '0' || s[i] > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-// IsValidBankCardNo 是否合法的银行卡号
-func IsValidBankCardNo(cardNo string) bool {
-	length := len(cardNo)
-	if length < 12 || length > 19 {
-		return false
-	}
-	return IsValidLuhn(cardNo)
 }
 
 // GetNameOfBank 通过银行卡 的前六位确定 判断银行开户行及卡种
