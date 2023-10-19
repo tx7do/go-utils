@@ -3,10 +3,13 @@ package qqwry
 import (
 	"bytes"
 	"io"
+	"regexp"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
+
+var regSpiltAddress = regexp.MustCompile(`.+?(省|市|自治区|自治州|盟|县|区|管委会|街道|镇|乡)`)
 
 func gb18030Decode(src []byte) string {
 	in := bytes.NewReader(src)
@@ -25,4 +28,8 @@ func byte3ToUInt32(data []byte) uint32 {
 	i |= (uint32(data[1]) << 8) & 0xff00
 	i |= (uint32(data[2]) << 16) & 0xff0000
 	return i
+}
+
+func SpiltAddress(addr string) []string {
+	return regSpiltAddress.FindAllString(addr, -1)
 }

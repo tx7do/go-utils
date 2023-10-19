@@ -6,14 +6,10 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/oschwald/geoip2-golang"
+
+	"github.com/tx7do/kratos-utils/geoip"
 	"github.com/tx7do/kratos-utils/geoip/geolite/assets"
 )
-
-type Result struct {
-	Country  string // 国家
-	Province string // 省
-	City     string // 城市
-}
 
 const defaultOutputLanguage = "zh-CN"
 
@@ -56,7 +52,7 @@ func (g *Client) query(rawIP string) (city *geoip2.City, err error) {
 }
 
 // Query 通过IP获取地区
-func (g *Client) Query(rawIP string) (ret Result, err error) {
+func (g *Client) Query(rawIP string) (ret geoip.Result, err error) {
 	record, err := g.query(rawIP)
 	if err != nil {
 		log.Fatal(err)

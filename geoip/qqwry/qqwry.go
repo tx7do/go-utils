@@ -3,6 +3,7 @@ package qqwry
 import (
 	"encoding/binary"
 	"errors"
+	"github.com/tx7do/kratos-utils/geoip"
 	"net"
 	"strings"
 	"sync"
@@ -136,7 +137,10 @@ func (c *Client) readUInt24(offset int32) uint32 {
 	return i
 }
 
-func (c *Client) Query(queryIp string) (country, city, isp string, err error) {
+func (c *Client) Query(queryIp string) (res geoip.Result, err error) {
+	res.IP = queryIp
+	res.Country = "中国"
+
 	ip32, err := c.parseIp(queryIp)
 	if err != nil {
 		return
@@ -152,7 +156,8 @@ func (c *Client) Query(queryIp string) (country, city, isp string, err error) {
 	offset += 4
 	mode := c.readMode(uint32(offset))
 
-	var _city []byte
+	var _area []byte
+	var area string
 
 	var ispPos uint32
 	switch mode {
@@ -164,25 +169,35 @@ func (c *Client) Query(queryIp string) (country, city, isp string, err error) {
 			posCA = c.readUInt24(int32(posC) + 1)
 			posC += 4
 		}
-		_city = c.readString(posCA)
+		_area = c.readString(posCA)
 		if mode != redirectMode2 {
-			posC += uint32(len(city) + 1)
+			posC += uint32(len(area) + 1)
 		}
 		ispPos = posC
 
 	case redirectMode2:
 		posCA := c.readUInt24(offset + 1)
-		_city = c.readString(posCA)
+		_area = c.readString(posCA)
 		ispPos = uint32(offset) + 4
 
 	default:
 		posCA := offset + 0
-		_city = c.readString(uint32(posCA))
-		ispPos = uint32(offset) + uint32(len(city)) + 1
+		_area = c.readString(uint32(posCA))
+		ispPos = uint32(offset) + uint32(len(area)) + 1
 	}
 
-	if len(_city) != 0 {
-		city = strings.TrimSpace(gb18030Decode(_city))
+	if len(_area) != 0 {
+		area = strings.TrimSpace(gb18030Decode(_area))
+
+		areas := SpiltAddress(area)
+		if len(areas) == 2 {
+			res.Province = areas[0]
+			res.City = areas[1]
+		} else if len(areas) == 1 {
+			res.City = areas[0]
+		} else {
+			res.City = area
+		}
 	}
 
 	ispMode := assets.QQWryDat[ispPos]
@@ -192,10 +207,10 @@ func (c *Client) Query(queryIp string) (country, city, isp string, err error) {
 	if ispPos > 0 {
 		var _isp []byte
 		_isp = c.readString(ispPos)
-		isp = strings.TrimSpace(gb18030Decode(_isp))
-		if isp != "" {
-			if strings.Contains(isp, "CZ88.NET") {
-				isp = ""
+		res.ISP = strings.TrimSpace(gb18030Decode(_isp))
+		if res.ISP != "" {
+			if strings.Contains(res.ISP, "CZ88.NET") {
+				res.ISP = ""
 			}
 		}
 	}
