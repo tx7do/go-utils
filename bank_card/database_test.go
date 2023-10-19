@@ -18,7 +18,7 @@ func TestImportBankName(t *testing.T) {
 
 	//db.openFromFile()
 
-	file, err := os.Open("name.csv")
+	file, err := os.Open("assets/name.csv")
 	if err != nil {
 		fmt.Println("Read file err, err =", err)
 		return
@@ -65,7 +65,7 @@ func TestImportBankCard(t *testing.T) {
 
 	//db.openFromFile()
 
-	file, err := os.Open("bin.csv")
+	file, err := os.Open("assets/bin.csv")
 	if err != nil {
 		fmt.Println("Read file err, err =", err)
 		return

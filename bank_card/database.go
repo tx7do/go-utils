@@ -3,17 +3,15 @@ package bank_card
 import (
 	"context"
 	"database/sql"
-	_ "embed"
 	"errors"
 	"fmt"
 	"log"
 
 	"github.com/mattn/go-sqlite3"
 	_ "github.com/mattn/go-sqlite3"
-)
 
-//go:embed bank_card.db
-var embeddedDatabase []byte
+	"github.com/tx7do/kratos-utils/bank_card/assets"
+)
 
 type Database struct {
 	db *sql.DB
@@ -33,7 +31,7 @@ func NewDatabase(openFile bool) *Database {
 
 // openFromFile 从文件打开数据库
 func (d *Database) openFromFile() {
-	db, err := sql.Open("sqlite3", "bank_card.db")
+	db, err := sql.Open("sqlite3", "assets/bank_card.db")
 	if err != nil {
 		panic("failed to connect database")
 	}
@@ -59,7 +57,7 @@ func (d *Database) openFromEmbed() error {
 	defer conn.Close()
 
 	if err = conn.Raw(func(raw interface{}) error {
-		return raw.(*sqlite3.SQLiteConn).Deserialize(embeddedDatabase, "")
+		return raw.(*sqlite3.SQLiteConn).Deserialize(assets.BankCardDatabase, "")
 	}); err != nil {
 		log.Fatal(err)
 		return err

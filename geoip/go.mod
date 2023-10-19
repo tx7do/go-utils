@@ -6,6 +6,7 @@ require (
 	github.com/go-kratos/kratos/v2 v2.7.0
 	github.com/oschwald/geoip2-golang v1.9.0
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/text v0.11.0
 )
 
 require (
