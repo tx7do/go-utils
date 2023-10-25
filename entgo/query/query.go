@@ -33,7 +33,8 @@ func parseJsonMap(strJson []byte, retMap *map[string]string) error {
 }
 
 // BuildQuerySelector 构建分页查询选择器
-func BuildQuerySelector(andFilterJsonString, orFilterJsonString string,
+func BuildQuerySelector(dbDriverName string,
+	andFilterJsonString, orFilterJsonString string,
 	page, pageSize int32, noPaging bool,
 	orderBys []string, defaultOrderField string) (err error, whereSelectors []func(s *sql.Selector), querySelectors []func(s *sql.Selector)) {
 	err, whereSelectors = BuildFilterSelector(andFilterJsonString, orFilterJsonString)

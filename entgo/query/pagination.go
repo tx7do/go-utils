@@ -3,7 +3,7 @@ package entgo
 import (
 	"entgo.io/ent/dialect/sql"
 
-	"github.com/tx7do/kratos-utils/pagination"
+	paging "restroom-system/pkg/util/pagination"
 )
 
 func BuildPaginationSelector(page, pageSize int32, noPaging bool) func(*sql.Selector) {
@@ -20,7 +20,7 @@ func BuildPaginationSelector(page, pageSize int32, noPaging bool) func(*sql.Sele
 	}
 
 	return func(s *sql.Selector) {
-		s.Offset(pagination.GetPageOffset(page, pageSize)).
+		s.Offset(paging.GetPageOffset(page, pageSize)).
 			Limit(int(pageSize))
 	}
 }
