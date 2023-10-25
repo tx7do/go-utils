@@ -7,7 +7,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/encoding"
 
-	"restroom-system/pkg/util/stringcase"
+	"github.com/tx7do/kratos-utils/stringcase"
 )
 
 const (
