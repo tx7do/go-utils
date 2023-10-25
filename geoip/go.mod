@@ -3,10 +3,10 @@ module github.com/tx7do/kratos-utils/geoip
 go 1.20
 
 require (
-	github.com/go-kratos/kratos/v2 v2.7.0
+	github.com/go-kratos/kratos/v2 v2.7.1
 	github.com/oschwald/geoip2-golang v1.9.0
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/text v0.11.0
+	golang.org/x/text v0.13.0
 )
 
 require (
