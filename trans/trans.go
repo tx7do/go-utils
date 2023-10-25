@@ -502,3 +502,28 @@ func BoolSliceValue(a []*bool) []bool {
 	}
 	return res
 }
+
+type mapKeyValueType interface {
+	~string | ~bool |
+		~int | ~int8 | ~int16 | ~int32 |
+		~uint | ~uint8 | ~uint16 | ~uint32 |
+		~float32 | ~float64
+}
+
+// MapKeys 获取map的键
+func MapKeys[TKey mapKeyValueType, TValue mapKeyValueType](source map[TKey]TValue) []TKey {
+	var target []TKey
+	for k := range source {
+		target = append(target, k)
+	}
+	return target
+}
+
+// MapValues 获取map的值
+func MapValues[TKey mapKeyValueType, TValue mapKeyValueType](source map[TKey]TValue) []TValue {
+	var target []TValue
+	for _, v := range source {
+		target = append(target, v)
+	}
+	return target
+}
