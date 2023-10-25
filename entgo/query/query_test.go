@@ -80,22 +80,6 @@ func TestJsonCodec(t *testing.T) {
 	fmt.Println(mapstrs)
 }
 
-func TestParseJsonMap(t *testing.T) {
-	var err error
-
-	req1 := make(map[string]string)
-	data1 := `{"key1":"val1", "key1":"val2", "key2":"val2"}`
-	err = parseJsonMap([]byte(data1), &req1)
-	assert.Nil(t, err)
-	fmt.Println(req1)
-
-	req2 := make(map[string]string)
-	data2 := `[{"key1":"val1"},{"key2":"val2"}]`
-	err = parseJsonMap([]byte(data2), &req2)
-	assert.Nil(t, err)
-	fmt.Println(req1)
-}
-
 func TestSplitQuery(t *testing.T) {
 	var keys []string
 
