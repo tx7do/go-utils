@@ -8,7 +8,7 @@ require (
 	github.com/go-kratos/kratos/v2 v2.7.1
 	github.com/google/uuid v1.3.1
 	github.com/stretchr/testify v1.8.4
-	github.com/tx7do/kratos-utils v0.0.0-20231025044346-36a096df76d8
+	github.com/tx7do/kratos-utils v1.0.0
 )
 
 require (
@@ -34,3 +34,5 @@ require (
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/tx7do/kratos-utils => ../

@@ -69,11 +69,11 @@ func (TimeAt) Fields() []ent.Field {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var _ ent.Mixin = (*CreatedTime)(nil)
+var _ ent.Mixin = (*CreateTime)(nil)
 
-type CreatedTime struct{ mixin.Schema }
+type CreateTime struct{ mixin.Schema }
 
-func (CreatedTime) Fields() []ent.Field {
+func (CreateTime) Fields() []ent.Field {
 	return []ent.Field{
 		// 创建时间
 		field.Time("create_time").
@@ -86,11 +86,11 @@ func (CreatedTime) Fields() []ent.Field {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var _ ent.Mixin = (*UpdatedTime)(nil)
+var _ ent.Mixin = (*UpdateTime)(nil)
 
-type UpdatedTime struct{ mixin.Schema }
+type UpdateTime struct{ mixin.Schema }
 
-func (UpdatedTime) Fields() []ent.Field {
+func (UpdateTime) Fields() []ent.Field {
 	return []ent.Field{
 		// 更新时间
 		field.Time("update_time").
@@ -102,11 +102,11 @@ func (UpdatedTime) Fields() []ent.Field {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var _ ent.Mixin = (*DeletedTime)(nil)
+var _ ent.Mixin = (*DeleteTime)(nil)
 
-type DeletedTime struct{ mixin.Schema }
+type DeleteTime struct{ mixin.Schema }
 
-func (DeletedTime) Fields() []ent.Field {
+func (DeleteTime) Fields() []ent.Field {
 	return []ent.Field{
 		// 删除时间
 		field.Time("delete_time").
@@ -122,9 +122,9 @@ type Time struct{ mixin.Schema }
 
 func (Time) Fields() []ent.Field {
 	var fields []ent.Field
-	fields = append(fields, CreatedTime{}.Fields()...)
-	fields = append(fields, UpdatedTime{}.Fields()...)
-	fields = append(fields, DeletedTime{}.Fields()...)
+	fields = append(fields, CreateTime{}.Fields()...)
+	fields = append(fields, UpdateTime{}.Fields()...)
+	fields = append(fields, DeleteTime{}.Fields()...)
 	return fields
 }
 
