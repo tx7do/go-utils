@@ -6,10 +6,11 @@ import (
 	"github.com/tx7do/kratos-utils/trans"
 )
 
-const (
-	TimeLayout = "2006-01-02 15:04:05"
-	DateLayout = "2006-01-02"
-)
+var DefaultTimeLocation *time.Location
+
+func RefreshDefaultTimeLocation(name string) {
+	DefaultTimeLocation, _ = time.LoadLocation(name)
+}
 
 // UnixMilliToStringPtr 毫秒时间戳 -> 字符串
 func UnixMilliToStringPtr(tm *int64) *string {
@@ -38,12 +39,30 @@ func StringTimeToTime(str *string) *time.Time {
 	if len(*str) == 0 {
 		return nil
 	}
-	loc, _ := time.LoadLocation("Asia/Shanghai")
-	theTime, err := time.ParseInLocation(TimeLayout, *str, loc)
-	if err != nil {
-		return nil
+
+	if DefaultTimeLocation == nil {
+		RefreshDefaultTimeLocation(DefaultTimeLocationName)
 	}
-	return &theTime
+
+	var err error
+	var theTime time.Time
+
+	theTime, err = time.ParseInLocation(TimeLayout, *str, DefaultTimeLocation)
+	if err == nil {
+		return &theTime
+	}
+
+	theTime, err = time.ParseInLocation(DateLayout, *str, DefaultTimeLocation)
+	if err == nil {
+		return &theTime
+	}
+
+	theTime, err = time.ParseInLocation(ClockLayout, *str, DefaultTimeLocation)
+	if err == nil {
+		return &theTime
+	}
+
+	return nil
 }
 
 // TimeToTimeString 时间 -> 时间字符串
@@ -62,12 +81,30 @@ func StringDateToTime(str *string) *time.Time {
 	if len(*str) == 0 {
 		return nil
 	}
-	loc, _ := time.LoadLocation("Asia/Shanghai")
-	theTime, err := time.ParseInLocation(DateLayout, *str, loc)
-	if err != nil {
-		return nil
+
+	if DefaultTimeLocation == nil {
+		RefreshDefaultTimeLocation(DefaultTimeLocationName)
 	}
-	return &theTime
+
+	var err error
+	var theTime time.Time
+
+	theTime, err = time.ParseInLocation(TimeLayout, *str, DefaultTimeLocation)
+	if err == nil {
+		return &theTime
+	}
+
+	theTime, err = time.ParseInLocation(DateLayout, *str, DefaultTimeLocation)
+	if err == nil {
+		return &theTime
+	}
+
+	theTime, err = time.ParseInLocation(ClockLayout, *str, DefaultTimeLocation)
+	if err == nil {
+		return &theTime
+	}
+
+	return nil
 }
 
 // TimeToDateString 时间 -> 日期字符串
