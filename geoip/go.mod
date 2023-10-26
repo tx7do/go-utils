@@ -1,4 +1,4 @@
-module github.com/tx7do/kratos-utils/geoip
+module github.com/tx7do/go-utils/geoip
 
 go 1.20
 
@@ -18,4 +18,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/tx7do/kratos-utils => ../
+replace github.com/tx7do/go-utils => ../

@@ -3,7 +3,7 @@ package entgo
 import (
 	"entgo.io/ent/dialect/sql"
 
-	paging "github.com/tx7do/kratos-utils/pagination"
+	paging "github.com/tx7do/go-utils/pagination"
 )
 
 func BuildPaginationSelector(page, pageSize int32, noPaging bool) func(*sql.Selector) {

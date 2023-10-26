@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tx7do/kratos-utils/trans"
+	"github.com/tx7do/go-utils/trans"
 )
 
 func TestGenerateOrderIdWithRandom(t *testing.T) {

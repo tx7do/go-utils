@@ -3,7 +3,7 @@ package util
 import (
 	"time"
 
-	"github.com/tx7do/kratos-utils/trans"
+	"github.com/tx7do/go-utils/trans"
 )
 
 var DefaultTimeLocation *time.Location

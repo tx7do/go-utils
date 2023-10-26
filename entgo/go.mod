@@ -1,4 +1,4 @@
-module github.com/tx7do/kratos-utils/entgo
+module github.com/tx7do/go-utils/entgo
 
 go 1.20
 
@@ -8,7 +8,7 @@ require (
 	github.com/go-kratos/kratos/v2 v2.7.1
 	github.com/google/uuid v1.3.1
 	github.com/stretchr/testify v1.8.4
-	github.com/tx7do/kratos-utils v1.0.0
+	github.com/tx7do/go-utils v1.0.0
 )
 
 require (
@@ -35,4 +35,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/tx7do/kratos-utils => ../
+replace github.com/tx7do/go-utils => ../

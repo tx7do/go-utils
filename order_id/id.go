@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tx7do/kratos-utils/trans"
+	"github.com/tx7do/go-utils/trans"
 )
 
 type idCounter uint32

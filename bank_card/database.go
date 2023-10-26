@@ -10,7 +10,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/tx7do/kratos-utils/bank_card/assets"
+	"github.com/tx7do/go-utils/bank_card/assets"
 )
 
 type Database struct {

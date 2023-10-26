@@ -1,4 +1,4 @@
-module github.com/tx7do/kratos-utils/bank_card
+module github.com/tx7do/go-utils/bank_card
 
 go 1.20
 
@@ -13,4 +13,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/tx7do/kratos-utils => ../
+replace github.com/tx7do/go-utils => ../

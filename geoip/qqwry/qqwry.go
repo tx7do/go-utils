@@ -3,12 +3,12 @@ package qqwry
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/tx7do/kratos-utils/geoip"
+	"github.com/tx7do/go-utils/geoip"
 	"net"
 	"strings"
 	"sync"
 
-	"github.com/tx7do/kratos-utils/geoip/qqwry/assets"
+	"github.com/tx7do/go-utils/geoip/qqwry/assets"
 )
 
 type Client struct {
