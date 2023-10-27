@@ -5,11 +5,6 @@ import (
 	_ "github.com/go-kratos/kratos/v2/encoding/json"
 )
 
-const (
-	DefaultPage     = 1
-	DefaultPageSize = 10
-)
-
 // BuildQuerySelector 构建分页查询选择器
 func BuildQuerySelector(
 	dbDriverName string,

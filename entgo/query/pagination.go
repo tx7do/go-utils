@@ -9,18 +9,14 @@ import (
 func BuildPaginationSelector(page, pageSize int32, noPaging bool) func(*sql.Selector) {
 	if noPaging {
 		return nil
+	} else {
+		return func(s *sql.Selector) {
+			BuildPaginationSelect(s, page, pageSize)
+		}
 	}
+}
 
-	if page == 0 {
-		page = DefaultPage
-	}
-
-	if pageSize == 0 {
-		pageSize = DefaultPageSize
-	}
-
-	return func(s *sql.Selector) {
-		s.Offset(paging.GetPageOffset(page, pageSize)).
-			Limit(int(pageSize))
-	}
+func BuildPaginationSelect(s *sql.Selector, page, pageSize int32) {
+	offset := paging.GetPageOffset(page, pageSize)
+	s.Offset(offset).Limit(int(pageSize))
 }

@@ -21,14 +21,14 @@ func QueryCommandToOrderConditions(orderBys []string) (error, func(s *sql.Select
 					continue
 				}
 
-				s.OrderBy(sql.Desc(s.C(key)))
+				BuildOrderSelect(s, key, true)
 			} else {
 				// 升序
 				if len(v) == 0 {
 					continue
 				}
 
-				s.OrderBy(sql.Asc(s.C(v)))
+				BuildOrderSelect(s, v, false)
 			}
 		}
 	}
@@ -37,9 +37,17 @@ func QueryCommandToOrderConditions(orderBys []string) (error, func(s *sql.Select
 func BuildOrderSelector(orderBys []string, defaultOrderField string) (error, func(s *sql.Selector)) {
 	if len(orderBys) == 0 {
 		return nil, func(s *sql.Selector) {
-			s.OrderBy(sql.Desc(s.C(defaultOrderField)))
+			BuildOrderSelect(s, defaultOrderField, true)
 		}
 	} else {
 		return QueryCommandToOrderConditions(orderBys)
+	}
+}
+
+func BuildOrderSelect(s *sql.Selector, field string, desc bool) {
+	if desc {
+		s.OrderBy(sql.Desc(s.C(field)))
+	} else {
+		s.OrderBy(sql.Asc(s.C(field)))
 	}
 }

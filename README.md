@@ -1,1 +1,1 @@
-# kratos-utils
+# go-utils
