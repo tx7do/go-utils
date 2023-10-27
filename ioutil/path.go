@@ -1,10 +1,11 @@
-package common
+package ioutil
 
 import (
 	"os"
 	"path/filepath"
 )
 
+// GetWorkingDirPath 获取工作路径
 func GetWorkingDirPath() string {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -13,6 +14,7 @@ func GetWorkingDirPath() string {
 	return dir
 }
 
+// GetExePath 获取可执行程序路径
 func GetExePath() string {
 	ex, err := os.Executable()
 	if err != nil {
@@ -22,6 +24,7 @@ func GetExePath() string {
 	return exePath
 }
 
+// GetAbsPath 获取绝对路径
 func GetAbsPath() string {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
