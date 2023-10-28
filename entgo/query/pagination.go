@@ -17,6 +17,13 @@ func BuildPaginationSelector(page, pageSize int32, noPaging bool) func(*sql.Sele
 }
 
 func BuildPaginationSelect(s *sql.Selector, page, pageSize int32) {
+	if page < 1 {
+		page = paging.DefaultPage
+	}
+
+	if pageSize < 1 {
+		pageSize = paging.DefaultPageSize
+	}
 	offset := paging.GetPageOffset(page, pageSize)
 	s.Offset(offset).Limit(int(pageSize))
 }

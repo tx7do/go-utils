@@ -7,13 +7,5 @@ const (
 
 // GetPageOffset 计算偏移量
 func GetPageOffset(pageNum, pageSize int32) int {
-	if pageNum < 1 {
-		pageNum = DefaultPage
-	}
-
-	if pageSize < 1 {
-		pageSize = DefaultPageSize
-	}
-
 	return int((pageNum - 1) * pageSize)
 }
