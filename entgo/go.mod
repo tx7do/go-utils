@@ -6,7 +6,7 @@ require (
 	entgo.io/contrib v0.4.5
 	entgo.io/ent v0.12.4
 	github.com/go-kratos/kratos/v2 v2.7.1
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.4.0
 	github.com/stretchr/testify v1.8.4
 	github.com/tx7do/go-utils v1.1.0
 )
