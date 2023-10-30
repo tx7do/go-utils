@@ -29,6 +29,7 @@ func (SwitchStatus) Fields() []ent.Field {
 			//	dialect.MySQL:    "switch_status",
 			//	dialect.Postgres: "switch_status",
 			//}).
+			Default("ON").
 			Values(
 				"OFF",
 				"ON",
