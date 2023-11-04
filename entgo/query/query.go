@@ -5,9 +5,8 @@ import (
 	_ "github.com/go-kratos/kratos/v2/encoding/json"
 )
 
-// BuildQuerySelector 构建分页查询选择器
+// BuildQuerySelector 构建分页过滤查询器
 func BuildQuerySelector(
-	dbDriverName string,
 	andFilterJsonString, orFilterJsonString string,
 	page, pageSize int32, noPaging bool,
 	orderBys []string, defaultOrderField string,

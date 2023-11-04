@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"strings"
 
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+
 	"github.com/go-kratos/kratos/v2/encoding"
 
 	"github.com/tx7do/go-utils/stringcase"
 )
+
+type FilterOp int
 
 const (
 	FilterNot                   = "not"         // 不等于
@@ -34,22 +38,50 @@ const (
 	FilterSearch                = "search"      // 全文搜索
 )
 
+type DatePart int
+
 const (
-	FilterDatePartDate        = "date"         // 日期
-	FilterDatePartYear        = "year"         // 年
-	FilterDatePartISOYear     = "iso_year"     // ISO 8601 一年中的周数
-	FilterDatePartQuarter     = "quarter"      // 季度
-	FilterDatePartMonth       = "month"        // 月
-	FilterDatePartWeek        = "week"         // ISO 8601 周编号 一年中的周数
-	FilterDatePartWeekDay     = "week_day"     // 星期几
-	FilterDatePartISOWeekDay  = "iso_week_day" // 星期几
-	FilterDatePartDay         = "day"          // 日
-	FilterDatePartTime        = "time"         // 小时：分钟：秒
-	FilterDatePartHour        = "hour"         // 小时
-	FilterDatePartMinute      = "minute"       // 分钟
-	FilterDatePartSecond      = "second"       // 秒
-	FilterDatePartMicrosecond = "microsecond"  // 微秒
+	DatePartDate        DatePart = iota // 日期
+	DatePartYear                        // 年
+	DatePartISOYear                     // ISO 8601 一年中的周数
+	DatePartQuarter                     // 季度
+	DatePartMonth                       // 月
+	DatePartWeek                        // ISO 8601 周编号 一年中的周数
+	DatePartWeekDay                     // 星期几
+	DatePartISOWeekDay                  // 星期几
+	DatePartDay                         // 日
+	DatePartTime                        // 小时：分钟：秒
+	DatePartHour                        // 小时
+	DatePartMinute                      // 分钟
+	DatePartSecond                      // 秒
+	DatePartMicrosecond                 // 微秒
 )
+
+var dateParts = [...]string{
+	DatePartDate:        "date",
+	DatePartYear:        "year",
+	DatePartISOYear:     "iso_year",
+	DatePartQuarter:     "quarter",
+	DatePartMonth:       "month",
+	DatePartWeek:        "week",
+	DatePartWeekDay:     "week_day",
+	DatePartISOWeekDay:  "iso_week_day",
+	DatePartDay:         "day",
+	DatePartTime:        "time",
+	DatePartHour:        "hour",
+	DatePartMinute:      "minute",
+	DatePartSecond:      "second",
+	DatePartMicrosecond: "microsecond",
+}
+
+func hasDatePart(str string) bool {
+	for _, item := range dateParts {
+		if str == item {
+			return true
+		}
+	}
+	return false
+}
 
 // QueryCommandToWhereConditions 查询命令转换为选择条件
 func QueryCommandToWhereConditions(strJson string, isOr bool) (error, func(s *sql.Selector)) {
@@ -154,7 +186,7 @@ func oneFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicate
 		case FilterIsNull:
 			cond = filterIsNull(s, field, value)
 		case FilterNotIsNull:
-			cond = filterNotIsNull(s, field, value)
+			cond = filterIsNotNull(s, field, value)
 		case FilterContains:
 			cond = filterContains(s, field, value)
 		case FilterInsensitiveContains:
@@ -201,32 +233,20 @@ func filterNot(s *sql.Selector, field, value string) *sql.Predicate {
 // filterIn IN操作
 // SQL: WHERE name IN ("tom", "jimmy")
 func filterIn(s *sql.Selector, field, value string) *sql.Predicate {
-	var strs []string
-	if err := json.Unmarshal([]byte(value), &strs); err == nil {
-		return sql.In(s.C(field), strs)
+	var values []any
+	if err := json.Unmarshal([]byte(value), &values); err == nil {
+		return sql.In(s.C(field), values...)
 	}
-
-	var float64s []float64
-	if err := json.Unmarshal([]byte(value), &float64s); err == nil {
-		return sql.In(s.C(field), strs)
-	}
-
 	return nil
 }
 
 // filterNotIn NOT IN操作
 // SQL: WHERE name NOT IN ("tom", "jimmy")`
 func filterNotIn(s *sql.Selector, field, value string) *sql.Predicate {
-	var strs []string
-	if err := json.Unmarshal([]byte(value), &strs); err == nil {
-		return sql.NotIn(s.C(field), strs)
+	var values []any
+	if err := json.Unmarshal([]byte(value), &values); err == nil {
+		return sql.NotIn(s.C(field), values...)
 	}
-
-	var float64s []float64
-	if err := json.Unmarshal([]byte(value), &float64s); err == nil {
-		return sql.NotIn(s.C(field), strs)
-	}
-
 	return nil
 }
 
@@ -258,27 +278,15 @@ func filterLT(s *sql.Selector, field, value string) *sql.Predicate {
 // SQL: WHERE "create_time" BETWEEN "2023-10-25" AND "2024-10-25"
 // 或者： WHERE "create_time" >= "2023-10-25" AND "create_time" <= "2024-10-25"
 func filterRange(s *sql.Selector, field, value string) *sql.Predicate {
-	var strs []string
-	if err := json.Unmarshal([]byte(value), &strs); err == nil {
-		if len(strs) != 2 {
+	var values []any
+	if err := json.Unmarshal([]byte(value), &values); err == nil {
+		if len(values) != 2 {
 			return nil
 		}
 
 		return sql.And(
-			sql.GTE(s.C(field), strs[0]),
-			sql.LTE(s.C(field), strs[1]),
-		)
-	}
-
-	var float64s []float64
-	if err := json.Unmarshal([]byte(value), &float64s); err == nil {
-		if len(float64s) != 2 {
-			return nil
-		}
-
-		return sql.And(
-			sql.GTE(s.C(field), float64s[0]),
-			sql.LTE(s.C(field), float64s[1]),
+			sql.GTE(s.C(field), values[0]),
+			sql.LTE(s.C(field), values[1]),
 		)
 	}
 
@@ -291,9 +299,9 @@ func filterIsNull(s *sql.Selector, field, _ string) *sql.Predicate {
 	return sql.IsNull(s.C(field))
 }
 
-// filterNotIsNull 不为空 IS NOT NULL操作
+// filterIsNotNull 不为空 IS NOT NULL操作
 // SQL: WHERE name IS NOT NULL
-func filterNotIsNull(s *sql.Selector, field, _ string) *sql.Predicate {
+func filterIsNotNull(s *sql.Selector, field, _ string) *sql.Predicate {
 	return sql.Not(sql.IsNull(s.C(field)))
 }
 
@@ -345,27 +353,75 @@ func filterInsensitiveExact(s *sql.Selector, field, value string) *sql.Predicate
 	return sql.EqualFold(s.C(field), value)
 }
 
-// filterRegex LIKE 操作 精确比对
+// filterRegex 正则查找
 // MySQL: WHERE title REGEXP BINARY '^(An?|The) +'
 // Oracle: WHERE REGEXP_LIKE(title, '^(An?|The) +', 'c');
 // PostgreSQL: WHERE title ~ '^(An?|The) +';
 // SQLite: WHERE title REGEXP '^(An?|The) +';
 func filterRegex(s *sql.Selector, field, value string) *sql.Predicate {
-	return nil
+	p := sql.P()
+	p.Append(func(b *sql.Builder) {
+		switch s.Builder.Dialect() {
+		case dialect.Postgres:
+			b.Ident(s.C(field)).WriteString(" ~ ")
+			b.Arg(value)
+			break
+		case dialect.MySQL:
+			b.Ident(s.C(field)).WriteString(" REGEXP BINARY ")
+			b.Arg(value)
+			break
+		case dialect.SQLite:
+			b.Ident(s.C(field)).WriteString(" REGEXP ")
+			b.Arg(value)
+			break
+		case dialect.Gremlin:
+			break
+		}
+	})
+	return p
 }
 
-// filterInsensitiveRegex ILIKE 操作 不区分大小写，精确比对
+// filterInsensitiveRegex 正则查找 不区分大小写
 // MySQL: WHERE title REGEXP '^(an?|the) +'
 // Oracle: WHERE REGEXP_LIKE(title, '^(an?|the) +', 'i');
 // PostgreSQL: WHERE title ~* '^(an?|the) +';
 // SQLite: WHERE title REGEXP '(?i)^(an?|the) +';
 func filterInsensitiveRegex(s *sql.Selector, field, value string) *sql.Predicate {
-	return nil
+	p := sql.P()
+	p.Append(func(b *sql.Builder) {
+		switch s.Builder.Dialect() {
+		case dialect.Postgres:
+			b.Ident(s.C(field)).WriteString(" ~* ")
+			b.Arg(strings.ToLower(value))
+			break
+		case dialect.MySQL:
+			b.Ident(s.C(field)).WriteString(" REGEXP ")
+			b.Arg(strings.ToLower(value))
+			break
+		case dialect.SQLite:
+			b.Ident(s.C(field)).WriteString(" REGEXP ")
+			if !strings.HasPrefix(value, "(?i)") {
+				value = "(?i)" + value
+			}
+			b.Arg(strings.ToLower(value))
+			break
+		case dialect.Gremlin:
+			break
+		}
+	})
+	return p
 }
 
 // filterSearch 全文搜索
 // SQL:
 func filterSearch(s *sql.Selector, _, _ string) *sql.Predicate {
+	p := sql.P()
+	p.Append(func(b *sql.Builder) {
+		switch s.Builder.Dialect() {
+
+		}
+	})
+
 	return nil
 }
 

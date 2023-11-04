@@ -6,7 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/sql"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-kratos/kratos/v2/encoding"
 	_ "github.com/go-kratos/kratos/v2/encoding/json"
@@ -91,4 +95,84 @@ func TestSplitQuery(t *testing.T) {
 	assert.Equal(t, len(keys), 2)
 	assert.Equal(t, keys[0], "id")
 	assert.Equal(t, keys[1], "not")
+}
+
+func TestBuildQuerySelectorDefault(t *testing.T) {
+	t.Run("MySQL_Pagination", func(t *testing.T) {
+		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
+
+		err, whereSelectors, querySelectors := BuildQuerySelector("", "", 1, 10, false, []string{}, "created_at")
+		require.Nil(t, err)
+		require.Nil(t, whereSelectors)
+		require.NotNil(t, querySelectors)
+
+		for _, fnc := range whereSelectors {
+			fnc(s)
+		}
+		for _, fnc := range querySelectors {
+			fnc(s)
+		}
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM `users` ORDER BY `users`.`created_at` DESC LIMIT 10 OFFSET 0", query)
+		require.Empty(t, args)
+	})
+	t.Run("PostgreSQL_Pagination", func(t *testing.T) {
+		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
+
+		err, whereSelectors, querySelectors := BuildQuerySelector("", "", 1, 10, false, []string{}, "created_at")
+		require.Nil(t, err)
+		require.Nil(t, whereSelectors)
+		require.NotNil(t, querySelectors)
+
+		for _, fnc := range whereSelectors {
+			fnc(s)
+		}
+		for _, fnc := range querySelectors {
+			fnc(s)
+		}
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM \"users\" ORDER BY \"users\".\"created_at\" DESC LIMIT 10 OFFSET 0", query)
+		require.Empty(t, args)
+	})
+
+	t.Run("MySQL_NoPagination", func(t *testing.T) {
+		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
+
+		err, whereSelectors, querySelectors := BuildQuerySelector("", "", 1, 10, true, []string{}, "created_at")
+		require.Nil(t, err)
+		require.Nil(t, whereSelectors)
+		require.NotNil(t, querySelectors)
+
+		for _, fnc := range whereSelectors {
+			fnc(s)
+		}
+		for _, fnc := range querySelectors {
+			fnc(s)
+		}
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM `users` ORDER BY `users`.`created_at` DESC", query)
+		require.Empty(t, args)
+	})
+	t.Run("PostgreSQL_NoPagination", func(t *testing.T) {
+		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
+
+		err, whereSelectors, querySelectors := BuildQuerySelector("", "", 1, 10, true, []string{}, "created_at")
+		require.Nil(t, err)
+		require.Nil(t, whereSelectors)
+		require.NotNil(t, querySelectors)
+
+		for _, fnc := range whereSelectors {
+			fnc(s)
+		}
+		for _, fnc := range querySelectors {
+			fnc(s)
+		}
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM \"users\" ORDER BY \"users\".\"created_at\" DESC", query)
+		require.Empty(t, args)
+	})
 }
