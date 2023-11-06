@@ -8,6 +8,10 @@ import (
 func BuildFieldSelect(s *sql.Selector, fields []string) {
 	if len(fields) > 0 {
 		for i, field := range fields {
+			switch {
+			case field == "id_" || field == "_id":
+				field = "id"
+			}
 			fields[i] = stringcase.ToSnakeCase(field)
 		}
 		s.Select(fields...)
