@@ -1,7 +1,7 @@
 // This package includes utility functions for handling and manipulating a slice.
 // It draws inspiration from JavaScript and Python and uses Go generics as a basis.
 
-package sliceutils
+package sliceutil
 
 import (
 	"golang.org/x/exp/constraints"

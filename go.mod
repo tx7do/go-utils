@@ -3,6 +3,7 @@ module github.com/tx7do/go-utils
 go 1.20
 
 require (
+	github.com/gobwas/glob v0.2.3
 	github.com/google/uuid v1.4.0
 	github.com/gosimple/slug v1.13.1
 	github.com/sony/sonyflake v1.2.0

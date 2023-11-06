@@ -1,21 +1,21 @@
-package dateutils_test
+package dateutil_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/tx7do/go-utils/dateutils"
+	"github.com/tx7do/go-utils/dateutil"
 )
 
 func TestFloor(t *testing.T) {
 	now := time.Now()
-	assert.Equal(t, "00:00:00", dateutils.Floor(now).Format("15:04:05"))
+	assert.Equal(t, "00:00:00", dateutil.Floor(now).Format("15:04:05"))
 }
 
 func TestCeil(t *testing.T) {
 	now := time.Now()
-	assert.Equal(t, "23:59:59", dateutils.Ceil(now).Format("15:04:05"))
+	assert.Equal(t, "23:59:59", dateutil.Ceil(now).Format("15:04:05"))
 }
 
 func TestBeforeOrEqual(t *testing.T) {
@@ -25,9 +25,9 @@ func TestBeforeOrEqual(t *testing.T) {
 	dEqual, _ := time.Parse("2006-01-02", "2023-01-01")
 	dAfter, _ := time.Parse("2006-01-02", "2023-01-31")
 
-	assert.Equal(t, true, dateutils.BeforeOrEqual(milestone, dBefore))
-	assert.Equal(t, true, dateutils.BeforeOrEqual(milestone, dEqual))
-	assert.Equal(t, false, dateutils.BeforeOrEqual(milestone, dAfter))
+	assert.Equal(t, true, dateutil.BeforeOrEqual(milestone, dBefore))
+	assert.Equal(t, true, dateutil.BeforeOrEqual(milestone, dEqual))
+	assert.Equal(t, false, dateutil.BeforeOrEqual(milestone, dAfter))
 }
 
 func TestAfterOrEqual(t *testing.T) {
@@ -37,9 +37,9 @@ func TestAfterOrEqual(t *testing.T) {
 	dEqual, _ := time.Parse("2006-01-02", "2023-01-01")
 	dAfter, _ := time.Parse("2006-01-02", "2023-01-31")
 
-	assert.Equal(t, false, dateutils.AfterOrEqual(milestone, dBefore))
-	assert.Equal(t, true, dateutils.AfterOrEqual(milestone, dEqual))
-	assert.Equal(t, true, dateutils.AfterOrEqual(milestone, dAfter))
+	assert.Equal(t, false, dateutil.AfterOrEqual(milestone, dBefore))
+	assert.Equal(t, true, dateutil.AfterOrEqual(milestone, dEqual))
+	assert.Equal(t, true, dateutil.AfterOrEqual(milestone, dAfter))
 }
 
 func TestOverlap(t *testing.T) {
@@ -52,8 +52,8 @@ func TestOverlap(t *testing.T) {
 	s3, _ := time.Parse("2006-01-02", "2023-01-02")
 	e3, _ := time.Parse("2006-01-02", "2023-01-04")
 
-	assert.Equal(t, true, dateutils.Overlap(s1, e1, s2, e2))
-	assert.Equal(t, false, dateutils.Overlap(s1, e1, s3, e3))
+	assert.Equal(t, true, dateutil.Overlap(s1, e1, s2, e2))
+	assert.Equal(t, false, dateutil.Overlap(s1, e1, s3, e3))
 
 	s4, _ := time.Parse("2006-01-02", "2023-07-13")
 	e4, _ := time.Parse("2006-01-02", "2023-07-14")
@@ -61,6 +61,6 @@ func TestOverlap(t *testing.T) {
 	s5, _ := time.Parse("2006-01-02", "2023-07-10")
 	e5, _ := time.Parse("2006-01-02", "2023-07-17")
 
-	assert.Equal(t, true, dateutils.Overlap(s4, e4, s5, e5))
-	assert.Equal(t, true, dateutils.Overlap(s5, e5, s4, e4))
+	assert.Equal(t, true, dateutil.Overlap(s4, e4, s5, e5))
+	assert.Equal(t, true, dateutil.Overlap(s5, e5, s4, e4))
 }
