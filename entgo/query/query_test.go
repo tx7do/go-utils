@@ -101,7 +101,11 @@ func TestBuildQuerySelectorDefault(t *testing.T) {
 	t.Run("MySQL_Pagination", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		err, whereSelectors, querySelectors := BuildQuerySelector("", "", 1, 10, false, []string{}, "created_at")
+		err, whereSelectors, querySelectors := BuildQuerySelector("", "",
+			1, 10, false,
+			[]string{}, "created_at",
+			[]string{},
+		)
 		require.Nil(t, err)
 		require.Nil(t, whereSelectors)
 		require.NotNil(t, querySelectors)
@@ -120,7 +124,11 @@ func TestBuildQuerySelectorDefault(t *testing.T) {
 	t.Run("PostgreSQL_Pagination", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		err, whereSelectors, querySelectors := BuildQuerySelector("", "", 1, 10, false, []string{}, "created_at")
+		err, whereSelectors, querySelectors := BuildQuerySelector("", "",
+			1, 10, false,
+			[]string{}, "created_at",
+			[]string{},
+		)
 		require.Nil(t, err)
 		require.Nil(t, whereSelectors)
 		require.NotNil(t, querySelectors)
@@ -140,7 +148,11 @@ func TestBuildQuerySelectorDefault(t *testing.T) {
 	t.Run("MySQL_NoPagination", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		err, whereSelectors, querySelectors := BuildQuerySelector("", "", 1, 10, true, []string{}, "created_at")
+		err, whereSelectors, querySelectors := BuildQuerySelector("", "",
+			1, 10, true,
+			[]string{}, "created_at",
+			[]string{},
+		)
 		require.Nil(t, err)
 		require.Nil(t, whereSelectors)
 		require.NotNil(t, querySelectors)
@@ -159,7 +171,11 @@ func TestBuildQuerySelectorDefault(t *testing.T) {
 	t.Run("PostgreSQL_NoPagination", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		err, whereSelectors, querySelectors := BuildQuerySelector("", "", 1, 10, true, []string{}, "created_at")
+		err, whereSelectors, querySelectors := BuildQuerySelector("", "",
+			1, 10, true,
+			[]string{}, "created_at",
+			[]string{},
+		)
 		require.Nil(t, err)
 		require.Nil(t, whereSelectors)
 		require.NotNil(t, querySelectors)
