@@ -34,6 +34,14 @@ func QueryCommandToOrderConditions(orderBys []string) (error, func(s *sql.Select
 	}
 }
 
+func BuildOrderSelect(s *sql.Selector, field string, desc bool) {
+	if desc {
+		s.OrderBy(sql.Desc(s.C(field)))
+	} else {
+		s.OrderBy(sql.Asc(s.C(field)))
+	}
+}
+
 func BuildOrderSelector(orderBys []string, defaultOrderField string) (error, func(s *sql.Selector)) {
 	if len(orderBys) == 0 {
 		return nil, func(s *sql.Selector) {
@@ -41,13 +49,5 @@ func BuildOrderSelector(orderBys []string, defaultOrderField string) (error, fun
 		}
 	} else {
 		return QueryCommandToOrderConditions(orderBys)
-	}
-}
-
-func BuildOrderSelect(s *sql.Selector, field string, desc bool) {
-	if desc {
-		s.OrderBy(sql.Desc(s.C(field)))
-	} else {
-		s.OrderBy(sql.Asc(s.C(field)))
 	}
 }
