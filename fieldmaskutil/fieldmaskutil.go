@@ -80,35 +80,37 @@ func (mask NestedMask) Filter(msg proto.Message) {
 	rft := msg.ProtoReflect()
 	rft.Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
 		m, ok := mask[string(fd.Name())]
-		if ok {
-			if len(m) == 0 {
-				return true
-			}
-
-			if fd.IsMap() {
-				xmap := rft.Get(fd).Map()
-				xmap.Range(func(mk protoreflect.MapKey, mv protoreflect.Value) bool {
-					if mi, ok := m[mk.String()]; ok {
-						if i, ok := mv.Interface().(protoreflect.Message); ok && len(mi) > 0 {
-							mi.Filter(i.Interface())
-						}
-					} else {
-						xmap.Clear(mk)
-					}
-
-					return true
-				})
-			} else if fd.IsList() {
-				list := rft.Get(fd).List()
-				for i := 0; i < list.Len(); i++ {
-					m.Filter(list.Get(i).Message().Interface())
-				}
-			} else if fd.Kind() == protoreflect.MessageKind {
-				m.Filter(rft.Get(fd).Message().Interface())
-			}
-		} else {
+		if !ok {
 			rft.Clear(fd)
+			return true
 		}
+
+		if len(m) == 0 {
+			return true
+		}
+
+		if fd.IsMap() {
+			xmap := rft.Get(fd).Map()
+			xmap.Range(func(mk protoreflect.MapKey, mv protoreflect.Value) bool {
+				if mi, ok := m[mk.String()]; ok {
+					if i, ok := mv.Interface().(protoreflect.Message); ok && len(mi) > 0 {
+						mi.Filter(i.Interface())
+					}
+				} else {
+					xmap.Clear(mk)
+				}
+
+				return true
+			})
+		} else if fd.IsList() {
+			list := rft.Get(fd).List()
+			for i := 0; i < list.Len(); i++ {
+				m.Filter(list.Get(i).Message().Interface())
+			}
+		} else if fd.Kind() == protoreflect.MessageKind {
+			m.Filter(rft.Get(fd).Message().Interface())
+		}
+
 		return true
 	})
 }
@@ -207,4 +209,26 @@ func isValid(fd protoreflect.FieldDescriptor, val protoreflect.Value) bool {
 		return val.Message().IsValid()
 	}
 	return true
+}
+
+func NilValuePaths(msg proto.Message, paths []string) []string {
+	if len(paths) == 0 {
+		return nil
+	}
+
+	var out []string
+
+	rft := msg.ProtoReflect()
+	for _, v := range paths {
+		fd := rft.Descriptor().Fields().ByName(protoreflect.Name(v))
+		if fd == nil {
+			continue
+		}
+
+		if !rft.Has(fd) {
+			out = append(out, v)
+		}
+	}
+
+	return out
 }
