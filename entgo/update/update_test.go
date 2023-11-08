@@ -1,10 +1,12 @@
-package update
+package entgo
 
 import (
+	"testing"
+
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestBuildSetNullUpdate(t *testing.T) {

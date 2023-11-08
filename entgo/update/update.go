@@ -1,4 +1,4 @@
-package update
+package entgo
 
 import (
 	"entgo.io/ent/dialect/sql"
