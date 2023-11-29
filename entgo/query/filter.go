@@ -2,6 +2,7 @@ package entgo
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"entgo.io/ent/dialect"
@@ -15,28 +16,62 @@ import (
 type FilterOp int
 
 const (
-	FilterNot                   = "not"         // 不等于
-	FilterIn                    = "in"          // 检查值是否在列表中
-	FilterNotIn                 = "not_in"      // 不在列表中
-	FilterGTE                   = "gte"         // 大于或等于传递的值
-	FilterGT                    = "gt"          // 大于传递值
-	FilterLTE                   = "lte"         // 小于或等于传递值
-	FilterLT                    = "lt"          // 小于传递值
-	FilterRange                 = "range"       // 是否介于和给定的两个值之间
-	FilterIsNull                = "isnull"      // 是否为空
-	FilterNotIsNull             = "not_isnull"  // 是否不为空
-	FilterContains              = "contains"    // 是否包含指定的子字符串
-	FilterInsensitiveContains   = "icontains"   // 不区分大小写，是否包含指定的子字符串
-	FilterStartsWith            = "startswith"  // 以值开头
-	FilterInsensitiveStartsWith = "istartswith" // 不区分大小写，以值开头
-	FilterEndsWith              = "endswith"    // 以值结尾
-	FilterInsensitiveEndsWith   = "iendswith"   // 不区分大小写，以值结尾
-	FilterExact                 = "exact"       // 精确匹配
-	FilterInsensitiveExact      = "iexact"      // 不区分大小写，精确匹配
-	FilterRegex                 = "regex"       // 正则表达式
-	FilterInsensitiveRegex      = "iregex"      // 不区分大小写，正则表达式
-	FilterSearch                = "search"      // 全文搜索
+	FilterNot                   DatePart = iota // 不等于
+	FilterIn                                    // 检查值是否在列表中
+	FilterNotIn                                 // 不在列表中
+	FilterGTE                                   // 大于或等于传递的值
+	FilterGT                                    // 大于传递值
+	FilterLTE                                   // 小于或等于传递值
+	FilterLT                                    // 小于传递值
+	FilterRange                                 // 是否介于和给定的两个值之间
+	FilterIsNull                                // 是否为空
+	FilterNotIsNull                             // 是否不为空
+	FilterContains                              // 是否包含指定的子字符串
+	FilterInsensitiveContains                   // 不区分大小写，是否包含指定的子字符串
+	FilterStartsWith                            // 以值开头
+	FilterInsensitiveStartsWith                 // 不区分大小写，以值开头
+	FilterEndsWith                              // 以值结尾
+	FilterInsensitiveEndsWith                   // 不区分大小写，以值结尾
+	FilterExact                                 // 精确匹配
+	FilterInsensitiveExact                      // 不区分大小写，精确匹配
+	FilterRegex                                 // 正则表达式
+	FilterInsensitiveRegex                      // 不区分大小写，正则表达式
+	FilterSearch                                // 全文搜索
 )
+
+var ops = [...]string{
+	FilterNot:                   "not",
+	FilterIn:                    "in",
+	FilterNotIn:                 "not_in",
+	FilterGTE:                   "gte",
+	FilterGT:                    "gt",
+	FilterLTE:                   "lte",
+	FilterLT:                    "lt",
+	FilterRange:                 "range",
+	FilterIsNull:                "isnull",
+	FilterNotIsNull:             "not_isnull",
+	FilterContains:              "contains",
+	FilterInsensitiveContains:   "icontains",
+	FilterStartsWith:            "startswith",
+	FilterInsensitiveStartsWith: "istartswith",
+	FilterEndsWith:              "endswith",
+	FilterInsensitiveEndsWith:   "iendswith",
+	FilterExact:                 "exact",
+	FilterInsensitiveExact:      "iexact",
+	FilterRegex:                 "regex",
+	FilterInsensitiveRegex:      "iregex",
+	FilterSearch:                "search",
+}
+
+func hasOperations(str string) bool {
+	str = strings.ToLower(str)
+	for _, item := range ops {
+		if str == item {
+			return true
+		}
+	}
+	return false
+}
 
 type DatePart int
 
@@ -75,6 +110,7 @@ var dateParts = [...]string{
 }
 
 func hasDatePart(str string) bool {
+	str = strings.ToLower(str)
 	for _, item := range dateParts {
 		if str == item {
 			return true
@@ -155,129 +191,192 @@ func BuildFilterSelector(andFilterJsonString, orFilterJsonString string) (error,
 }
 
 func oneFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicate {
-	var cond *sql.Predicate
+	if len(keys) == 0 {
+		return nil
+	}
+	if len(value) == 0 {
+		return nil
+	}
 
-	if len(keys) == 1 {
-		field := keys[0]
-		cond = filterEqual(s, field, value)
-	} else if len(keys) == 2 {
-		if len(keys[0]) == 0 {
+	field := keys[0]
+	if len(field) == 0 {
+		return nil
+	}
+
+	p := sql.P()
+
+	switch len(keys) {
+	case 1:
+		return filterEqual(s, p, field, value)
+
+	case 2:
+		op := keys[1]
+		if len(op) == 0 {
 			return nil
 		}
-		field := keys[0]
-		op := strings.ToLower(keys[1])
-		switch op {
-		case FilterNot:
-			cond = filterNot(s, field, value)
-		case FilterIn:
-			cond = filterIn(s, field, value)
-		case FilterNotIn:
-			cond = filterNotIn(s, field, value)
-		case FilterGTE:
-			cond = filterGTE(s, field, value)
-		case FilterGT:
-			cond = filterGT(s, field, value)
-		case FilterLTE:
-			cond = filterLTE(s, field, value)
-		case FilterLT:
-			cond = filterLT(s, field, value)
-		case FilterRange:
-			cond = filterRange(s, field, value)
-		case FilterIsNull:
-			cond = filterIsNull(s, field, value)
-		case FilterNotIsNull:
-			cond = filterIsNotNull(s, field, value)
-		case FilterContains:
-			cond = filterContains(s, field, value)
-		case FilterInsensitiveContains:
-			cond = filterInsensitiveContains(s, field, value)
-		case FilterStartsWith:
-			cond = filterStartsWith(s, field, value)
-		case FilterInsensitiveStartsWith:
-			cond = filterInsensitiveStartsWith(s, field, value)
-		case FilterEndsWith:
-			cond = filterEndsWith(s, field, value)
-		case FilterInsensitiveEndsWith:
-			cond = filterInsensitiveEndsWith(s, field, value)
-		case FilterExact:
-			cond = filterExact(s, field, value)
-		case FilterInsensitiveExact:
-			cond = filterInsensitiveExact(s, field, value)
-		case FilterRegex:
-			cond = filterRegex(s, field, value)
-		case FilterInsensitiveRegex:
-			cond = filterInsensitiveRegex(s, field, value)
-		case FilterSearch:
-			cond = filterSearch(s, field, value)
-		default:
-			cond = filterDatePart(s, op, field, value)
+
+		var cond *sql.Predicate
+		if hasOperations(op) {
+			return processOp(s, p, op, field, value)
+		} else if hasDatePart(op) {
+			cond = filterDatePart(s, p, op, field).EQ("", value)
+		} else {
+			cond = filterJsonb(s, p, op, field).EQ("", value)
 		}
+
+		return cond
+
+	case 3:
+		op1 := keys[1]
+		if len(op1) == 0 {
+			return nil
+		}
+
+		op2 := keys[2]
+		if len(op2) == 0 {
+			return nil
+		}
+
+		// 第二个参数，要么是提取日期，要么是json字段。
+
+		//var cond *sql.Predicate
+		if hasDatePart(op1) {
+			str := filterDatePartField(s, op1, field)
+			if hasOperations(op2) {
+				return processOp(s, p, op2, str, value)
+			}
+			return nil
+		} else {
+			str := filterJsonbField(s, op1, field)
+
+			if hasOperations(op2) {
+				return processOp(s, p, op2, str, value)
+			} else if hasDatePart(op2) {
+				return filterDatePart(s, p, op2, str)
+			}
+			return nil
+		}
+
+	default:
+		return nil
 	}
+}
+
+func processOp(s *sql.Selector, p *sql.Predicate, op, field, value string) *sql.Predicate {
+	var cond *sql.Predicate
+
+	switch op {
+	case ops[FilterNot]:
+		cond = filterNot(s, p, field, value)
+	case ops[FilterIn]:
+		cond = filterIn(s, p, field, value)
+	case ops[FilterNotIn]:
+		cond = filterNotIn(s, p, field, value)
+	case ops[FilterGTE]:
+		cond = filterGTE(s, p, field, value)
+	case ops[FilterGT]:
+		cond = filterGT(s, p, field, value)
+	case ops[FilterLTE]:
+		cond = filterLTE(s, p, field, value)
+	case ops[FilterLT]:
+		cond = filterLT(s, p, field, value)
+	case ops[FilterRange]:
+		cond = filterRange(s, p, field, value)
+	case ops[FilterIsNull]:
+		cond = filterIsNull(s, p, field, value)
+	case ops[FilterNotIsNull]:
+		cond = filterIsNotNull(s, p, field, value)
+	case ops[FilterContains]:
+		cond = filterContains(s, p, field, value)
+	case ops[FilterInsensitiveContains]:
+		cond = filterInsensitiveContains(s, p, field, value)
+	case ops[FilterStartsWith]:
+		cond = filterStartsWith(s, p, field, value)
+	case ops[FilterInsensitiveStartsWith]:
+		cond = filterInsensitiveStartsWith(s, p, field, value)
+	case ops[FilterEndsWith]:
+		cond = filterEndsWith(s, p, field, value)
+	case ops[FilterInsensitiveEndsWith]:
+		cond = filterInsensitiveEndsWith(s, p, field, value)
+	case ops[FilterExact]:
+		cond = filterExact(s, p, field, value)
+	case ops[FilterInsensitiveExact]:
+		cond = filterInsensitiveExact(s, p, field, value)
+	case ops[FilterRegex]:
+		cond = filterRegex(s, p, field, value)
+	case ops[FilterInsensitiveRegex]:
+		cond = filterInsensitiveRegex(s, p, field, value)
+	case ops[FilterSearch]:
+		cond = filterSearch(s, p, field, value)
+	default:
+		return nil
+	}
+
 	return cond
 }
 
 // filterEqual = 相等操作
 // SQL: WHERE "name" = "tom"
-func filterEqual(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.EQ(s.C(field), value)
+func filterEqual(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.EQ(s.C(field), value)
 }
 
 // filterNot NOT 不相等操作
 // SQL: WHERE NOT ("name" = "tom")
 // 或者： WHERE "name" <> "tom"
 // 用NOT可以过滤出NULL，而用<>、!=则不能。
-func filterNot(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.Not(sql.EQ(s.C(field), value))
+func filterNot(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.Not().EQ(s.C(field), value)
 }
 
 // filterIn IN操作
 // SQL: WHERE name IN ("tom", "jimmy")
-func filterIn(s *sql.Selector, field, value string) *sql.Predicate {
+func filterIn(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
 	var values []any
 	if err := json.Unmarshal([]byte(value), &values); err == nil {
-		return sql.In(s.C(field), values...)
+		return p.In(s.C(field), values...)
 	}
 	return nil
 }
 
 // filterNotIn NOT IN操作
 // SQL: WHERE name NOT IN ("tom", "jimmy")`
-func filterNotIn(s *sql.Selector, field, value string) *sql.Predicate {
+func filterNotIn(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
 	var values []any
 	if err := json.Unmarshal([]byte(value), &values); err == nil {
-		return sql.NotIn(s.C(field), values...)
+		return p.NotIn(s.C(field), values...)
 	}
 	return nil
 }
 
 // filterGTE GTE (Greater Than or Equal) 大于等于 >=操作
 // SQL: WHERE "create_time" >= "2023-10-25"
-func filterGTE(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.GTE(s.C(field), value)
+func filterGTE(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.GTE(s.C(field), value)
 }
 
 // filterGT GT (Greater than) 大于 >操作
 // SQL: WHERE "create_time" > "2023-10-25"
-func filterGT(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.GT(s.C(field), value)
+func filterGT(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.GT(s.C(field), value)
 }
 
 // filterLTE LTE (Less Than or Equal) 小于等于 <=操作
 // SQL: WHERE "create_time" <= "2023-10-25"
-func filterLTE(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.LTE(s.C(field), value)
+func filterLTE(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.LTE(s.C(field), value)
 }
 
 // filterLT LT (Less than) 小于 <操作
 // SQL: WHERE "create_time" < "2023-10-25"
-func filterLT(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.LT(s.C(field), value)
+func filterLT(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.LT(s.C(field), value)
 }
 
 // filterRange 在值域之中 BETWEEN操作
 // SQL: WHERE "create_time" BETWEEN "2023-10-25" AND "2024-10-25"
 // 或者： WHERE "create_time" >= "2023-10-25" AND "create_time" <= "2024-10-25"
-func filterRange(s *sql.Selector, field, value string) *sql.Predicate {
+func filterRange(s *sql.Selector, _ *sql.Predicate, field, value string) *sql.Predicate {
 	var values []any
 	if err := json.Unmarshal([]byte(value), &values); err == nil {
 		if len(values) != 2 {
@@ -295,62 +394,62 @@ func filterRange(s *sql.Selector, field, value string) *sql.Predicate {
 
 // filterIsNull 为空 IS NULL操作
 // SQL: WHERE name IS NULL
-func filterIsNull(s *sql.Selector, field, _ string) *sql.Predicate {
-	return sql.IsNull(s.C(field))
+func filterIsNull(s *sql.Selector, p *sql.Predicate, field, _ string) *sql.Predicate {
+	return p.IsNull(s.C(field))
 }
 
 // filterIsNotNull 不为空 IS NOT NULL操作
 // SQL: WHERE name IS NOT NULL
-func filterIsNotNull(s *sql.Selector, field, _ string) *sql.Predicate {
-	return sql.Not(sql.IsNull(s.C(field)))
+func filterIsNotNull(s *sql.Selector, p *sql.Predicate, field, _ string) *sql.Predicate {
+	return p.Not().IsNull(s.C(field))
 }
 
 // filterContains LIKE 前后模糊查询
 // SQL: WHERE name LIKE '%L%';
-func filterContains(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.Contains(s.C(field), value)
+func filterContains(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.Contains(s.C(field), value)
 }
 
 // filterInsensitiveContains ILIKE 前后模糊查询
 // SQL: WHERE name ILIKE '%L%';
-func filterInsensitiveContains(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.ContainsFold(s.C(field), value)
+func filterInsensitiveContains(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.ContainsFold(s.C(field), value)
 }
 
 // filterStartsWith LIKE 前缀+模糊查询
 // SQL: WHERE name LIKE 'La%';
-func filterStartsWith(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.HasPrefix(s.C(field), value)
+func filterStartsWith(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.HasPrefix(s.C(field), value)
 }
 
 // filterInsensitiveStartsWith ILIKE 前缀+模糊查询
 // SQL: WHERE name ILIKE 'La%';
-func filterInsensitiveStartsWith(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.EqualFold(s.C(field), value+"%")
+func filterInsensitiveStartsWith(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.EqualFold(s.C(field), value+"%")
 }
 
 // filterEndsWith LIKE 后缀+模糊查询
 // SQL: WHERE name LIKE '%a';
-func filterEndsWith(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.HasSuffix(s.C(field), value)
+func filterEndsWith(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.HasSuffix(s.C(field), value)
 }
 
 // filterInsensitiveEndsWith ILIKE 后缀+模糊查询
 // SQL: WHERE name ILIKE '%a';
-func filterInsensitiveEndsWith(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.EqualFold(s.C(field), "%"+value)
+func filterInsensitiveEndsWith(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.EqualFold(s.C(field), "%"+value)
 }
 
 // filterExact LIKE 操作 精确比对
 // SQL: WHERE name LIKE 'a';
-func filterExact(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.Like(s.C(field), value)
+func filterExact(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.Like(s.C(field), value)
 }
 
 // filterInsensitiveExact ILIKE 操作 不区分大小写，精确比对
 // SQL: WHERE name ILIKE 'a';
-func filterInsensitiveExact(s *sql.Selector, field, value string) *sql.Predicate {
-	return sql.EqualFold(s.C(field), value)
+func filterInsensitiveExact(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
+	return p.EqualFold(s.C(field), value)
 }
 
 // filterRegex 正则查找
@@ -358,22 +457,24 @@ func filterInsensitiveExact(s *sql.Selector, field, value string) *sql.Predicate
 // Oracle: WHERE REGEXP_LIKE(title, '^(An?|The) +', 'c');
 // PostgreSQL: WHERE title ~ '^(An?|The) +';
 // SQLite: WHERE title REGEXP '^(An?|The) +';
-func filterRegex(s *sql.Selector, field, value string) *sql.Predicate {
-	p := sql.P()
+func filterRegex(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
 	p.Append(func(b *sql.Builder) {
 		switch s.Builder.Dialect() {
 		case dialect.Postgres:
 			b.Ident(s.C(field)).WriteString(" ~ ")
 			b.Arg(value)
 			break
+
 		case dialect.MySQL:
 			b.Ident(s.C(field)).WriteString(" REGEXP BINARY ")
 			b.Arg(value)
 			break
+
 		case dialect.SQLite:
 			b.Ident(s.C(field)).WriteString(" REGEXP ")
 			b.Arg(value)
 			break
+
 		case dialect.Gremlin:
 			break
 		}
@@ -386,18 +487,19 @@ func filterRegex(s *sql.Selector, field, value string) *sql.Predicate {
 // Oracle: WHERE REGEXP_LIKE(title, '^(an?|the) +', 'i');
 // PostgreSQL: WHERE title ~* '^(an?|the) +';
 // SQLite: WHERE title REGEXP '(?i)^(an?|the) +';
-func filterInsensitiveRegex(s *sql.Selector, field, value string) *sql.Predicate {
-	p := sql.P()
+func filterInsensitiveRegex(s *sql.Selector, p *sql.Predicate, field, value string) *sql.Predicate {
 	p.Append(func(b *sql.Builder) {
 		switch s.Builder.Dialect() {
 		case dialect.Postgres:
 			b.Ident(s.C(field)).WriteString(" ~* ")
 			b.Arg(strings.ToLower(value))
 			break
+
 		case dialect.MySQL:
 			b.Ident(s.C(field)).WriteString(" REGEXP ")
 			b.Arg(strings.ToLower(value))
 			break
+
 		case dialect.SQLite:
 			b.Ident(s.C(field)).WriteString(" REGEXP ")
 			if !strings.HasPrefix(value, "(?i)") {
@@ -405,6 +507,7 @@ func filterInsensitiveRegex(s *sql.Selector, field, value string) *sql.Predicate
 			}
 			b.Arg(strings.ToLower(value))
 			break
+
 		case dialect.Gremlin:
 			break
 		}
@@ -414,19 +517,87 @@ func filterInsensitiveRegex(s *sql.Selector, field, value string) *sql.Predicate
 
 // filterSearch 全文搜索
 // SQL:
-func filterSearch(s *sql.Selector, _, _ string) *sql.Predicate {
-	p := sql.P()
+func filterSearch(s *sql.Selector, p *sql.Predicate, _, _ string) *sql.Predicate {
 	p.Append(func(b *sql.Builder) {
 		switch s.Builder.Dialect() {
 
 		}
 	})
-
-	return nil
+	return p
 }
 
-// filterDatePart 时间戳提取日期 select extract(quarter from timestamp '2018-08-15 12:10:10');
-// SQL:
-func filterDatePart(s *sql.Selector, datePart, field, value string) *sql.Predicate {
-	return nil
+// filterDatePart 时间戳提取日期
+// SQL: select extract(quarter from timestamp '2018-08-15 12:10:10');
+func filterDatePart(s *sql.Selector, p *sql.Predicate, datePart, field string) *sql.Predicate {
+	p.Append(func(b *sql.Builder) {
+		switch s.Builder.Dialect() {
+		case dialect.Postgres:
+			str := fmt.Sprintf("EXTRACT('%s' FROM %s)", strings.ToUpper(datePart), s.C(field))
+			b.WriteString(str)
+			//b.Arg(strings.ToLower(value))
+			break
+
+		case dialect.MySQL:
+			str := fmt.Sprintf("%s(%s)", strings.ToUpper(datePart), s.C(field))
+			b.WriteString(str)
+			//b.Arg(strings.ToLower(value))
+			break
+		}
+	})
+	return p
+}
+
+func filterDatePartField(s *sql.Selector, datePart, field string) string {
+	p := sql.P()
+	switch s.Builder.Dialect() {
+	case dialect.Postgres:
+		str := fmt.Sprintf("EXTRACT('%s' FROM %s)", strings.ToUpper(datePart), s.C(field))
+		p.WriteString(str)
+		break
+
+	case dialect.MySQL:
+		str := fmt.Sprintf("%s(%s)", strings.ToUpper(datePart), s.C(field))
+		p.WriteString(str)
+		break
+	}
+
+	return p.String()
+}
+
+// filterJsonb 提取JSONB字段
+// Postgresql: WHERE ("app_profile"."preferences" -> daily_email) = 'true'
+func filterJsonb(s *sql.Selector, p *sql.Predicate, jsonbField, field string) *sql.Predicate {
+	p.Append(func(b *sql.Builder) {
+		switch s.Builder.Dialect() {
+		case dialect.Postgres:
+			b.Ident(s.C(field)).WriteString(" -> ").WriteString(jsonbField)
+			//b.Arg(strings.ToLower(value))
+			break
+
+		case dialect.MySQL:
+			str := fmt.Sprintf("JSON_EXTRACT(%s, '$.%s')", s.C(field), jsonbField)
+			b.WriteString(str)
+			//b.Arg(strings.ToLower(value))
+			break
+		}
+	})
+	return p
+}
+
+func filterJsonbField(s *sql.Selector, jsonbField, field string) string {
+	p := sql.P()
+	switch s.Builder.Dialect() {
+	case dialect.Postgres:
+		p.Ident(s.C(field)).WriteString(" -> ").WriteString(jsonbField)
+		//b.Arg(strings.ToLower(value))
+		break
+
+	case dialect.MySQL:
+		str := fmt.Sprintf("JSON_EXTRACT(%s, '$.%s')", s.C(field), jsonbField)
+		p.WriteString(str)
+		//b.Arg(strings.ToLower(value))
+		break
+	}
+
+	return p.String()
 }

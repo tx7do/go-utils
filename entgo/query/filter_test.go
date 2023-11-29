@@ -1,6 +1,7 @@
 package entgo
 
 import (
+	"fmt"
 	"testing"
 
 	"entgo.io/ent/dialect"
@@ -13,7 +14,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterEqual", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterEqual(s, "name", "tom")
+		p := sql.P()
+
+		p = filterEqual(s, p, "name", "tom")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -24,7 +27,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterEqual", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterEqual(s, "name", "tom")
+		p := sql.P()
+
+		p = filterEqual(s, p, "name", "tom")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -38,22 +43,26 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterNot", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterNot(s, "name", "tom")
+		p := sql.P()
+
+		p = filterNot(s, p, "name", "tom")
 		s.Where(p)
 
 		query, args := s.Query()
-		require.Equal(t, "SELECT * FROM `users` WHERE NOT (`users`.`name` = ?)", query)
+		require.Equal(t, "SELECT * FROM `users` WHERE NOT `users`.`name` = ?", query)
 		require.NotEmpty(t, args)
 		require.Equal(t, args[0], "tom")
 	})
 	t.Run("PostgreSQL_FilterNot", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterNot(s, "name", "tom")
+		p := sql.P()
+
+		p = filterNot(s, p, "name", "tom")
 		s.Where(p)
 
 		query, args := s.Query()
-		require.Equal(t, "SELECT * FROM \"users\" WHERE NOT (\"users\".\"name\" = $1)", query)
+		require.Equal(t, "SELECT * FROM \"users\" WHERE NOT \"users\".\"name\" = $1", query)
 		require.NotEmpty(t, args)
 		require.Equal(t, args[0], "tom")
 	})
@@ -63,7 +72,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterIn", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterIn(s, "name", "[\"tom\", \"jimmy\", 123]")
+		p := sql.P()
+
+		p = filterIn(s, p, "name", "[\"tom\", \"jimmy\", 123]")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -76,7 +87,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterIn", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterIn(s, "name", "[\"tom\", \"jimmy\", 123]")
+		p := sql.P()
+
+		p = filterIn(s, p, "name", "[\"tom\", \"jimmy\", 123]")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -92,7 +105,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterNotIn", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterNotIn(s, "name", "[\"tom\", \"jimmy\", 123]")
+		p := sql.P()
+
+		p = filterNotIn(s, p, "name", "[\"tom\", \"jimmy\", 123]")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -105,7 +120,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterNotIn", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterNotIn(s, "name", "[\"tom\", \"jimmy\", 123]")
+		p := sql.P()
+
+		p = filterNotIn(s, p, "name", "[\"tom\", \"jimmy\", 123]")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -121,7 +138,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterGTE", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterGTE(s, "create_time", "2023-10-25")
+		p := sql.P()
+
+		p = filterGTE(s, p, "create_time", "2023-10-25")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -132,7 +151,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterGTE", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterGTE(s, "create_time", "2023-10-25")
+		p := sql.P()
+
+		p = filterGTE(s, p, "create_time", "2023-10-25")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -146,7 +167,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterGT", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterGT(s, "create_time", "2023-10-25")
+		p := sql.P()
+
+		p = filterGT(s, p, "create_time", "2023-10-25")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -157,7 +180,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterGT", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterGT(s, "create_time", "2023-10-25")
+		p := sql.P()
+
+		p = filterGT(s, p, "create_time", "2023-10-25")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -171,7 +196,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterLTE", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterLTE(s, "create_time", "2023-10-25")
+		p := sql.P()
+
+		p = filterLTE(s, p, "create_time", "2023-10-25")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -182,7 +209,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterLTE", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterLTE(s, "create_time", "2023-10-25")
+		p := sql.P()
+
+		p = filterLTE(s, p, "create_time", "2023-10-25")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -196,7 +225,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterLT", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterLT(s, "create_time", "2023-10-25")
+		p := sql.P()
+
+		p = filterLT(s, p, "create_time", "2023-10-25")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -207,7 +238,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterLT", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterLT(s, "create_time", "2023-10-25")
+		p := sql.P()
+
+		p = filterLT(s, p, "create_time", "2023-10-25")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -221,7 +254,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterRange", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterRange(s, "create_time", "[\"2023-10-25\", \"2024-10-25\"]")
+		p := sql.P()
+
+		p = filterRange(s, p, "create_time", "[\"2023-10-25\", \"2024-10-25\"]")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -233,7 +268,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterRange", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterRange(s, "create_time", "[\"2023-10-25\", \"2024-10-25\"]")
+		p := sql.P()
+
+		p = filterRange(s, p, "create_time", "[\"2023-10-25\", \"2024-10-25\"]")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -248,7 +285,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterIsNull", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterIsNull(s, "name", "true")
+		p := sql.P()
+
+		p = filterIsNull(s, p, "name", "true")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -258,7 +297,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterIsNull", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterIsNull(s, "name", "true")
+		p := sql.P()
+
+		p = filterIsNull(s, p, "name", "true")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -271,21 +312,25 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterIsNotNull", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterIsNotNull(s, "name", "true")
+		p := sql.P()
+
+		p = filterIsNotNull(s, p, "name", "true")
 		s.Where(p)
 
 		query, args := s.Query()
-		require.Equal(t, "SELECT * FROM `users` WHERE NOT (`users`.`name` IS NULL)", query)
+		require.Equal(t, "SELECT * FROM `users` WHERE NOT `users`.`name` IS NULL", query)
 		require.Empty(t, args)
 	})
 	t.Run("PostgreSQL_FilterIsNotNull", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterIsNotNull(s, "name", "true")
+		p := sql.P()
+
+		p = filterIsNotNull(s, p, "name", "true")
 		s.Where(p)
 
 		query, args := s.Query()
-		require.Equal(t, "SELECT * FROM \"users\" WHERE NOT (\"users\".\"name\" IS NULL)", query)
+		require.Equal(t, "SELECT * FROM \"users\" WHERE NOT \"users\".\"name\" IS NULL", query)
 		require.Empty(t, args)
 	})
 
@@ -294,7 +339,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterContains", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterContains(s, "name", "L")
+		p := sql.P()
+
+		p = filterContains(s, p, "name", "L")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -305,7 +352,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterContains", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterContains(s, "name", "L")
+		p := sql.P()
+
+		p = filterContains(s, p, "name", "L")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -319,7 +368,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterInsensitiveContains", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveContains(s, "name", "L")
+		p := sql.P()
+
+		p = filterInsensitiveContains(s, p, "name", "L")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -330,7 +381,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterInsensitiveContains", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveContains(s, "name", "L")
+		p := sql.P()
+
+		p = filterInsensitiveContains(s, p, "name", "L")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -344,7 +397,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterStartsWith", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterStartsWith(s, "name", "La")
+		p := sql.P()
+
+		p = filterStartsWith(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -355,7 +410,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterStartsWith", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterStartsWith(s, "name", "La")
+		p := sql.P()
+
+		p = filterStartsWith(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -369,7 +426,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterInsensitiveStartsWith", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveStartsWith(s, "name", "La")
+		p := sql.P()
+
+		p = filterInsensitiveStartsWith(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -380,7 +439,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterInsensitiveStartsWith", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveStartsWith(s, "name", "La")
+		p := sql.P()
+
+		p = filterInsensitiveStartsWith(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -394,7 +455,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterEndsWith", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterEndsWith(s, "name", "La")
+		p := sql.P()
+
+		p = filterEndsWith(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -405,7 +468,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterEndsWith", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterEndsWith(s, "name", "La")
+		p := sql.P()
+
+		p = filterEndsWith(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -419,7 +484,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterInsensitiveEndsWith", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveEndsWith(s, "name", "La")
+		p := sql.P()
+
+		p = filterInsensitiveEndsWith(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -430,7 +497,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterInsensitiveEndsWith", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveEndsWith(s, "name", "La")
+		p := sql.P()
+
+		p = filterInsensitiveEndsWith(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -444,7 +513,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterExact", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterExact(s, "name", "La")
+		p := sql.P()
+
+		p = filterExact(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -455,7 +526,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterExact", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterExact(s, "name", "La")
+		p := sql.P()
+
+		p = filterExact(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -469,7 +542,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterInsensitiveExact", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveExact(s, "name", "La")
+		p := sql.P()
+
+		p = filterInsensitiveExact(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -480,7 +555,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterInsensitiveExact", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveExact(s, "name", "La")
+		p := sql.P()
+
+		p = filterInsensitiveExact(s, p, "name", "La")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -494,7 +571,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterRegex", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterRegex(s, "name", "^(An?|The) +")
+		p := sql.P()
+
+		p = filterRegex(s, p, "name", "^(An?|The) +")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -505,7 +584,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterRegex", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterRegex(s, "name", "^(An?|The) +")
+		p := sql.P()
+
+		p = filterRegex(s, p, "name", "^(An?|The) +")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -519,7 +600,9 @@ func TestFilter(t *testing.T) {
 	t.Run("MySQL_FilterInsensitiveRegex", func(t *testing.T) {
 		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveRegex(s, "name", "^(An?|The) +")
+		p := sql.P()
+
+		p = filterInsensitiveRegex(s, p, "name", "^(An?|The) +")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -530,7 +613,9 @@ func TestFilter(t *testing.T) {
 	t.Run("PostgreSQL_FilterInsensitiveRegex", func(t *testing.T) {
 		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
 
-		p := filterInsensitiveRegex(s, "name", "^(An?|The) +")
+		p := sql.P()
+
+		p = filterInsensitiveRegex(s, p, "name", "^(An?|The) +")
 		s.Where(p)
 
 		query, args := s.Query()
@@ -538,4 +623,72 @@ func TestFilter(t *testing.T) {
 		require.NotEmpty(t, args)
 		require.Equal(t, args[0], "^(an?|the) +")
 	})
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	t.Run("MySQL_FilterDatePart", func(t *testing.T) {
+		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("publishes"))
+
+		p := sql.P()
+
+		p = filterDatePart(s, p, "date", "pub_date")
+		p.EQ("", "2023-01-01")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM `publishes` WHERE DATE(`publishes`.`pub_date`) = ?", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "2023-01-01")
+	})
+	t.Run("PostgreSQL_FilterDatePart", func(t *testing.T) {
+		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("publishes"))
+
+		p := sql.P()
+
+		p = filterDatePart(s, p, "date", "pub_date")
+		p.EQ("", "2023-01-01")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM \"publishes\" WHERE EXTRACT('DATE' FROM \"publishes\".\"pub_date\") = $1", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "2023-01-01")
+	})
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	t.Run("MySQL_FilterJsonb", func(t *testing.T) {
+		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("app_profile"))
+
+		p := sql.P()
+
+		p = filterJsonb(s, p, "daily_email", "preferences")
+		p.EQ("", "true")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM `app_profile` WHERE JSON_EXTRACT(`app_profile`.`preferences`, '$.daily_email') = ?", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "true")
+	})
+	t.Run("PostgreSQL_FilterJsonb", func(t *testing.T) {
+		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("app_profile"))
+
+		p := sql.P()
+
+		p = filterJsonb(s, p, "daily_email", "preferences")
+		p.EQ("", "true")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM \"app_profile\" WHERE \"app_profile\".\"preferences\" -> daily_email = $1", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "true")
+	})
+}
+
+func TestFilterJsonbField(t *testing.T) {
+	s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("app_profile"))
+	str := filterJsonbField(s, "daily_email", "preferences")
+	fmt.Println(str)
 }

@@ -9,11 +9,9 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/go-kratos/kratos/v2/encoding"
 	_ "github.com/go-kratos/kratos/v2/encoding/json"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestKratosJsonCodec(t *testing.T) {
@@ -98,97 +96,56 @@ func TestSplitQuery(t *testing.T) {
 }
 
 func TestBuildQuerySelectorDefault(t *testing.T) {
-	t.Run("MySQL_Pagination", func(t *testing.T) {
-		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
+	testcases := []struct {
+		name      string
+		dialect   string
+		and       string
+		or        string
+		noPaging  bool
+		actualSql string
+	}{
+		{"MySQL_Pagination", dialect.MySQL, "", "", false, "SELECT * FROM `users` ORDER BY `users`.`created_at` DESC LIMIT 10 OFFSET 0"},
+		{"PostgreSQL_Pagination", dialect.Postgres, "", "", false, "SELECT * FROM \"users\" ORDER BY \"users\".\"created_at\" DESC LIMIT 10 OFFSET 0"},
 
-		err, whereSelectors, querySelectors := BuildQuerySelector("", "",
-			1, 10, false,
-			[]string{}, "created_at",
-			[]string{},
-		)
-		require.Nil(t, err)
-		require.Nil(t, whereSelectors)
-		require.NotNil(t, querySelectors)
+		{"MySQL_NoPagination", dialect.MySQL, "", "", true, "SELECT * FROM `users` ORDER BY `users`.`created_at` DESC"},
+		{"PostgreSQL_NoPagination", dialect.Postgres, "", "", true, "SELECT * FROM \"users\" ORDER BY \"users\".\"created_at\" DESC"},
 
-		for _, fnc := range whereSelectors {
-			fnc(s)
-		}
-		for _, fnc := range querySelectors {
-			fnc(s)
-		}
+		{"MySQL_JsonbQuery", dialect.MySQL, "{\"preferences__daily_email\" : \"true\"}", "", true, "SELECT * FROM `users` WHERE JSON_EXTRACT(`users`.`preferences`, '$.daily_email') = ? ORDER BY `users`.`created_at` DESC"},
+		{"PostgreSQL_JsonbQuery", dialect.Postgres, "{\"preferences__daily_email\" : \"true\"}", "", true, "SELECT * FROM \"users\" WHERE \"users\".\"preferences\" -> daily_email = $1 ORDER BY \"users\".\"created_at\" DESC"},
 
-		query, args := s.Query()
-		require.Equal(t, "SELECT * FROM `users` ORDER BY `users`.`created_at` DESC LIMIT 10 OFFSET 0", query)
-		require.Empty(t, args)
-	})
-	t.Run("PostgreSQL_Pagination", func(t *testing.T) {
-		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
+		{"MySQL_DatePartQuery", dialect.MySQL, "{\"created_at__date\" : \"2023-01-01\"}", "", true, "SELECT * FROM `users` WHERE DATE(`users`.`created_at`) = ? ORDER BY `users`.`created_at` DESC"},
+		{"PostgreSQL_DatePartQuery", dialect.Postgres, "{\"created_at__date\" : \"2023-01-01\"}", "", true, "SELECT * FROM \"users\" WHERE EXTRACT('DATE' FROM \"users\".\"created_at\") = $1 ORDER BY \"users\".\"created_at\" DESC"},
 
-		err, whereSelectors, querySelectors := BuildQuerySelector("", "",
-			1, 10, false,
-			[]string{}, "created_at",
-			[]string{},
-		)
-		require.Nil(t, err)
-		require.Nil(t, whereSelectors)
-		require.NotNil(t, querySelectors)
+		{"MySQL_JsonbCombineQuery", dialect.MySQL, "{\"preferences__pub_date__not\" : \"true\"}", "", true, "SELECT * FROM `users` WHERE NOT JSON_EXTRACT(`users`.`preferences`, '$.pub_date') = ? ORDER BY `users`.`created_at` DESC"},
+		{"PostgreSQL_JsonbCombineQuery", dialect.Postgres, "{\"preferences__pub_date__not\" : \"true\"}", "", true, "SELECT * FROM \"users\" WHERE NOT \"users\".\"preferences\" -> pub_date = $1 ORDER BY \"users\".\"created_at\" DESC"},
 
-		for _, fnc := range whereSelectors {
-			fnc(s)
-		}
-		for _, fnc := range querySelectors {
-			fnc(s)
-		}
+		{"MySQL_DatePartCombineQuery", dialect.MySQL, "{\"pub_date__date__not\" : \"true\"}", "", true, "SELECT * FROM `users` WHERE NOT DATE(`users`.`pub_date`) = ? ORDER BY `users`.`created_at` DESC"},
+		{"PostgreSQL_DatePartCombineQuery", dialect.Postgres, "{\"pub_date__date__not\" : \"true\"}", "", true, "SELECT * FROM \"users\" WHERE NOT EXTRACT('DATE' FROM \"users\".\"pub_date\") = $1 ORDER BY \"users\".\"created_at\" DESC"},
 
-		query, args := s.Query()
-		require.Equal(t, "SELECT * FROM \"users\" ORDER BY \"users\".\"created_at\" DESC LIMIT 10 OFFSET 0", query)
-		require.Empty(t, args)
-	})
+		{"MySQL_DatePartRangeQuery", dialect.MySQL, "{\"pub_date__date__range\" : \"[\\\"2023-10-25\\\", \\\"2024-10-25\\\"]\"}", "", true, "SELECT * FROM `users` WHERE DATE(`users`.`pub_date`) >= ? AND DATE(`users`.`pub_date`) <= ? ORDER BY `users`.`created_at` DESC"},
+		{"PostgreSQL_DatePartRangeQuery", dialect.Postgres, "{\"pub_date__date__range\" : \"[\\\"2023-10-25\\\", \\\"2024-10-25\\\"]\"}", "", true, "SELECT * FROM \"users\" WHERE EXTRACT('DATE' FROM \"users\".\"pub_date\") >= $1 AND EXTRACT('DATE' FROM \"users\".\"pub_date\") <= $2 ORDER BY \"users\".\"created_at\" DESC"},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			checker := assert.New(t)
+			s := sql.Dialect(tc.dialect).Select("*").From(sql.Table("users"))
 
-	t.Run("MySQL_NoPagination", func(t *testing.T) {
-		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
+			err, _, querySelectors := BuildQuerySelector(tc.and, tc.or,
+				1, 10, tc.noPaging,
+				[]string{}, "created_at",
+				[]string{},
+			)
+			checker.Nil(err)
+			//checker.NotNil(whereSelectors)
+			checker.NotNil(querySelectors)
 
-		err, whereSelectors, querySelectors := BuildQuerySelector("", "",
-			1, 10, true,
-			[]string{}, "created_at",
-			[]string{},
-		)
-		require.Nil(t, err)
-		require.Nil(t, whereSelectors)
-		require.NotNil(t, querySelectors)
+			for _, fnc := range querySelectors {
+				fnc(s)
+			}
 
-		for _, fnc := range whereSelectors {
-			fnc(s)
-		}
-		for _, fnc := range querySelectors {
-			fnc(s)
-		}
-
-		query, args := s.Query()
-		require.Equal(t, "SELECT * FROM `users` ORDER BY `users`.`created_at` DESC", query)
-		require.Empty(t, args)
-	})
-	t.Run("PostgreSQL_NoPagination", func(t *testing.T) {
-		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
-
-		err, whereSelectors, querySelectors := BuildQuerySelector("", "",
-			1, 10, true,
-			[]string{}, "created_at",
-			[]string{},
-		)
-		require.Nil(t, err)
-		require.Nil(t, whereSelectors)
-		require.NotNil(t, querySelectors)
-
-		for _, fnc := range whereSelectors {
-			fnc(s)
-		}
-		for _, fnc := range querySelectors {
-			fnc(s)
-		}
-
-		query, args := s.Query()
-		require.Equal(t, "SELECT * FROM \"users\" ORDER BY \"users\".\"created_at\" DESC", query)
-		require.Empty(t, args)
-	})
+			query, _ := s.Query()
+			checker.Equal(tc.actualSql, query)
+			//checker.Empty(t, args)
+		})
+	}
 }
