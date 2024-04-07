@@ -4,13 +4,13 @@ go 1.20
 
 require (
 	github.com/gobwas/glob v0.2.3
-	github.com/google/uuid v1.4.0
-	github.com/gosimple/slug v1.13.1
+	github.com/google/uuid v1.6.0
+	github.com/gosimple/slug v1.14.0
 	github.com/sony/sonyflake v1.2.0
-	github.com/stretchr/testify v1.8.4
-	golang.org/x/crypto v0.14.0
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
-	google.golang.org/protobuf v1.31.0
+	github.com/stretchr/testify v1.9.0
+	golang.org/x/crypto v0.22.0
+	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0
+	google.golang.org/protobuf v1.33.0
 )
 
 require (
