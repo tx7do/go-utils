@@ -1,11 +1,13 @@
 package entgo
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 
-	"entgo.io/ent/dialect/sql"
+	entSql "entgo.io/ent/dialect/sql"
 )
 
 type entClientInterface interface {
@@ -14,10 +16,10 @@ type entClientInterface interface {
 
 type EntClient[T entClientInterface] struct {
 	db  T
-	drv *sql.Driver
+	drv *entSql.Driver
 }
 
-func NewEntClient[T entClientInterface](db T, drv *sql.Driver) *EntClient[T] {
+func NewEntClient[T entClientInterface](db T, drv *entSql.Driver) *EntClient[T] {
 	return &EntClient[T]{
 		db:  db,
 		drv: drv,
@@ -28,17 +30,29 @@ func (c *EntClient[T]) Client() T {
 	return c.db
 }
 
-func (c *EntClient[T]) Driver() *sql.Driver {
+func (c *EntClient[T]) Driver() *entSql.Driver {
 	return c.drv
 }
 
-func (c *EntClient[T]) Close() {
-	_ = c.db.Close()
+func (c *EntClient[T]) DB() *sql.DB {
+	return c.drv.DB()
+}
+
+func (c *EntClient[T]) Close() error {
+	return c.db.Close()
+}
+
+func (c *EntClient[T]) Query(ctx context.Context, query string, args, v any) error {
+	return c.Driver().Query(ctx, query, args, v)
+}
+
+func (c *EntClient[T]) Exec(ctx context.Context, query string, args, v any) error {
+	return c.Driver().Exec(ctx, query, args, v)
 }
 
 // CreateDriver 创建数据库驱动
-func CreateDriver(driverName, dsn string, maxIdleConnections, maxOpenConnections int, connMaxLifetime time.Duration) (*sql.Driver, error) {
-	drv, err := sql.Open(driverName, dsn)
+func CreateDriver(driverName, dsn string, maxIdleConnections, maxOpenConnections int, connMaxLifetime time.Duration) (*entSql.Driver, error) {
+	drv, err := entSql.Open(driverName, dsn)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("failed opening connection to db: %v", err))
 	}
