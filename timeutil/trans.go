@@ -3,6 +3,8 @@ package util
 import (
 	"time"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/tx7do/go-utils/trans"
 )
 
@@ -113,4 +115,20 @@ func TimeToDateString(tm *time.Time) *string {
 		return nil
 	}
 	return trans.String(tm.Format(DateLayout))
+}
+
+// TimestamppbToTime timestamppb.Timestamp -> time.Time
+func TimestamppbToTime(tm *timestamppb.Timestamp) *time.Time {
+	if tm != nil {
+		return trans.Ptr(tm.AsTime())
+	}
+	return nil
+}
+
+// TimeToTimestamppb time.Time -> timestamppb.Timestamp
+func TimeToTimestamppb(tm *time.Time) *timestamppb.Timestamp {
+	if tm != nil {
+		return timestamppb.New(*tm)
+	}
+	return nil
 }
