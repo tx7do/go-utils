@@ -5,6 +5,8 @@ import (
 
 	"gorm.io/gorm"
 
+	"gorm.io/plugin/opentelemetry/tracing"
+
 	"gorm.io/driver/clickhouse"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
@@ -18,14 +20,14 @@ type Client struct {
 	err error
 }
 
-func NewClient(driverName, dsn string, enableMigrate bool, gormCfg *gorm.Config) *Client {
+func NewClient(driverName, dsn string, enableMigrate, enableTrace, enableMetrics bool, gormCfg *gorm.Config) *Client {
 	c := &Client{}
 
 	if gormCfg == nil {
 		gormCfg = &gorm.Config{}
 	}
 
-	c.err = c.createGormClient(driverName, dsn, enableMigrate, gormCfg)
+	c.err = c.createGormClient(driverName, dsn, enableMigrate, enableTrace, enableMetrics, gormCfg)
 
 	return c
 }
@@ -35,7 +37,7 @@ func (c *Client) Error() error {
 }
 
 // createGormClient 创建GORM的客户端
-func (c *Client) createGormClient(driverName, dsn string, enableMigrate bool, gormCfg *gorm.Config) error {
+func (c *Client) createGormClient(driverName, dsn string, enableMigrate, enableTrace, enableMetrics bool, gormCfg *gorm.Config) error {
 	var driver gorm.Dialector
 	switch driverName {
 	default:
@@ -60,6 +62,17 @@ func (c *Client) createGormClient(driverName, dsn string, enableMigrate bool, go
 	client, err := gorm.Open(driver, gormCfg)
 	if err != nil {
 		return fmt.Errorf("failed opening connection to db: %v", err)
+	}
+
+	if enableTrace {
+		var opts []tracing.Option
+		if enableMetrics {
+			opts = append(opts, tracing.WithoutMetrics())
+		}
+
+		if err = client.Use(tracing.NewPlugin(opts...)); err != nil {
+			return fmt.Errorf("failed opening connection to db: %v", err)
+		}
 	}
 
 	// 运行数据库迁移工具
