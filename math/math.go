@@ -42,3 +42,30 @@ func StandardDeviation(num []float64) float64 {
 	var variance = Variance(mean, num)
 	return math.Sqrt(variance)
 }
+
+// SumInt 计算整数数组的和
+func SumInt[T int | int32 | int64](array []T) int64 {
+	var sum int64
+	for _, v := range array {
+		sum = sum + int64(v)
+	}
+	return sum
+}
+
+// SumUint 计算整数数组的和
+func SumUint[T uint | uint32 | uint64](array []T) uint64 {
+	var sum uint64
+	for _, v := range array {
+		sum = sum + uint64(v)
+	}
+	return sum
+}
+
+// SumFloat 计算浮点数数组的和
+func SumFloat[T float32 | float64](array []T) float64 {
+	var sum float64
+	for _, v := range array {
+		sum = sum + float64(v)
+	}
+	return sum
+}

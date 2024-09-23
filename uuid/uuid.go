@@ -2,6 +2,7 @@ package uuid
 
 import (
 	"github.com/google/uuid"
+
 	"github.com/tx7do/go-utils/trans"
 )
 
