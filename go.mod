@@ -1,6 +1,8 @@
 module github.com/tx7do/go-utils
 
-go 1.20
+go 1.22.0
+
+toolchain go1.23.2
 
 require (
 	github.com/gobwas/glob v0.2.3
@@ -8,9 +10,9 @@ require (
 	github.com/gosimple/slug v1.14.0
 	github.com/sony/sonyflake v1.2.0
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/crypto v0.22.0
-	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0
-	google.golang.org/protobuf v1.33.0
+	golang.org/x/crypto v0.28.0
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+	google.golang.org/protobuf v1.35.1
 )
 
 require (
