@@ -10,8 +10,8 @@ require (
 	github.com/gosimple/slug v1.14.0
 	github.com/sony/sonyflake v1.2.0
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/crypto v0.28.0
-	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+	golang.org/x/crypto v0.29.0
+	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
 	google.golang.org/protobuf v1.35.1
 )
 

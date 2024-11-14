@@ -15,16 +15,16 @@ import (
 	entSql "entgo.io/ent/dialect/sql"
 )
 
-type entClientInterface interface {
+type EntClientInterface interface {
 	Close() error
 }
 
-type EntClient[T entClientInterface] struct {
+type EntClient[T EntClientInterface] struct {
 	db  T
 	drv *entSql.Driver
 }
 
-func NewEntClient[T entClientInterface](db T, drv *entSql.Driver) *EntClient[T] {
+func NewEntClient[T EntClientInterface](db T, drv *entSql.Driver) *EntClient[T] {
 	return &EntClient[T]{
 		db:  db,
 		drv: drv,
