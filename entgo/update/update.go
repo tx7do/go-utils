@@ -34,7 +34,7 @@ func BuildSetNullUpdater(fields []string) func(u *sql.UpdateBuilder) {
 }
 
 // ExtractJsonFieldKeyValues 提取json字段的键值对
-func ExtractJsonFieldKeyValues(msg proto.Message, paths []string) []string {
+func ExtractJsonFieldKeyValues(msg proto.Message, paths []string, needToSnakeCase bool) []string {
 	var keyValues []string
 	rft := msg.ProtoReflect()
 	for _, path := range paths {
@@ -46,7 +46,14 @@ func ExtractJsonFieldKeyValues(msg proto.Message, paths []string) []string {
 			continue
 		}
 
-		keyValues = append(keyValues, fmt.Sprintf("'%s'", stringcase.ToSnakeCase(path)))
+		var k string
+		if needToSnakeCase {
+			k = stringcase.ToSnakeCase(path)
+		} else {
+			k = path
+		}
+
+		keyValues = append(keyValues, fmt.Sprintf("'%s'", k))
 
 		v := rft.Get(fd)
 		switch v.Interface().(type) {
@@ -77,8 +84,8 @@ func SetJsonNullFieldUpdateBuilder(fieldName string, msg proto.Message, paths []
 }
 
 // SetJsonFieldValueUpdateBuilder 设置json字段的值
-func SetJsonFieldValueUpdateBuilder(fieldName string, msg proto.Message, paths []string) func(u *sql.UpdateBuilder) {
-	keyValues := ExtractJsonFieldKeyValues(msg, paths)
+func SetJsonFieldValueUpdateBuilder(fieldName string, msg proto.Message, paths []string, needToSnakeCase bool) func(u *sql.UpdateBuilder) {
+	keyValues := ExtractJsonFieldKeyValues(msg, paths, needToSnakeCase)
 	if len(keyValues) == 0 {
 		return nil
 	}
