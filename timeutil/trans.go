@@ -3,6 +3,7 @@ package util
 import (
 	"time"
 
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/tx7do/go-utils/trans"
@@ -131,4 +132,20 @@ func TimeToTimestamppb(tm *time.Time) *timestamppb.Timestamp {
 		return timestamppb.New(*tm)
 	}
 	return nil
+}
+
+func FloatToDurationpb(duration *float64, timePrecision time.Duration) *durationpb.Duration {
+	if duration == nil {
+		return nil
+	}
+	return durationpb.New(time.Duration(*duration) * timePrecision)
+}
+
+func DurationpbToFloat(duration *durationpb.Duration, timePrecision time.Duration) *float64 {
+	if duration == nil {
+		return nil
+	}
+	seconds := duration.AsDuration().Seconds()
+	secondsWithPrecision := seconds / timePrecision.Seconds()
+	return &secondsWithPrecision
 }
