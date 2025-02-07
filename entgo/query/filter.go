@@ -588,7 +588,7 @@ func filterJsonbField(s *sql.Selector, jsonbField, field string) string {
 	p := sql.P()
 	switch s.Builder.Dialect() {
 	case dialect.Postgres:
-		p.Ident(s.C(field)).WriteString(" -> ").WriteString(jsonbField)
+		p.Ident(s.C(field)).WriteString(" ->> ").WriteString("'" + jsonbField + "'")
 		//b.Arg(strings.ToLower(value))
 		break
 
