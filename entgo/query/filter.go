@@ -565,12 +565,12 @@ func filterDatePartField(s *sql.Selector, datePart, field string) string {
 }
 
 // filterJsonb 提取JSONB字段
-// Postgresql: WHERE ("app_profile"."preferences" -> daily_email) = 'true'
+// Postgresql: WHERE ("app_profile"."preferences" ->> 'daily_email') = 'true'
 func filterJsonb(s *sql.Selector, p *sql.Predicate, jsonbField, field string) *sql.Predicate {
 	p.Append(func(b *sql.Builder) {
 		switch s.Builder.Dialect() {
 		case dialect.Postgres:
-			b.Ident(s.C(field)).WriteString(" -> ").WriteString(jsonbField)
+			b.Ident(s.C(field)).WriteString(" ->> ").WriteString("'" + jsonbField + "'")
 			//b.Arg(strings.ToLower(value))
 			break
 

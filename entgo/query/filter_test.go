@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -681,7 +682,7 @@ func TestFilter(t *testing.T) {
 		s.Where(p)
 
 		query, args := s.Query()
-		require.Equal(t, "SELECT * FROM \"app_profile\" WHERE \"app_profile\".\"preferences\" -> daily_email = $1", query)
+		require.Equal(t, "SELECT * FROM \"app_profile\" WHERE \"app_profile\".\"preferences\" ->> 'daily_email' = $1", query)
 		require.NotEmpty(t, args)
 		require.Equal(t, args[0], "true")
 	})
@@ -691,4 +692,5 @@ func TestFilterJsonbField(t *testing.T) {
 	s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("app_profile"))
 	str := filterJsonbField(s, "daily_email", "preferences")
 	fmt.Println(str)
+	assert.Equal(t, str, "\"app_profile\".\"preferences\" ->> 'daily_email'")
 }
