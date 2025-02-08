@@ -235,7 +235,7 @@ func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicat
 				field = stringcase.ToSnakeCase(field)
 				return filterEqual(s, p, field, value)
 			}
-			value = "'" + value + "'"
+			//value = "'" + value + "'"
 			return filterJsonb(
 				s, p,
 				stringcase.ToSnakeCase(jsonFields[1]),
@@ -259,7 +259,7 @@ func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicat
 					stringcase.ToSnakeCase(jsonFields[1]),
 					stringcase.ToSnakeCase(jsonFields[0]),
 				)
-				value = "'" + value + "'"
+				//value = "'" + value + "'"
 			}
 		} else {
 			field = stringcase.ToSnakeCase(field)
@@ -295,7 +295,7 @@ func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicat
 				jsonFields := splitJsonFieldKey(field)
 				if len(jsonFields) == 2 {
 					field = filterJsonbField(s, jsonFields[1], jsonFields[0])
-					value = "'" + value + "'"
+					//value = "'" + value + "'"
 				}
 			} else {
 				field = stringcase.ToSnakeCase(field)
