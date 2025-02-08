@@ -110,19 +110,22 @@ func TestBuildQuerySelectorDefault(t *testing.T) {
 		{"PostgreSQL_NoPagination", dialect.Postgres, "", "", true, "SELECT * FROM \"users\" ORDER BY \"users\".\"created_at\" DESC"},
 
 		{"MySQL_JsonbQuery", dialect.MySQL, "{\"preferences__daily_email\" : \"true\"}", "", true, "SELECT * FROM `users` WHERE JSON_EXTRACT(`users`.`preferences`, '$.daily_email') = ? ORDER BY `users`.`created_at` DESC"},
-		{"PostgreSQL_JsonbQuery", dialect.Postgres, "{\"preferences__daily_email\" : \"true\"}", "", true, "SELECT * FROM \"users\" WHERE \"users\".\"preferences\" -> daily_email = $1 ORDER BY \"users\".\"created_at\" DESC"},
+		{"PostgreSQL_JsonbQuery", dialect.Postgres, "{\"preferences__daily_email\" : \"true\"}", "", true, "SELECT * FROM \"users\" WHERE \"users\".\"preferences\" ->> 'daily_email' = $1 ORDER BY \"users\".\"created_at\" DESC"},
 
 		{"MySQL_DatePartQuery", dialect.MySQL, "{\"created_at__date\" : \"2023-01-01\"}", "", true, "SELECT * FROM `users` WHERE DATE(`users`.`created_at`) = ? ORDER BY `users`.`created_at` DESC"},
 		{"PostgreSQL_DatePartQuery", dialect.Postgres, "{\"created_at__date\" : \"2023-01-01\"}", "", true, "SELECT * FROM \"users\" WHERE EXTRACT('DATE' FROM \"users\".\"created_at\") = $1 ORDER BY \"users\".\"created_at\" DESC"},
 
 		{"MySQL_JsonbCombineQuery", dialect.MySQL, "{\"preferences__pub_date__not\" : \"true\"}", "", true, "SELECT * FROM `users` WHERE NOT JSON_EXTRACT(`users`.`preferences`, '$.pub_date') = ? ORDER BY `users`.`created_at` DESC"},
-		{"PostgreSQL_JsonbCombineQuery", dialect.Postgres, "{\"preferences__pub_date__not\" : \"true\"}", "", true, "SELECT * FROM \"users\" WHERE NOT \"users\".\"preferences\" -> pub_date = $1 ORDER BY \"users\".\"created_at\" DESC"},
+		{"PostgreSQL_JsonbCombineQuery", dialect.Postgres, "{\"preferences__pub_date__not\" : \"true\"}", "", true, "SELECT * FROM \"users\" WHERE NOT \"users\".\"preferences\" ->> 'pub_date' = $1 ORDER BY \"users\".\"created_at\" DESC"},
 
 		{"MySQL_DatePartCombineQuery", dialect.MySQL, "{\"pub_date__date__not\" : \"true\"}", "", true, "SELECT * FROM `users` WHERE NOT DATE(`users`.`pub_date`) = ? ORDER BY `users`.`created_at` DESC"},
 		{"PostgreSQL_DatePartCombineQuery", dialect.Postgres, "{\"pub_date__date__not\" : \"true\"}", "", true, "SELECT * FROM \"users\" WHERE NOT EXTRACT('DATE' FROM \"users\".\"pub_date\") = $1 ORDER BY \"users\".\"created_at\" DESC"},
 
 		{"MySQL_DatePartRangeQuery", dialect.MySQL, "{\"pub_date__date__range\" : \"[\\\"2023-10-25\\\", \\\"2024-10-25\\\"]\"}", "", true, "SELECT * FROM `users` WHERE DATE(`users`.`pub_date`) >= ? AND DATE(`users`.`pub_date`) <= ? ORDER BY `users`.`created_at` DESC"},
 		{"PostgreSQL_DatePartRangeQuery", dialect.Postgres, "{\"pub_date__date__range\" : \"[\\\"2023-10-25\\\", \\\"2024-10-25\\\"]\"}", "", true, "SELECT * FROM \"users\" WHERE EXTRACT('DATE' FROM \"users\".\"pub_date\") >= $1 AND EXTRACT('DATE' FROM \"users\".\"pub_date\") <= $2 ORDER BY \"users\".\"created_at\" DESC"},
+
+		{"MySQL_JsonQuery", dialect.MySQL, "{\"meta.title\" : \"preferences__daily_email\"}", "", true, "SELECT * FROM `users` WHERE JSON_EXTRACT(`users`.`meta`, '$.title') = ? ORDER BY `users`.`created_at` DESC"},
+		{"PostgreSQL_JsonQuery", dialect.Postgres, "{\"meta.title\" : \"preferences__daily_email\"}", "", true, "SELECT * FROM \"users\" WHERE \"users\".\"meta\" ->> 'title' = $1 ORDER BY \"users\".\"created_at\" DESC"},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {

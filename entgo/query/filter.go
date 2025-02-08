@@ -3,14 +3,13 @@ package entgo
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/tx7do/go-utils/stringcase"
 	"strings"
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 
 	"github.com/go-kratos/kratos/v2/encoding"
-
-	"github.com/tx7do/go-utils/stringcase"
 )
 
 type FilterOp int
@@ -202,9 +201,7 @@ func QueryCommandToWhereConditions(strJson string, isOr bool) (error, func(s *sq
 func processQueryMap(s *sql.Selector, queryMap map[string]string) []*sql.Predicate {
 	var ps []*sql.Predicate
 	for k, v := range queryMap {
-		key := stringcase.ToSnakeCase(k)
-
-		keys := splitQueryKey(key)
+		keys := splitQueryKey(k)
 
 		if cond := makeFieldFilter(s, keys, v); cond != nil {
 			ps = append(ps, cond)
@@ -235,11 +232,18 @@ func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicat
 		if isJsonFieldKey(field) {
 			jsonFields := splitJsonFieldKey(field)
 			if len(jsonFields) != 2 {
+				field = stringcase.ToSnakeCase(field)
 				return filterEqual(s, p, field, value)
 			}
 			value = "'" + value + "'"
-			return filterJsonb(s, p, jsonFields[1], jsonFields[0]).EQ("", value)
+			return filterJsonb(
+				s, p,
+				stringcase.ToSnakeCase(jsonFields[1]),
+				stringcase.ToSnakeCase(jsonFields[0]),
+			).
+				EQ("", value)
 		}
+		field = stringcase.ToSnakeCase(field)
 		return filterEqual(s, p, field, value)
 
 	case 2:
@@ -251,9 +255,14 @@ func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicat
 		if isJsonFieldKey(field) {
 			jsonFields := splitJsonFieldKey(field)
 			if len(jsonFields) == 2 {
-				field = filterJsonbField(s, jsonFields[1], jsonFields[0])
+				field = filterJsonbField(s,
+					stringcase.ToSnakeCase(jsonFields[1]),
+					stringcase.ToSnakeCase(jsonFields[0]),
+				)
 				value = "'" + value + "'"
 			}
+		} else {
+			field = stringcase.ToSnakeCase(field)
 		}
 
 		var cond *sql.Predicate
@@ -288,9 +297,12 @@ func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicat
 					field = filterJsonbField(s, jsonFields[1], jsonFields[0])
 					value = "'" + value + "'"
 				}
+			} else {
+				field = stringcase.ToSnakeCase(field)
 			}
 
 			str := filterDatePartField(s, op1, field)
+
 			if hasOperations(op2) {
 				return processOp(s, p, op2, str, value)
 			}
@@ -618,6 +630,8 @@ func filterDatePartField(s *sql.Selector, datePart, field string) string {
 // filterJsonb 提取JSONB字段
 // Postgresql: WHERE ("app_profile"."preferences" ->> 'daily_email') = 'true'
 func filterJsonb(s *sql.Selector, p *sql.Predicate, jsonbField, field string) *sql.Predicate {
+	field = stringcase.ToSnakeCase(field)
+
 	p.Append(func(b *sql.Builder) {
 		switch s.Builder.Dialect() {
 		case dialect.Postgres:
@@ -637,6 +651,8 @@ func filterJsonb(s *sql.Selector, p *sql.Predicate, jsonbField, field string) *s
 
 // filterJsonbField JSONB字段
 func filterJsonbField(s *sql.Selector, jsonbField, field string) string {
+	field = stringcase.ToSnakeCase(field)
+
 	p := sql.P()
 	switch s.Builder.Dialect() {
 	case dialect.Postgres:
