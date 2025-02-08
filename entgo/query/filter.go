@@ -237,7 +237,8 @@ func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicat
 			if len(jsonFields) != 2 {
 				return filterEqual(s, p, field, value)
 			}
-			return filterJsonb(s, p, jsonFields[0], jsonFields[1]).EQ("", value)
+			value = "'" + value + "'"
+			return filterJsonb(s, p, jsonFields[1], jsonFields[0]).EQ("", value)
 		}
 		return filterEqual(s, p, field, value)
 
@@ -250,7 +251,7 @@ func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicat
 		if isJsonFieldKey(field) {
 			jsonFields := splitJsonFieldKey(field)
 			if len(jsonFields) == 2 {
-				field = filterJsonbField(s, op, field)
+				field = filterJsonbField(s, jsonFields[1], jsonFields[0])
 				value = "'" + value + "'"
 			}
 		}
@@ -284,7 +285,7 @@ func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicat
 			if isJsonFieldKey(field) {
 				jsonFields := splitJsonFieldKey(field)
 				if len(jsonFields) == 2 {
-					field = filterJsonbField(s, op2, field)
+					field = filterJsonbField(s, jsonFields[1], jsonFields[0])
 					value = "'" + value + "'"
 				}
 			}

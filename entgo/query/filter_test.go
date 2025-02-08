@@ -7,7 +7,6 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -689,8 +688,97 @@ func TestFilter(t *testing.T) {
 }
 
 func TestFilterJsonbField(t *testing.T) {
-	s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("app_profile"))
-	str := filterJsonbField(s, "daily_email", "preferences")
-	fmt.Println(str)
-	assert.Equal(t, str, "\"app_profile\".\"preferences\" ->> 'daily_email'")
+	t.Run("filterJsonbField", func(t *testing.T) {
+		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("app_profile"))
+		str := filterJsonbField(s, "daily_email", "preferences")
+		fmt.Println(str)
+		require.Equal(t, str, "\"app_profile\".\"preferences\" ->> 'daily_email'")
+	})
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	t.Run("MySQL_FilterEqual", func(t *testing.T) {
+		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("menus"))
+
+		p := sql.P()
+
+		p = makeFieldFilter(s, []string{"meta.title"}, "tom")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM `menus` WHERE JSON_EXTRACT(`menus`.`meta`, '$.title') = ?", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "'tom'")
+	})
+	t.Run("PostgreSQL_FilterEqual", func(t *testing.T) {
+		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("menus"))
+
+		p := sql.P()
+
+		p = makeFieldFilter(s, []string{"meta.title"}, "tom")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM \"menus\" WHERE \"menus\".\"meta\" ->> 'title' = $1", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "'tom'")
+	})
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	t.Run("MySQL_FilterNot", func(t *testing.T) {
+		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
+
+		p := sql.P()
+
+		p = makeFieldFilter(s, []string{"meta.title", "not"}, "tom")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM `users` WHERE NOT JSON_EXTRACT(`users`.`meta`, '$.title') = ?", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "'tom'")
+	})
+	t.Run("PostgreSQL_FilterNot", func(t *testing.T) {
+		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
+
+		p := sql.P()
+
+		p = makeFieldFilter(s, []string{"meta.title", "not"}, "tom")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM \"users\" WHERE NOT \"users\".\"meta\" ->> 'title' = $1", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "'tom'")
+	})
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	t.Run("MySQL_FilterNot_Date", func(t *testing.T) {
+		s := sql.Dialect(dialect.MySQL).Select("*").From(sql.Table("users"))
+
+		p := sql.P()
+
+		p = makeFieldFilter(s, []string{"meta.title", "date", "not"}, "2023-01-01")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM `users` WHERE NOT DATE(JSON_EXTRACT(`users`.`meta`, '$.title')) = ?", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "'2023-01-01'")
+	})
+	t.Run("PostgreSQL_FilterNot_Date", func(t *testing.T) {
+		s := sql.Dialect(dialect.Postgres).Select("*").From(sql.Table("users"))
+
+		p := sql.P()
+
+		p = makeFieldFilter(s, []string{"meta.title", "date", "not"}, "2023-01-01")
+		s.Where(p)
+
+		query, args := s.Query()
+		require.Equal(t, "SELECT * FROM \"users\" WHERE NOT EXTRACT('DATE' FROM \"users\".\"meta\" ->> 'title') = $1", query)
+		require.NotEmpty(t, args)
+		require.Equal(t, args[0], "'2023-01-01'")
+	})
 }
