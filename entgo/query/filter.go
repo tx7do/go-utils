@@ -63,16 +63,6 @@ var ops = [...]string{
 	FilterSearch:                "search",
 }
 
-func hasOperations(str string) bool {
-	str = strings.ToLower(str)
-	for _, item := range ops {
-		if str == item {
-			return true
-		}
-	}
-	return false
-}
-
 type DatePart int
 
 const (
@@ -109,6 +99,38 @@ var dateParts = [...]string{
 	DatePartMicrosecond: "microsecond",
 }
 
+const (
+	QueryDelimiter     = "__" // 分隔符
+	JsonFieldDelimiter = "."  // JSONB字段分隔符
+)
+
+// splitQueryKey 分割查询键
+func splitQueryKey(key string) []string {
+	return strings.Split(key, QueryDelimiter)
+}
+
+// splitJsonFieldKey 分割JSON字段键
+func splitJsonFieldKey(key string) []string {
+	return strings.Split(key, JsonFieldDelimiter)
+}
+
+// isJsonFieldKey 是否为JSON字段键
+func isJsonFieldKey(key string) bool {
+	return strings.Contains(key, JsonFieldDelimiter)
+}
+
+// hasOperations 是否有操作
+func hasOperations(str string) bool {
+	str = strings.ToLower(str)
+	for _, item := range ops {
+		if str == item {
+			return true
+		}
+	}
+	return false
+}
+
+// hasDatePart 是否有日期部分
 func hasDatePart(str string) bool {
 	str = strings.ToLower(str)
 	for _, item := range dateParts {
@@ -117,6 +139,32 @@ func hasDatePart(str string) bool {
 		}
 	}
 	return false
+}
+
+// BuildFilterSelector 构建过滤选择器
+func BuildFilterSelector(andFilterJsonString, orFilterJsonString string) (error, []func(s *sql.Selector)) {
+	var err error
+	var queryConditions []func(s *sql.Selector)
+
+	var andSelector func(s *sql.Selector)
+	err, andSelector = QueryCommandToWhereConditions(andFilterJsonString, false)
+	if err != nil {
+		return err, nil
+	}
+	if andSelector != nil {
+		queryConditions = append(queryConditions, andSelector)
+	}
+
+	var orSelector func(s *sql.Selector)
+	err, orSelector = QueryCommandToWhereConditions(orFilterJsonString, true)
+	if err != nil {
+		return err, nil
+	}
+	if orSelector != nil {
+		queryConditions = append(queryConditions, orSelector)
+	}
+
+	return nil, queryConditions
 }
 
 // QueryCommandToWhereConditions 查询命令转换为选择条件
@@ -150,14 +198,15 @@ func QueryCommandToWhereConditions(strJson string, isOr bool) (error, func(s *sq
 	}
 }
 
+// processQueryMap 处理查询映射表
 func processQueryMap(s *sql.Selector, queryMap map[string]string) []*sql.Predicate {
 	var ps []*sql.Predicate
 	for k, v := range queryMap {
 		key := stringcase.ToSnakeCase(k)
 
-		keys := strings.Split(key, "__")
+		keys := splitQueryKey(key)
 
-		if cond := oneFieldFilter(s, keys, v); cond != nil {
+		if cond := makeFieldFilter(s, keys, v); cond != nil {
 			ps = append(ps, cond)
 		}
 	}
@@ -165,32 +214,8 @@ func processQueryMap(s *sql.Selector, queryMap map[string]string) []*sql.Predica
 	return ps
 }
 
-func BuildFilterSelector(andFilterJsonString, orFilterJsonString string) (error, []func(s *sql.Selector)) {
-	var err error
-	var queryConditions []func(s *sql.Selector)
-
-	var andSelector func(s *sql.Selector)
-	err, andSelector = QueryCommandToWhereConditions(andFilterJsonString, false)
-	if err != nil {
-		return err, nil
-	}
-	if andSelector != nil {
-		queryConditions = append(queryConditions, andSelector)
-	}
-
-	var orSelector func(s *sql.Selector)
-	err, orSelector = QueryCommandToWhereConditions(orFilterJsonString, true)
-	if err != nil {
-		return err, nil
-	}
-	if orSelector != nil {
-		queryConditions = append(queryConditions, orSelector)
-	}
-
-	return nil, queryConditions
-}
-
-func oneFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicate {
+// makeFieldFilter 构建一个字段过滤器
+func makeFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicate {
 	if len(keys) == 0 {
 		return nil
 	}
@@ -207,12 +232,27 @@ func oneFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicate
 
 	switch len(keys) {
 	case 1:
+		if isJsonFieldKey(field) {
+			jsonFields := splitJsonFieldKey(field)
+			if len(jsonFields) != 2 {
+				return filterEqual(s, p, field, value)
+			}
+			return filterJsonb(s, p, jsonFields[0], jsonFields[1]).EQ("", value)
+		}
 		return filterEqual(s, p, field, value)
 
 	case 2:
 		op := keys[1]
 		if len(op) == 0 {
 			return nil
+		}
+
+		if isJsonFieldKey(field) {
+			jsonFields := splitJsonFieldKey(field)
+			if len(jsonFields) == 2 {
+				field = filterJsonbField(s, op, field)
+				value = "'" + value + "'"
+			}
 		}
 
 		var cond *sql.Predicate
@@ -241,10 +281,19 @@ func oneFieldFilter(s *sql.Selector, keys []string, value string) *sql.Predicate
 
 		//var cond *sql.Predicate
 		if hasDatePart(op1) {
+			if isJsonFieldKey(field) {
+				jsonFields := splitJsonFieldKey(field)
+				if len(jsonFields) == 2 {
+					field = filterJsonbField(s, op2, field)
+					value = "'" + value + "'"
+				}
+			}
+
 			str := filterDatePartField(s, op1, field)
 			if hasOperations(op2) {
 				return processOp(s, p, op2, str, value)
 			}
+
 			return nil
 		} else {
 			str := filterJsonbField(s, op1, field)
@@ -547,6 +596,7 @@ func filterDatePart(s *sql.Selector, p *sql.Predicate, datePart, field string) *
 	return p
 }
 
+// filterDatePartField 日期
 func filterDatePartField(s *sql.Selector, datePart, field string) string {
 	p := sql.P()
 	switch s.Builder.Dialect() {
@@ -584,6 +634,7 @@ func filterJsonb(s *sql.Selector, p *sql.Predicate, jsonbField, field string) *s
 	return p
 }
 
+// filterJsonbField JSONB字段
 func filterJsonbField(s *sql.Selector, jsonbField, field string) string {
 	p := sql.P()
 	switch s.Builder.Dialect() {

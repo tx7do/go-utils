@@ -3,7 +3,6 @@ package entgo
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	"entgo.io/ent/dialect"
@@ -85,11 +84,11 @@ func TestJsonCodec(t *testing.T) {
 func TestSplitQuery(t *testing.T) {
 	var keys []string
 
-	keys = strings.Split("id", "__")
+	keys = splitQueryKey("id")
 	assert.Equal(t, len(keys), 1)
 	assert.Equal(t, keys[0], "id")
 
-	keys = strings.Split("id__not", "__")
+	keys = splitQueryKey("id__not")
 	assert.Equal(t, len(keys), 2)
 	assert.Equal(t, keys[0], "id")
 	assert.Equal(t, keys[1], "not")
