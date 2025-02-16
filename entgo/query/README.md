@@ -9,8 +9,8 @@
 | query     | `string`  | `json object` 或 `json object array` | AND过滤条件 | json字符串: `{"field1":"val1","field2":"val2"}` 或者`[{"field1":"val1"},{"field1":"val2"},{"field2":"val2"}]` | `map`和`array`都支持，当需要同字段名，不同值的情况下，请使用`array`。具体规则请见：[过滤规则](#过滤规则) |
 | or        | `string`  | `json object` 或 `json object array` | OR过滤条件  | 同 AND过滤条件                                                                                                |                                                                  |
 | orderBy   | `string`  | `json string array`                 | 排序条件    | json字符串：`["-create_time", "type"]`                                                                       | json的`string array`，字段名前加`-`是为降序，不加为升序。具体规则请见：[排序规则](#排序规则)      |
-| nopaging  | `boolean` |                                     | 是否不分页   |                                                                                                          | 此字段为`true`时，`page`、`pageSize`字段的传入将无效用。                          |
-| fieldMask | `string`  | `json string array`                 | 字段掩码    |                                                                                                          | 此字段是`SELECT`条件，为空的时候是为`*`。                                       |
+| noPaging  | `boolean` |                                     | 是否不分页   |                                                                                                          | 此字段为`true`时，`page`、`pageSize`字段的传入将无效用。                          |
+| fieldMask | `string`  | 其语法为使用逗号分隔字段名                       | 字段掩码    | 例如：id,realName,userName。                                                                                 | 此字段是`SELECT`条件，为空的时候是为`*`。                                       |
 
 ## 排序规则
 
@@ -36,6 +36,7 @@
 
 ```text
 {字段名}__{查找类型} : {值}
+{字段名}.{JSON字段名}__{查找类型} : {值}
 ```
 
 | 查找类型        | 示例                                                            | SQL                                                                                                                                                                                                                       | 备注                                                                                                            |
