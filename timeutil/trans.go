@@ -165,3 +165,18 @@ func DurationpbToNumber[T int | int8 | int16 | int32 | int64 | uint | uint8 | ui
 	secondsWithPrecision := T(seconds / timePrecision.Seconds())
 	return &secondsWithPrecision
 }
+
+func DurationToDurationpb(duration *time.Duration) *durationpb.Duration {
+	if duration == nil {
+		return nil
+	}
+	return durationpb.New(*duration)
+}
+
+func DurationpbToDuration(duration *durationpb.Duration) *time.Duration {
+	if duration == nil {
+		return nil
+	}
+	d := duration.AsDuration()
+	return &d
+}
