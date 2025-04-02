@@ -149,3 +149,19 @@ func DurationpbToFloat(duration *durationpb.Duration, timePrecision time.Duratio
 	secondsWithPrecision := seconds / timePrecision.Seconds()
 	return &secondsWithPrecision
 }
+
+func NumberToDurationpb[T int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | float32 | float64](duration *T, timePrecision time.Duration) *durationpb.Duration {
+	if duration == nil {
+		return nil
+	}
+	return durationpb.New(time.Duration(*duration) * timePrecision)
+}
+
+func DurationpbToNumber[T int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | float32 | float64](duration *durationpb.Duration, timePrecision time.Duration) *T {
+	if duration == nil {
+		return nil
+	}
+	seconds := duration.AsDuration().Seconds()
+	secondsWithPrecision := T(seconds / timePrecision.Seconds())
+	return &secondsWithPrecision
+}
