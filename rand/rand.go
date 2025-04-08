@@ -1,16 +1,16 @@
 package rand
 
 import (
-	"math/rand"
-	"time"
-
 	"github.com/tx7do/go-utils/math"
+	"math/rand"
 )
 
-var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
+var rnd = rand.New(rand.NewSource(Seed(UnixNanoSeed)))
 
 func init() {
-	rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
+	if rnd != nil {
+		rnd = rand.New(rand.NewSource(Seed(UnixNanoSeed)))
+	}
 }
 
 func Float32() float32 {
