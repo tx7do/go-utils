@@ -19,17 +19,17 @@ const (
 	RandomStringSeed SeedType = "RandomString"
 )
 
-type Randomizer struct {
+type Seeder struct {
 	seedType SeedType
 }
 
-func NewRandomizer(seedType SeedType) *Randomizer {
-	return &Randomizer{
+func NewSeeder(seedType SeedType) *Seeder {
+	return &Seeder{
 		seedType: seedType,
 	}
 }
 
-func (r *Randomizer) UnixNano() int64 {
+func (r *Seeder) UnixNano() int64 {
 	// 获取当前时间戳
 	timestamp := time.Now().UnixNano()
 
@@ -50,11 +50,11 @@ func (r *Randomizer) UnixNano() int64 {
 	return seed
 }
 
-func (r *Randomizer) MapHash() int64 {
+func (r *Seeder) MapHash() int64 {
 	return int64(new(maphash.Hash).Sum64())
 }
 
-func (r *Randomizer) CryptoRand() int64 {
+func (r *Seeder) CryptoRand() int64 {
 	var b [8]byte
 	_, err := cryptoRand.Read(b[:])
 	if err != nil {
@@ -66,7 +66,7 @@ func (r *Randomizer) CryptoRand() int64 {
 
 var Alpha = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-func (r *Randomizer) RandomString() int64 {
+func (r *Seeder) RandomString() int64 {
 	const size = 8
 	buf := make([]byte, size)
 	for i := 0; i < size; i++ {
@@ -77,7 +77,7 @@ func (r *Randomizer) RandomString() int64 {
 	return seed
 }
 
-func (r *Randomizer) Seed() int64 {
+func (r *Seeder) Seed() int64 {
 	switch r.seedType {
 	default:
 		fallthrough
@@ -94,6 +94,6 @@ func (r *Randomizer) Seed() int64 {
 
 // Seed generates a seed based on the specified SeedType.
 func Seed(seedType SeedType) int64 {
-	randomizer := NewRandomizer(seedType)
+	randomizer := NewSeeder(seedType)
 	return randomizer.Seed()
 }

@@ -5,45 +5,45 @@ import (
 	"testing"
 )
 
-func TestUnixNano(t *testing.T) {
-	randomizer := NewRandomizer(UnixNanoSeed)
+func TestUnixNanoSeed(t *testing.T) {
+	seeder := NewSeeder(UnixNanoSeed)
 
 	var seeds = make(map[int64]bool)
 	for i := 0; i < 100000; i++ {
-		seed := randomizer.Seed()
+		seed := seeder.Seed()
 		seeds[seed] = true
 	}
 	fmt.Println("UnixNano Seed", len(seeds))
 }
 
-func TestMapHash(t *testing.T) {
-	randomizer := NewRandomizer(MapHashSeed)
+func TestMapHashSeed(t *testing.T) {
+	seeder := NewSeeder(MapHashSeed)
 
 	var seeds = make(map[int64]bool)
 	for i := 0; i < 100000; i++ {
-		seed := randomizer.Seed()
+		seed := seeder.Seed()
 		seeds[seed] = true
 	}
 	fmt.Println("MapHash Seed", len(seeds))
 }
 
-func TestCryptoRand(t *testing.T) {
-	randomizer := NewRandomizer(CryptoRandSeed)
+func TestCryptoRandSeed(t *testing.T) {
+	seeder := NewSeeder(CryptoRandSeed)
 
 	var seeds = make(map[int64]bool)
 	for i := 0; i < 100000; i++ {
-		seed := randomizer.Seed()
+		seed := seeder.Seed()
 		seeds[seed] = true
 	}
 	fmt.Println("CryptoRand Seed", len(seeds))
 }
 
-func TestRandomString(t *testing.T) {
-	randomizer := NewRandomizer(RandomStringSeed)
+func TestRandomStringSeed(t *testing.T) {
+	seeder := NewSeeder(RandomStringSeed)
 
 	var seeds = make(map[int64]bool)
 	for i := 0; i < 100000; i++ {
-		seed := randomizer.Seed()
+		seed := seeder.Seed()
 		seeds[seed] = true
 	}
 	fmt.Println("RandomString Seed", len(seeds))
