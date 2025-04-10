@@ -2,9 +2,10 @@ package crypto
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHashPassword(t *testing.T) {
@@ -13,13 +14,15 @@ func TestHashPassword(t *testing.T) {
 	fmt.Println(hash)
 }
 
-func TestCheckPasswordHash(t *testing.T) {
+func TestVerifyPassword(t *testing.T) {
 	text := "123456"
+
+	// Prefix + Cost + Salt + Hashed Text
 	hash3 := "$2a$10$ygWrRwHCzg2GUpz0UK40kuWAGva121VkScpcdMNsDCih2U/bL2qYy"
-	bMatched := CheckPasswordHash(text, hash3)
+	bMatched := VerifyPassword(text, hash3)
 	assert.True(t, bMatched)
 
-	bMatched = CheckPasswordHash(text, hash3)
+	bMatched = VerifyPassword(text, hash3)
 	assert.True(t, bMatched)
 }
 
