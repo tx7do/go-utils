@@ -59,18 +59,17 @@ func RandomInt64(min, max int64) int64 {
 
 // RandomString 随机字符串，包含大小写字母和数字
 func RandomString(l int) string {
+	if l <= 0 {
+		return ""
+	}
+
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
 	bytes := make([]byte, l)
 	for i := 0; i < l; i++ {
-		x := Intn(3)
-		switch x {
-		case 0:
-			bytes[i] = byte(RandomInt(65, 90)) //大写字母
-		case 1:
-			bytes[i] = byte(RandomInt(97, 122))
-		case 2:
-			bytes[i] = byte(Intn(10))
-		}
+		bytes[i] = charset[Intn(len(charset))]
 	}
+
 	return string(bytes)
 }
 

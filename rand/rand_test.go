@@ -208,11 +208,13 @@ func TestRandomInt64_ZeroRange(t *testing.T) {
 func TestRandomString_LengthZero(t *testing.T) {
 	result := RandomString(0)
 	assert.Equal(t, "", result)
+	t.Logf("LengthZero: %s", result)
 }
 
 func TestRandomString_PositiveLength(t *testing.T) {
 	result := RandomString(10)
 	assert.Len(t, result, 10)
+	t.Logf("PositiveLength: %s", result)
 }
 
 func TestRandomString_ContainsOnlyValidCharacters(t *testing.T) {
@@ -220,6 +222,7 @@ func TestRandomString_ContainsOnlyValidCharacters(t *testing.T) {
 	for _, char := range result {
 		assert.True(t, (char >= 'A' && char <= 'Z') || (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9'))
 	}
+	t.Logf("ContainsOnlyValidCharacters: %s", result)
 }
 
 func TestRandomString_NegativeLength(t *testing.T) {
