@@ -40,7 +40,14 @@ func PKCS5UnPadding(origData []byte) []byte {
 }
 
 // AesEncrypt AES加密
-func AesEncrypt(origData, key []byte, iv []byte) ([]byte, error) {
+func AesEncrypt(plainText, key, iv []byte) ([]byte, error) {
+	if plainText == nil {
+		return nil, fmt.Errorf("plain text is nil")
+	}
+	if key == nil {
+		return nil, fmt.Errorf("key is nil")
+	}
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -54,15 +61,23 @@ func AesEncrypt(origData, key []byte, iv []byte) ([]byte, error) {
 		iv = key[:blockSize]
 	}
 
-	origData = PKCS5Padding(origData, blockSize)
+	plainText = PKCS5Padding(plainText, blockSize)
+
 	blockMode := cipher.NewCBCEncrypter(block, iv)
-	crypted := make([]byte, len(origData))
-	blockMode.CryptBlocks(crypted, origData)
-	return crypted, nil
+	cryptedText := make([]byte, len(plainText))
+	blockMode.CryptBlocks(cryptedText, plainText)
+	return cryptedText, nil
 }
 
 // AesDecrypt AES解密
-func AesDecrypt(crypted, key []byte, iv []byte) ([]byte, error) {
+func AesDecrypt(cryptedText, key, iv []byte) ([]byte, error) {
+	if cryptedText == nil {
+		return nil, fmt.Errorf("crypted text is nil")
+	}
+	if key == nil {
+		return nil, fmt.Errorf("key is nil")
+	}
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -77,8 +92,9 @@ func AesDecrypt(crypted, key []byte, iv []byte) ([]byte, error) {
 	}
 
 	blockMode := cipher.NewCBCDecrypter(block, iv)
-	origData := make([]byte, len(crypted))
-	blockMode.CryptBlocks(origData, crypted)
-	origData = PKCS5UnPadding(origData)
-	return origData, nil
+
+	plainText := make([]byte, len(cryptedText))
+	blockMode.CryptBlocks(plainText, cryptedText)
+	plainText = PKCS5UnPadding(plainText)
+	return plainText, nil
 }
