@@ -15,7 +15,7 @@ func TestDecryptAES(t *testing.T) {
 	aesKey = DefaultAESKey
 
 	plainText := []byte("cloud123456")
-	encryptText, err := AesEncrypt(plainText, aesKey)
+	encryptText, err := AesEncrypt(plainText, aesKey, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -30,7 +30,7 @@ func TestDecryptAES(t *testing.T) {
 		return
 	}
 
-	decryptText, err := AesDecrypt(bytesPass, aesKey)
+	decryptText, err := AesDecrypt(bytesPass, aesKey, nil)
 	if err != nil {
 		fmt.Println(err)
 		return

@@ -40,23 +40,29 @@ func PKCS5UnPadding(origData []byte) []byte {
 }
 
 // AesEncrypt AES加密
-func AesEncrypt(origData, key []byte) ([]byte, error) {
+func AesEncrypt(origData, key []byte, iv []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
 
-	//AES分组长度为128位，所以blockSize=16，单位字节
+	// AES分组长度为128位，所以blockSize=16，单位字节
 	blockSize := block.BlockSize()
+
+	if iv == nil {
+		// 初始向量的长度必须等于块block的长度16字节
+		iv = key[:blockSize]
+	}
+
 	origData = PKCS5Padding(origData, blockSize)
-	blockMode := cipher.NewCBCEncrypter(block, key[:blockSize]) //初始向量的长度必须等于块block的长度16字节
+	blockMode := cipher.NewCBCEncrypter(block, iv)
 	crypted := make([]byte, len(origData))
 	blockMode.CryptBlocks(crypted, origData)
 	return crypted, nil
 }
 
 // AesDecrypt AES解密
-func AesDecrypt(crypted, key []byte) ([]byte, error) {
+func AesDecrypt(crypted, key []byte, iv []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -64,7 +70,13 @@ func AesDecrypt(crypted, key []byte) ([]byte, error) {
 
 	//AES分组长度为128位，所以blockSize=16，单位字节
 	blockSize := block.BlockSize()
-	blockMode := cipher.NewCBCDecrypter(block, key[:blockSize]) //初始向量的长度必须等于块block的长度16字节
+
+	if iv == nil {
+		// 初始向量的长度必须等于块block的长度16字节
+		iv = key[:blockSize]
+	}
+
+	blockMode := cipher.NewCBCDecrypter(block, iv)
 	origData := make([]byte, len(crypted))
 	blockMode.CryptBlocks(origData, crypted)
 	origData = PKCS5UnPadding(origData)
