@@ -26,6 +26,15 @@ func TestVerifyPassword(t *testing.T) {
 	assert.True(t, bMatched)
 }
 
+func TestVerifyPasswordWithSalt_CorrectPassword(t *testing.T) {
+	password := "securePassword"
+	salt, _ := GenerateSalt(16)
+	hashedPassword, _ := HashPasswordWithSalt(password, salt)
+
+	result := VerifyPasswordWithSalt(password, salt, hashedPassword)
+	assert.True(t, result, "Password verification should succeed with correct password and salt")
+}
+
 func TestJwtToken(t *testing.T) {
 	const bearerWord string = "Bearer"
 	token := "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjowfQ.XgcKAAjHbA6o4sxxbEaMi05ingWvKdCNnyW9wowbJvs"

@@ -6,8 +6,7 @@ import (
 
 	"crypto/aes"
 	"crypto/cipher"
-
-	"math/rand/v2"
+	"crypto/rand"
 )
 
 // DefaultAESKey 默认AES密钥(16字节)
@@ -19,8 +18,7 @@ func GenerateAESKey(length int) ([]byte, error) {
 		return nil, fmt.Errorf("invalid key length: %d, must be 16, 24, or 32 bytes", length)
 	}
 	key := make([]byte, length)
-	src := rand.ChaCha8{}
-	_, err := src.Read(key)
+	_, err := rand.Read(key)
 	if err != nil {
 		return nil, err
 	}
