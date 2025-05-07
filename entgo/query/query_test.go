@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/encoding"
 	_ "github.com/go-kratos/kratos/v2/encoding/json"
+
 	"github.com/stretchr/testify/assert"
 )
 

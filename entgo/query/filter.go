@@ -1,15 +1,17 @@
 package entgo
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/tx7do/go-utils/stringcase"
 	"strings"
+
+	"encoding/json"
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 
 	"github.com/go-kratos/kratos/v2/encoding"
+
+	"github.com/tx7do/go-utils/stringcase"
 )
 
 type FilterOp int
