@@ -1,8 +1,14 @@
 package crypto
 
 import (
+	"fmt"
+
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+
+	"encoding/base64"
 	"encoding/hex"
 
 	"golang.org/x/crypto/bcrypt"
@@ -52,4 +58,45 @@ func GenerateSalt(length int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(salt), nil
+}
+
+// DecryptAES AES解密函数
+func DecryptAES(cipherText, key string) (string, error) {
+	// 将密文从Base64解码
+	cipherData, err := base64.StdEncoding.DecodeString(cipherText)
+	if err != nil {
+		return "", err
+	}
+
+	// 创建AES块
+	block, err := aes.NewCipher([]byte(key))
+	if err != nil {
+		return "", err
+	}
+
+	// 检查密文长度是否为块大小的倍数
+	if len(cipherData)%aes.BlockSize != 0 {
+		return "", fmt.Errorf("ciphertext is not a multiple of the block size")
+	}
+
+	// 创建CBC解密器
+	iv := cipherData[:aes.BlockSize] // 提取IV
+	cipherData = cipherData[aes.BlockSize:]
+	mode := cipher.NewCBCDecrypter(block, iv)
+
+	// 解密
+	plainText := make([]byte, len(cipherData))
+	mode.CryptBlocks(plainText, cipherData)
+
+	// 去除填充
+	plainText = pkcs7Unpad(plainText)
+
+	return string(plainText), nil
+}
+
+// pkcs7Unpad PKCS7填充去除
+func pkcs7Unpad(data []byte) []byte {
+	length := len(data)
+	padding := int(data[length-1])
+	return data[:length-padding]
 }

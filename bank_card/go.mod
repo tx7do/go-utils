@@ -3,7 +3,7 @@ module github.com/tx7do/go-utils/bank_card
 go 1.20
 
 require (
-	github.com/mattn/go-sqlite3 v1.14.25
+	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/stretchr/testify v1.10.0
 )
 
