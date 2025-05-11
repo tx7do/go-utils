@@ -9,10 +9,20 @@ import (
 	"github.com/tx7do/go-utils/trans"
 )
 
-var DefaultTimeLocation *time.Location
+var defaultTimeLocation *time.Location
 
-func RefreshDefaultTimeLocation(name string) {
-	DefaultTimeLocation, _ = time.LoadLocation(name)
+func RefreshDefaultTimeLocation(name string) *time.Location {
+	if defaultTimeLocation == nil {
+		defaultTimeLocation, _ = time.LoadLocation(name)
+	}
+	return defaultTimeLocation
+}
+
+func GetDefaultTimeLocation() *time.Location {
+	if defaultTimeLocation == nil {
+		RefreshDefaultTimeLocation(DefaultTimeLocationName)
+	}
+	return defaultTimeLocation
 }
 
 // UnixMilliToStringPtr 毫秒时间戳 -> 字符串
@@ -26,6 +36,10 @@ func UnixMilliToStringPtr(tm *int64) *string {
 
 // StringToUnixMilliInt64Ptr 字符串 -> 毫秒时间戳
 func StringToUnixMilliInt64Ptr(tm *string) *int64 {
+	if tm == nil {
+		return nil
+	}
+
 	theTime := StringTimeToTime(tm)
 	if theTime == nil {
 		return nil
@@ -43,24 +57,20 @@ func StringTimeToTime(str *string) *time.Time {
 		return nil
 	}
 
-	if DefaultTimeLocation == nil {
-		RefreshDefaultTimeLocation(DefaultTimeLocationName)
-	}
-
 	var err error
 	var theTime time.Time
 
-	theTime, err = time.ParseInLocation(TimeLayout, *str, DefaultTimeLocation)
+	theTime, err = time.ParseInLocation(TimeLayout, *str, GetDefaultTimeLocation())
 	if err == nil {
 		return &theTime
 	}
 
-	theTime, err = time.ParseInLocation(DateLayout, *str, DefaultTimeLocation)
+	theTime, err = time.ParseInLocation(DateLayout, *str, GetDefaultTimeLocation())
 	if err == nil {
 		return &theTime
 	}
 
-	theTime, err = time.ParseInLocation(ClockLayout, *str, DefaultTimeLocation)
+	theTime, err = time.ParseInLocation(ClockLayout, *str, GetDefaultTimeLocation())
 	if err == nil {
 		return &theTime
 	}
@@ -85,24 +95,20 @@ func StringDateToTime(str *string) *time.Time {
 		return nil
 	}
 
-	if DefaultTimeLocation == nil {
-		RefreshDefaultTimeLocation(DefaultTimeLocationName)
-	}
-
 	var err error
 	var theTime time.Time
 
-	theTime, err = time.ParseInLocation(TimeLayout, *str, DefaultTimeLocation)
+	theTime, err = time.ParseInLocation(TimeLayout, *str, GetDefaultTimeLocation())
 	if err == nil {
 		return &theTime
 	}
 
-	theTime, err = time.ParseInLocation(DateLayout, *str, DefaultTimeLocation)
+	theTime, err = time.ParseInLocation(DateLayout, *str, GetDefaultTimeLocation())
 	if err == nil {
 		return &theTime
 	}
 
-	theTime, err = time.ParseInLocation(ClockLayout, *str, DefaultTimeLocation)
+	theTime, err = time.ParseInLocation(ClockLayout, *str, GetDefaultTimeLocation())
 	if err == nil {
 		return &theTime
 	}
@@ -138,7 +144,16 @@ func FloatToDurationpb(duration *float64, timePrecision time.Duration) *duration
 	if duration == nil {
 		return nil
 	}
-	return durationpb.New(time.Duration(*duration) * timePrecision)
+	return durationpb.New(time.Duration(*duration * float64(timePrecision)))
+}
+
+func Float64ToDurationpb(d float64) *durationpb.Duration {
+	duration := time.Duration(d * float64(time.Second))
+	return durationpb.New(duration)
+}
+
+func SecondToDurationpb(seconds *float64) *durationpb.Duration {
+	return FloatToDurationpb(seconds, time.Second)
 }
 
 func DurationpbToFloat(duration *durationpb.Duration, timePrecision time.Duration) *float64 {
@@ -179,4 +194,13 @@ func DurationpbToDuration(duration *durationpb.Duration) *time.Duration {
 	}
 	d := duration.AsDuration()
 	return &d
+}
+
+func DurationpbSecond(duration *durationpb.Duration) *float64 {
+	if duration == nil {
+		return nil
+	}
+	seconds := duration.AsDuration().Seconds()
+	secondsInt64 := seconds
+	return &secondsInt64
 }
