@@ -305,3 +305,51 @@ func TestDurationpbSecond(t *testing.T) {
 	result = DurationpbSecond(nil)
 	assert.Nil(t, result, "空输入应返回nil")
 }
+
+func TestUnixMilliToTimePtr(t *testing.T) {
+	// 测试有效输入
+	now := time.Now().UnixMilli()
+	result := UnixMilliToTimePtr(&now)
+	assert.NotNil(t, result)
+	assert.Equal(t, time.UnixMilli(now), *result)
+
+	// 测试空输入
+	result = UnixMilliToTimePtr(nil)
+	assert.Nil(t, result)
+}
+
+func TestTimeToUnixMilliInt64Ptr(t *testing.T) {
+	// 测试有效输入
+	now := time.Now()
+	result := TimeToUnixMilliInt64Ptr(&now)
+	assert.NotNil(t, result)
+	assert.Equal(t, now.UnixMilli(), *result)
+
+	// 测试空输入
+	result = TimeToUnixMilliInt64Ptr(nil)
+	assert.Nil(t, result)
+}
+
+func TestUnixSecondToTimePtr(t *testing.T) {
+	// 测试有效输入
+	now := time.Now().Unix()
+	result := UnixSecondToTimePtr(&now)
+	assert.NotNil(t, result)
+	assert.Equal(t, time.Unix(now, 0), *result)
+
+	// 测试空输入
+	result = UnixSecondToTimePtr(nil)
+	assert.Nil(t, result)
+}
+
+func TestTimeToUnixSecondInt64Ptr(t *testing.T) {
+	// 测试有效输入
+	now := time.Now()
+	result := TimeToUnixSecondInt64Ptr(&now)
+	assert.NotNil(t, result)
+	assert.Equal(t, now.Unix(), *result)
+
+	// 测试空输入
+	result = TimeToUnixSecondInt64Ptr(nil)
+	assert.Nil(t, result)
+}

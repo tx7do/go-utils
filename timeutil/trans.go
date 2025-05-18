@@ -48,6 +48,46 @@ func StringToUnixMilliInt64Ptr(tm *string) *int64 {
 	return &unixTime
 }
 
+// UnixMilliToTimePtr 毫秒时间戳 -> 时间
+func UnixMilliToTimePtr(tm *int64) *time.Time {
+	if tm == nil {
+		return nil
+	}
+
+	unixMilli := time.UnixMilli(*tm)
+	return &unixMilli
+}
+
+// TimeToUnixMilliInt64Ptr 时间 -> 毫秒时间戳
+func TimeToUnixMilliInt64Ptr(tm *time.Time) *int64 {
+	if tm == nil {
+		return nil
+	}
+
+	unixTime := tm.UnixMilli()
+	return &unixTime
+}
+
+// UnixSecondToTimePtr 秒时间戳 -> 时间
+func UnixSecondToTimePtr(tm *int64) *time.Time {
+	if tm == nil {
+		return nil
+	}
+
+	unixMilli := time.Unix(*tm, 0)
+	return &unixMilli
+}
+
+// TimeToUnixSecondInt64Ptr 时间 -> 秒时间戳
+func TimeToUnixSecondInt64Ptr(tm *time.Time) *int64 {
+	if tm == nil {
+		return nil
+	}
+
+	unixTime := tm.Unix()
+	return &unixTime
+}
+
 // StringTimeToTime 时间字符串 -> 时间
 func StringTimeToTime(str *string) *time.Time {
 	if str == nil {
