@@ -10,10 +10,22 @@ cd %DIR%/bank_card
 go get all
 go mod tidy
 
+cd %DIR%/geoip
+go get all
+go mod tidy
+
+cd %DIR%/copierutil
+go get all
+go mod tidy
+
+cd %DIR%/translator
+go get all
+go mod tidy
+
 cd %DIR%/entgo
 go get all
 go mod tidy
 
-cd %DIR%/geoip
+cd %DIR%/gorm
 go get all
 go mod tidy
