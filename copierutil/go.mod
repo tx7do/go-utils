@@ -9,6 +9,6 @@ require (
 	github.com/tx7do/go-utils v1.1.22
 )
 
-require google.golang.org/protobuf v1.36.6 // indirect
+require google.golang.org/protobuf v1.36.6
 
 replace github.com/tx7do/go-utils => ../
