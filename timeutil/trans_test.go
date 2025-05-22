@@ -288,21 +288,21 @@ func TestSecondToDurationpb(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-func TestDurationpbSecond(t *testing.T) {
+func TestDurationpbToSecond(t *testing.T) {
 	// 测试非空输入
 	duration := durationpb.New(5 * time.Second)
-	result := DurationpbSecond(duration)
+	result := DurationpbToSecond(duration)
 	assert.NotNil(t, result)
 	assert.Equal(t, 5.0, *result, "应返回正确的秒数")
 
 	// 测试零输入
 	duration = durationpb.New(0)
-	result = DurationpbSecond(duration)
+	result = DurationpbToSecond(duration)
 	assert.NotNil(t, result)
 	assert.Equal(t, 0.0, *result, "应返回零秒")
 
 	// 测试空输入
-	result = DurationpbSecond(nil)
+	result = DurationpbToSecond(nil)
 	assert.Nil(t, result, "空输入应返回nil")
 }
 
@@ -351,5 +351,50 @@ func TestTimeToUnixSecondInt64Ptr(t *testing.T) {
 
 	// 测试空输入
 	result = TimeToUnixSecondInt64Ptr(nil)
+	assert.Nil(t, result)
+}
+
+func TestStringToDurationpb(t *testing.T) {
+	// 测试有效输入
+	validInput := "1h30m"
+	expected := durationpb.New(90 * time.Minute)
+	result := StringToDurationpb(&validInput)
+	assert.NotNil(t, result)
+	assert.Equal(t, expected, result)
+
+	// 测试无效输入
+	invalidInput := "invalid-duration"
+	result = StringToDurationpb(&invalidInput)
+	assert.NotNil(t, result) // 即使输入无效，time.ParseDuration 返回零值
+	assert.Equal(t, durationpb.New(0), result)
+
+	// 测试空字符串输入
+	emptyInput := ""
+	result = StringToDurationpb(&emptyInput)
+	assert.NotNil(t, result) // 空字符串解析为零值
+	assert.Equal(t, durationpb.New(0), result)
+
+	// 测试空指针输入
+	result = StringToDurationpb(nil)
+	assert.Nil(t, result)
+}
+
+func TestDurationpbToString(t *testing.T) {
+	// 测试有效输入
+	duration := durationpb.New(90 * time.Second) // 90秒
+	expected := "1m30s"
+	result := DurationpbToString(duration)
+	assert.NotNil(t, result)
+	assert.Equal(t, expected, *result)
+
+	// 测试零值输入
+	duration = durationpb.New(0)
+	expected = "0s"
+	result = DurationpbToString(duration)
+	assert.NotNil(t, result)
+	assert.Equal(t, expected, *result)
+
+	// 测试空输入
+	result = DurationpbToString(nil)
 	assert.Nil(t, result)
 }

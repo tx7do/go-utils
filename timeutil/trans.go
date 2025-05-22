@@ -236,11 +236,28 @@ func DurationpbToDuration(duration *durationpb.Duration) *time.Duration {
 	return &d
 }
 
-func DurationpbSecond(duration *durationpb.Duration) *float64 {
+func DurationpbToSecond(duration *durationpb.Duration) *float64 {
 	if duration == nil {
 		return nil
 	}
 	seconds := duration.AsDuration().Seconds()
 	secondsInt64 := seconds
 	return &secondsInt64
+}
+
+func StringToDurationpb(in *string) *durationpb.Duration {
+	if in == nil {
+		return nil
+	}
+
+	f, _ := time.ParseDuration(*in)
+	return durationpb.New(f)
+}
+
+func DurationpbToString(in *durationpb.Duration) *string {
+	if in == nil {
+		return nil
+	}
+
+	return trans.Ptr(in.AsDuration().String())
 }
