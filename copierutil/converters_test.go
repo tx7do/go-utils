@@ -4,35 +4,33 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/tx7do/go-utils/timeutil"
 	"github.com/tx7do/go-utils/trans"
 )
 
-func TestMakeTypeConverter(t *testing.T) {
+func TestNewTypeConverter(t *testing.T) {
 	srcType := &time.Time{}
 	dstType := trans.Ptr("")
 	fn := func(src interface{}) (interface{}, error) {
 		return timeutil.TimeToTimeString(src.(*time.Time)), nil
 	}
 
-	converter := MakeTypeConverter(srcType, dstType, fn)
+	converter := NewTypeConverter(srcType, dstType, fn)
 
 	// 验证转换器的类型
-	if converter.SrcType != srcType || converter.DstType != dstType {
-		t.Errorf("converter types mismatch")
-	}
+	assert.IsType(t, srcType, converter.SrcType)
+	assert.IsType(t, dstType, converter.DstType)
 
 	// 验证转换器的功能
 	result, err := converter.Fn(&time.Time{})
-	if err != nil {
-		t.Errorf("converter function failed: %v", err)
-	}
-	if _, ok := result.(*string); !ok {
-		t.Errorf("converter result type mismatch")
-	}
+	assert.NoError(t, err)
+	assert.IsType(t, dstType, result)
 }
 
-func TestMakeTypeConverterPair(t *testing.T) {
+func TestNewTypeConverterPair(t *testing.T) {
 	srcType := &time.Time{}
 	dstType := trans.Ptr("")
 	fromFn := func(src interface{}) (interface{}, error) {
@@ -42,75 +40,49 @@ func TestMakeTypeConverterPair(t *testing.T) {
 		return timeutil.StringTimeToTime(src.(*string)), nil
 	}
 
-	converters := MakeTypeConverterPair(srcType, dstType, fromFn, toFn)
-
-	if len(converters) != 2 {
-		t.Fatalf("expected 2 converters, got %d", len(converters))
-	}
+	converters := NewTypeConverterPair(srcType, dstType, fromFn, toFn)
+	assert.Len(t, converters, 2, "expected 2 converters")
 
 	// 验证第一个转换器
-	if converters[0].SrcType != srcType || converters[0].DstType != dstType {
-		t.Errorf("first converter types mismatch")
-	}
+	assert.IsType(t, srcType, converters[0].SrcType)
+	assert.IsType(t, dstType, converters[0].DstType)
 	result, err := converters[0].Fn(&time.Time{})
-	if err != nil {
-		t.Errorf("first converter function failed: %v", err)
-	}
-	if _, ok := result.(*string); !ok {
-		t.Errorf("first converter result type mismatch")
-	}
+	assert.NoError(t, err)
+	assert.IsType(t, dstType, result)
 
 	// 验证第二个转换器
-	if converters[1].SrcType != dstType || converters[1].DstType != srcType {
-		t.Errorf("second converter types mismatch")
-	}
+	assert.IsType(t, dstType, converters[1].SrcType)
+	assert.IsType(t, srcType, converters[1].DstType)
 	result, err = converters[1].Fn(trans.Ptr(""))
-	if err != nil {
-		t.Errorf("second converter function failed: %v", err)
-	}
-	if _, ok := result.(*time.Time); !ok {
-		t.Errorf("second converter result type mismatch")
-	}
+	assert.NoError(t, err)
+	assert.IsType(t, srcType, result)
 }
 
-func TestMakeGenericTypeConverterPair(t *testing.T) {
+func TestNewGenericTypeConverterPair(t *testing.T) {
 	srcType := &time.Time{}
 	dstType := trans.Ptr("")
 	fromFn := timeutil.TimeToTimeString
 	toFn := timeutil.StringTimeToTime
 
-	converters := MakeGenericTypeConverterPair(srcType, dstType, fromFn, toFn)
-
-	if len(converters) != 2 {
-		t.Fatalf("expected 2 converters, got %d", len(converters))
-	}
+	converters := NewGenericTypeConverterPair(srcType, dstType, fromFn, toFn)
+	assert.Len(t, converters, 2, "expected 2 converters")
 
 	// 验证第一个转换器
-	if converters[0].SrcType != srcType || converters[0].DstType != dstType {
-		t.Errorf("first converter types mismatch")
-	}
+	assert.IsType(t, srcType, converters[0].SrcType)
+	assert.IsType(t, dstType, converters[0].DstType)
 	result, err := converters[0].Fn(&time.Time{})
-	if err != nil {
-		t.Errorf("first converter function failed: %v", err)
-	}
-	if _, ok := result.(*string); !ok {
-		t.Errorf("first converter result type mismatch")
-	}
+	assert.NoError(t, err)
+	assert.IsType(t, dstType, result)
 
 	// 验证第二个转换器
-	if converters[1].SrcType != dstType || converters[1].DstType != srcType {
-		t.Errorf("second converter types mismatch")
-	}
+	assert.IsType(t, dstType, converters[1].SrcType)
+	assert.IsType(t, srcType, converters[1].DstType)
 	result, err = converters[1].Fn(trans.Ptr(""))
-	if err != nil {
-		t.Errorf("second converter function failed: %v", err)
-	}
-	if _, ok := result.(*time.Time); !ok {
-		t.Errorf("second converter result type mismatch")
-	}
+	assert.NoError(t, err)
+	assert.IsType(t, srcType, result)
 }
 
-func TestMakeErrorHandlingTypeConverterPair(t *testing.T) {
+func TestNewErrorHandlingGenericTypeConverterPair(t *testing.T) {
 	srcType := &time.Time{}
 	dstType := trans.Ptr("")
 	fromFn := func(src *time.Time) (*string, error) {
@@ -120,33 +92,62 @@ func TestMakeErrorHandlingTypeConverterPair(t *testing.T) {
 		return timeutil.StringTimeToTime(src), nil
 	}
 
-	converters := MakeErrorHandlingTypeConverterPair(srcType, dstType, fromFn, toFn)
-
-	if len(converters) != 2 {
-		t.Fatalf("expected 2 converters, got %d", len(converters))
-	}
+	converters := NewErrorHandlingGenericTypeConverterPair(srcType, dstType, fromFn, toFn)
+	assert.Len(t, converters, 2, "expected 2 converters")
 
 	// 验证第一个转换器
-	if converters[0].SrcType != srcType || converters[0].DstType != dstType {
-		t.Errorf("first converter types mismatch")
-	}
+	assert.IsType(t, srcType, converters[0].SrcType)
+	assert.IsType(t, dstType, converters[0].DstType)
 	result, err := converters[0].Fn(&time.Time{})
-	if err != nil {
-		t.Errorf("first converter function failed: %v", err)
-	}
-	if _, ok := result.(*string); !ok {
-		t.Errorf("first converter result type mismatch")
-	}
+	assert.NoError(t, err)
+	assert.IsType(t, dstType, result)
 
 	// 验证第二个转换器
-	if converters[1].SrcType != dstType || converters[1].DstType != srcType {
-		t.Errorf("second converter types mismatch")
-	}
+	assert.IsType(t, dstType, converters[1].SrcType)
+	assert.IsType(t, srcType, converters[1].DstType)
 	result, err = converters[1].Fn(trans.Ptr(""))
-	if err != nil {
-		t.Errorf("second converter function failed: %v", err)
-	}
-	if _, ok := result.(*time.Time); !ok {
-		t.Errorf("second converter result type mismatch")
-	}
+	assert.NoError(t, err)
+	assert.IsType(t, srcType, result)
+}
+
+func TestNewTimeStringConverterPair(t *testing.T) {
+	converters := NewTimeStringConverterPair()
+	assert.Len(t, converters, 2, "expected 2 converters")
+
+	// 验证第一个转换器
+	srcType := &time.Time{}
+	dstType := trans.Ptr("")
+	assert.IsType(t, srcType, converters[0].SrcType)
+	assert.IsType(t, dstType, converters[0].DstType)
+	result, err := converters[0].Fn(&time.Time{})
+	assert.NoError(t, err)
+	assert.IsType(t, dstType, result)
+
+	// 验证第二个转换器
+	assert.IsType(t, dstType, converters[1].SrcType)
+	assert.IsType(t, srcType, converters[1].DstType)
+	result, err = converters[1].Fn(trans.Ptr(""))
+	assert.NoError(t, err)
+	assert.IsType(t, srcType, result)
+}
+
+func TestNewTimeTimestamppbConverterPair(t *testing.T) {
+	converters := NewTimeTimestamppbConverterPair()
+	assert.Len(t, converters, 2, "expected 2 converters")
+
+	// 验证第一个转换器
+	srcType := &time.Time{}
+	dstType := &timestamppb.Timestamp{}
+	assert.IsType(t, srcType, converters[0].SrcType)
+	assert.IsType(t, dstType, converters[0].DstType)
+	result, err := converters[0].Fn(&time.Time{})
+	assert.NoError(t, err)
+	assert.IsType(t, dstType, result)
+
+	// 验证第二个转换器
+	assert.IsType(t, dstType, converters[1].SrcType)
+	assert.IsType(t, srcType, converters[1].DstType)
+	result, err = converters[1].Fn(&timestamppb.Timestamp{})
+	assert.NoError(t, err)
+	assert.IsType(t, srcType, result)
 }

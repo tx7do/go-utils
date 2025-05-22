@@ -42,7 +42,27 @@ var TimestamppbToTimeConverter = copier.TypeConverter{
 	},
 }
 
-func MakeTypeConverter(srcType, dstType interface{}, fn func(src interface{}) (interface{}, error)) copier.TypeConverter {
+func NewTimeStringConverterPair() []copier.TypeConverter {
+	srcType := &time.Time{}
+	dstType := trans.Ptr("")
+
+	fromFn := timeutil.TimeToTimeString
+	toFn := timeutil.StringTimeToTime
+
+	return NewGenericTypeConverterPair(srcType, dstType, fromFn, toFn)
+}
+
+func NewTimeTimestamppbConverterPair() []copier.TypeConverter {
+	srcType := &time.Time{}
+	dstType := &timestamppb.Timestamp{}
+
+	fromFn := timeutil.TimeToTimestamppb
+	toFn := timeutil.TimestamppbToTime
+
+	return NewGenericTypeConverterPair(srcType, dstType, fromFn, toFn)
+}
+
+func NewTypeConverter(srcType, dstType interface{}, fn func(src interface{}) (interface{}, error)) copier.TypeConverter {
 	return copier.TypeConverter{
 		SrcType: srcType,
 		DstType: dstType,
@@ -50,7 +70,7 @@ func MakeTypeConverter(srcType, dstType interface{}, fn func(src interface{}) (i
 	}
 }
 
-func MakeTypeConverterPair(srcType, dstType interface{}, fromFn, toFn func(src interface{}) (interface{}, error)) []copier.TypeConverter {
+func NewTypeConverterPair(srcType, dstType interface{}, fromFn, toFn func(src interface{}) (interface{}, error)) []copier.TypeConverter {
 	return []copier.TypeConverter{
 		{
 			SrcType: srcType,
@@ -65,7 +85,7 @@ func MakeTypeConverterPair(srcType, dstType interface{}, fromFn, toFn func(src i
 	}
 }
 
-func MakeGenericTypeConverterPair[A interface{}, B interface{}](srcType A, dstType B, fromFn func(src A) B, toFn func(src B) A) []copier.TypeConverter {
+func NewGenericTypeConverterPair[A interface{}, B interface{}](srcType A, dstType B, fromFn func(src A) B, toFn func(src B) A) []copier.TypeConverter {
 	return []copier.TypeConverter{
 		{
 			SrcType: srcType,
@@ -84,7 +104,7 @@ func MakeGenericTypeConverterPair[A interface{}, B interface{}](srcType A, dstTy
 	}
 }
 
-func MakeErrorHandlingTypeConverterPair[A interface{}, B interface{}](srcType A, dstType B, fromFn func(src A) (B, error), toFn func(src B) (A, error)) []copier.TypeConverter {
+func NewErrorHandlingGenericTypeConverterPair[A interface{}, B interface{}](srcType A, dstType B, fromFn func(src A) (B, error), toFn func(src B) (A, error)) []copier.TypeConverter {
 	return []copier.TypeConverter{
 		{
 			SrcType: srcType,
