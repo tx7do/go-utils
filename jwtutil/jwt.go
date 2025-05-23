@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"encoding/json"
+	"github.com/go-kratos/kratos/v2/encoding"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -40,14 +40,16 @@ func ParseJWTClaimsToStruct[T any](tokenString string) (*T, error) {
 		return nil, fmt.Errorf("invalid token claims")
 	}
 
+	codec := encoding.GetCodec("json")
+
 	// 将 claims 转换为目标类型
-	claimsBytes, err := json.Marshal(claims)
+	claimsBytes, err := codec.Marshal(claims)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal claims: %v", err)
 	}
 
 	var ret T
-	err = json.Unmarshal(claimsBytes, &ret)
+	err = codec.Unmarshal(claimsBytes, &ret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal claims: %v", err)
 	}
@@ -132,13 +134,15 @@ func GenerateGenericJWT[T any](payload T, secretKey []byte, signingMethod jwt.Si
 
 // ToMapClaims 将泛型 payload 转换为 jwt.MapClaims
 func ToMapClaims[T any](payload T) (jwt.MapClaims, error) {
-	payloadBytes, err := json.Marshal(payload)
+	codec := encoding.GetCodec("json")
+
+	payloadBytes, err := codec.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
 
 	var claims jwt.MapClaims
-	err = json.Unmarshal(payloadBytes, &claims)
+	err = codec.Unmarshal(payloadBytes, &claims)
 	if err != nil {
 		return nil, err
 	}
