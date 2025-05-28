@@ -11,7 +11,7 @@ require (
 	github.com/go-kratos/kratos/v2 v2.8.4
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.10.0
-	github.com/tx7do/go-utils v1.1.24
+	github.com/tx7do/go-utils v1.1.27
 	go.opentelemetry.io/otel v1.36.0
 	google.golang.org/protobuf v1.36.6
 )
