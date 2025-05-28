@@ -3,7 +3,7 @@ git tag v1.1.24
 git tag bank_card/v1.1.5
 git tag geoip/v1.1.5
 git tag translator/v1.1.2
-git tag copierutil/v0.0.3
+git tag copierutil/v0.0.4
 git tag jwtutil/v0.0.2
 
 git tag entgo/v1.1.28
