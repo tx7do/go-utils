@@ -11,7 +11,7 @@ require (
 	github.com/go-kratos/kratos/v2 v2.8.4
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.10.0
-	github.com/tx7do/go-utils v1.1.22
+	github.com/tx7do/go-utils v1.1.24
 	go.opentelemetry.io/otel v1.36.0
 	google.golang.org/protobuf v1.36.6
 )
@@ -23,7 +23,7 @@ require (
 	github.com/bmatcuk/doublestar v1.3.4 // indirect
 	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/inflect v0.21.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect

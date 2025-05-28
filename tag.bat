@@ -6,7 +6,7 @@ git tag translator/v1.1.2
 git tag copierutil/v0.0.4
 git tag jwtutil/v0.0.2
 
-git tag entgo/v1.1.28
+git tag entgo/v1.1.29
 git tag gorm/v1.1.6
 
 git push origin --tags
