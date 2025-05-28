@@ -26,11 +26,17 @@ func GetDefaultTimeLocation() *time.Location {
 }
 
 // UnixMilliToStringPtr 毫秒时间戳 -> 字符串
-func UnixMilliToStringPtr(tm *int64) *string {
-	if tm == nil {
+func UnixMilliToStringPtr(milli *int64) *string {
+	if milli == nil {
 		return nil
 	}
-	str := time.UnixMilli(*tm).Format(TimeLayout)
+
+	tm := time.UnixMilli(*milli)
+
+	// 设置默认时区
+	tm.In(GetDefaultTimeLocation())
+
+	str := tm.Format(TimeLayout)
 	return &str
 }
 
@@ -44,17 +50,18 @@ func StringToUnixMilliInt64Ptr(tm *string) *int64 {
 	if theTime == nil {
 		return nil
 	}
+
 	unixTime := theTime.UnixMilli()
 	return &unixTime
 }
 
 // UnixMilliToTimePtr 毫秒时间戳 -> 时间
-func UnixMilliToTimePtr(tm *int64) *time.Time {
-	if tm == nil {
+func UnixMilliToTimePtr(milli *int64) *time.Time {
+	if milli == nil {
 		return nil
 	}
 
-	unixMilli := time.UnixMilli(*tm)
+	unixMilli := time.UnixMilli(*milli)
 	return &unixMilli
 }
 
@@ -69,12 +76,13 @@ func TimeToUnixMilliInt64Ptr(tm *time.Time) *int64 {
 }
 
 // UnixSecondToTimePtr 秒时间戳 -> 时间
-func UnixSecondToTimePtr(tm *int64) *time.Time {
-	if tm == nil {
+func UnixSecondToTimePtr(second *int64) *time.Time {
+	if second == nil {
 		return nil
 	}
 
-	unixMilli := time.Unix(*tm, 0)
+	unixMilli := time.Unix(*second, 0)
+
 	return &unixMilli
 }
 
@@ -100,18 +108,19 @@ func StringTimeToTime(str *string) *time.Time {
 	var err error
 	var theTime time.Time
 
-	theTime, err = time.ParseInLocation(TimeLayout, *str, GetDefaultTimeLocation())
-	if err == nil {
+	if theTime, err = time.ParseInLocation(TimeLayout, *str, GetDefaultTimeLocation()); err == nil {
 		return &theTime
 	}
 
-	theTime, err = time.ParseInLocation(DateLayout, *str, GetDefaultTimeLocation())
-	if err == nil {
+	if theTime, err = time.ParseInLocation(DateLayout, *str, GetDefaultTimeLocation()); err == nil {
 		return &theTime
 	}
 
-	theTime, err = time.ParseInLocation(ClockLayout, *str, GetDefaultTimeLocation())
-	if err == nil {
+	if theTime, err = time.ParseInLocation(ClockLayout, *str, GetDefaultTimeLocation()); err == nil {
+		return &theTime
+	}
+
+	if theTime, err = time.ParseInLocation(ISO9075MicroTZ, *str, GetDefaultTimeLocation()); err == nil {
 		return &theTime
 	}
 
@@ -123,6 +132,10 @@ func TimeToTimeString(tm *time.Time) *string {
 	if tm == nil {
 		return nil
 	}
+
+	// 设置默认时区
+	tm.In(GetDefaultTimeLocation())
+
 	return trans.String(tm.Format(TimeLayout))
 }
 
@@ -161,13 +174,17 @@ func TimeToDateString(tm *time.Time) *string {
 	if tm == nil {
 		return nil
 	}
+
+	// 设置默认时区
+	tm.In(GetDefaultTimeLocation())
+
 	return trans.String(tm.Format(DateLayout))
 }
 
 // TimestamppbToTime timestamppb.Timestamp -> time.Time
-func TimestamppbToTime(tm *timestamppb.Timestamp) *time.Time {
-	if tm != nil {
-		return trans.Ptr(tm.AsTime())
+func TimestamppbToTime(timestamp *timestamppb.Timestamp) *time.Time {
+	if timestamp != nil {
+		return trans.Ptr(timestamp.AsTime())
 	}
 	return nil
 }
