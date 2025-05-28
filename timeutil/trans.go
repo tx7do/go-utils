@@ -172,7 +172,7 @@ func TimeToDateString(tm *time.Time) *string {
 	return trans.String(tm.In(GetDefaultTimeLocation()).Format(DateLayout))
 }
 
-func TimeToDateStringWithLayout(tm *time.Time, layout string) *string {
+func TimeToString(tm *time.Time, layout string) *string {
 	if tm == nil {
 		return nil
 	}
