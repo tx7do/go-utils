@@ -217,7 +217,7 @@ func timeMarshalJSON(t time.Time, layout string) ([]byte, error) {
 }
 
 func ParseSlice(layout string, strings []string) ([]time.Time, error) {
-	times := []time.Time{}
+	var times []time.Time
 	for _, raw := range strings {
 		t, err := time.Parse(layout, raw)
 		if err != nil {

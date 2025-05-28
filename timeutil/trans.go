@@ -172,6 +172,14 @@ func TimeToDateString(tm *time.Time) *string {
 	return trans.String(tm.In(GetDefaultTimeLocation()).Format(DateLayout))
 }
 
+func TimeToDateStringWithLayout(tm *time.Time, layout string) *string {
+	if tm == nil {
+		return nil
+	}
+
+	return trans.String(tm.Format(layout))
+}
+
 // TimestamppbToTime timestamppb.Timestamp -> time.Time
 func TimestamppbToTime(timestamp *timestamppb.Timestamp) *time.Time {
 	if timestamp != nil {

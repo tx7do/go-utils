@@ -1,4 +1,4 @@
-git tag v1.1.25
+git tag v1.1.26
 
 git tag bank_card/v1.1.5
 git tag geoip/v1.1.5

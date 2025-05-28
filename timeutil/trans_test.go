@@ -149,6 +149,15 @@ func TestTimeToDateString(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+func TestTimeToDateStringWithLayout(t *testing.T) {
+	now := time.Now()
+
+	fmt.Println(*TimeToDateStringWithLayout(&now, DateLayout))
+	fmt.Println(*TimeToDateStringWithLayout(&now, ISO8601))
+	fmt.Println(*TimeToDateStringWithLayout(&now, ISO8601TZHour))
+	fmt.Println(*TimeToDateStringWithLayout(&now, ISO8601NoTZ))
+}
+
 func TestTimestamppbToTime(t *testing.T) {
 	// 测试有效输入
 	timestamp := timestamppb.Now()
