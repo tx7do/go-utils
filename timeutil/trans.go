@@ -33,10 +33,7 @@ func UnixMilliToStringPtr(milli *int64) *string {
 
 	tm := time.UnixMilli(*milli)
 
-	// 设置默认时区
-	tm.In(GetDefaultTimeLocation())
-
-	str := tm.Format(TimeLayout)
+	str := tm.In(GetDefaultTimeLocation()).Format(TimeLayout)
 	return &str
 }
 
@@ -133,10 +130,7 @@ func TimeToTimeString(tm *time.Time) *string {
 		return nil
 	}
 
-	// 设置默认时区
-	tm.In(GetDefaultTimeLocation())
-
-	return trans.String(tm.Format(TimeLayout))
+	return trans.String(tm.In(GetDefaultTimeLocation()).Format(TimeLayout))
 }
 
 // StringDateToTime 字符串 -> 时间
@@ -175,10 +169,7 @@ func TimeToDateString(tm *time.Time) *string {
 		return nil
 	}
 
-	// 设置默认时区
-	tm.In(GetDefaultTimeLocation())
-
-	return trans.String(tm.Format(DateLayout))
+	return trans.String(tm.In(GetDefaultTimeLocation()).Format(DateLayout))
 }
 
 // TimestamppbToTime timestamppb.Timestamp -> time.Time
