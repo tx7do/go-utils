@@ -42,11 +42,15 @@ var TimestamppbToTimeConverter = copier.TypeConverter{
 	},
 }
 
+func TimeToString(tm *time.Time) *string {
+	return timeutil.TimeToString(tm, timeutil.ISO8601)
+}
+
 func NewTimeStringConverterPair() []copier.TypeConverter {
 	srcType := &time.Time{}
 	dstType := trans.Ptr("")
 
-	fromFn := timeutil.TimeToTimeString
+	fromFn := TimeToString
 	toFn := timeutil.StringTimeToTime
 
 	return NewGenericTypeConverterPair(srcType, dstType, fromFn, toFn)

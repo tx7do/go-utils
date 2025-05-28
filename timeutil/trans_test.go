@@ -156,6 +156,40 @@ func TestTimeToString(t *testing.T) {
 	fmt.Println(*TimeToString(&now, ISO8601))
 	fmt.Println(*TimeToString(&now, ISO8601TZHour))
 	fmt.Println(*TimeToString(&now, ISO8601NoTZ))
+
+	layout := "2006-01-02"
+	expected := now.Format(layout)
+	result := TimeToString(&now, layout)
+	assert.NotNil(t, result)
+	assert.Equal(t, expected, *result)
+
+	// 测试空输入
+	result = TimeToString(nil, layout)
+	assert.Nil(t, result)
+}
+
+func TestStringToTime(t *testing.T) {
+	// 测试有效时间字符串输入
+	input := "2023-03-09 12:34:56"
+	layout := "2006-01-02 15:04:05"
+	expected := time.Date(2023, 3, 9, 12, 34, 56, 0, GetDefaultTimeLocation())
+	result := StringToTime(&input, layout)
+	assert.NotNil(t, result)
+	assert.Equal(t, expected, *result)
+
+	// 测试无效时间字符串输入
+	invalidInput := "invalid-date"
+	result = StringToTime(&invalidInput, layout)
+	assert.Nil(t, result)
+
+	// 测试空字符串输入
+	emptyInput := ""
+	result = StringToTime(&emptyInput, layout)
+	assert.Nil(t, result)
+
+	// 测试空指针输入
+	result = StringToTime(nil, layout)
+	assert.Nil(t, result)
 }
 
 func TestTimestamppbToTime(t *testing.T) {

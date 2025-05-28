@@ -172,6 +172,25 @@ func TimeToDateString(tm *time.Time) *string {
 	return trans.String(tm.In(GetDefaultTimeLocation()).Format(DateLayout))
 }
 
+func StringToTime(str *string, layout string) *time.Time {
+	if str == nil {
+		return nil
+	}
+	if len(*str) == 0 {
+		return nil
+	}
+
+	var err error
+	var theTime time.Time
+
+	theTime, err = time.ParseInLocation(layout, *str, GetDefaultTimeLocation())
+	if err == nil {
+		return &theTime
+	}
+
+	return nil
+}
+
 func TimeToString(tm *time.Time, layout string) *string {
 	if tm == nil {
 		return nil
