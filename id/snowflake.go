@@ -59,3 +59,8 @@ func NewSnowflakeID(workerId int64) (int64, error) {
 
 	return node.Generate(), nil
 }
+
+func GenerateSnowflakeID(workerId int64) int64 {
+	id, _ := NewSnowflakeID(workerId)
+	return id
+}

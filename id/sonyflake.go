@@ -23,3 +23,8 @@ func NewSonyflakeID() (uint64, error) {
 
 	return sf.NextID()
 }
+
+func GenerateSonyflakeID() uint64 {
+	id, _ := NewSonyflakeID()
+	return id
+}
