@@ -7,7 +7,7 @@ import (
 	"entgo.io/ent/schema/index"
 	"entgo.io/ent/schema/mixin"
 
-	"github.com/tx7do/go-utils/sonyflake"
+	"github.com/tx7do/go-utils/id"
 )
 
 type SnowflackId struct {
@@ -18,7 +18,7 @@ func (SnowflackId) Fields() []ent.Field {
 	return []ent.Field{
 		field.Uint64("id").
 			Comment("id").
-			DefaultFunc(sonyflake.GenerateSonyflake).
+			DefaultFunc(id.GenerateSonyflakeID).
 			Positive().
 			Immutable().
 			StructTag(`json:"id,omitempty"`).

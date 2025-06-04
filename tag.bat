@@ -8,7 +8,7 @@ git tag jwtutil/v0.0.2
 git tag id/v0.0.2
 git tag slug/v0.0.1
 
-git tag entgo/v1.1.30
+git tag entgo/v1.1.31
 git tag gorm/v1.1.6
 
 git push origin --tags
