@@ -1,6 +1,10 @@
 package trans
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 func String(a string) *string {
 	return &a
@@ -526,4 +530,29 @@ func MapValues[TKey mapKeyValueType, TValue mapKeyValueType](source map[TKey]TVa
 		target = append(target, v)
 	}
 	return target
+}
+
+func ToUuidPtr(str *string) *uuid.UUID {
+	var id *uuid.UUID
+	if str != nil {
+		_id, err := uuid.Parse(*str)
+		if err != nil {
+			return nil
+		}
+		id = &_id
+	}
+	return id
+}
+
+func ToUuid(str string) uuid.UUID {
+	id, _ := uuid.Parse(str)
+	return id
+}
+
+func ToStringPtr(id *uuid.UUID) *string {
+	var strUUID *string
+	if id != nil {
+		strUUID = Ptr(id.String())
+	}
+	return strUUID
 }
