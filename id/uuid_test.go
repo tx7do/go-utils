@@ -94,6 +94,7 @@ func TestNewXID(t *testing.T) {
 	// 测试生成的 XID 是否非空
 	id := NewXID()
 	assert.NotEmpty(t, id, "生成的 XID 应该非空")
+	t.Logf("xid: %s", id)
 
 	// 测试生成的 XID 的长度是否符合预期
 	assert.Equal(t, 20, len(id), "生成的 XID 长度应该为 20")
