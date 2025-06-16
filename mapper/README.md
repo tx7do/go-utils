@@ -49,17 +49,17 @@ package main
 import "github.com/tx7do/go-utils/mapper"
 
 func main() {
-	type DtoType string
-	type ModelType int32
+	type DtoType int32
+	type ModelType string
 
 	const (
-		DtoTypeOne DtoType = "One"
-		DtoTypeTwo DtoType = "Two"
+		DtoTypeOne DtoType = 1
+		DtoTypeTwo DtoType = 2
 	)
 
 	const (
-		ModelTypeOne ModelType = 1
-		ModelTypeTwo ModelType = 2
+		ModelTypeOne ModelType = "One"
+		ModelTypeTwo ModelType = "Two"
 	)
 
 	nameMap := map[int32]string{
@@ -78,7 +78,7 @@ func main() {
 	model := converter.ToModel(&dto)
 
 	// 测试 ToModel 方法，传入不存在的值
-	dtoInvalid := DtoType("Three")
+	dtoInvalid := DtoType(3)
 	modelInvalid := converter.ToModel(&dtoInvalid)
 
 	// 测试 ToDto 方法
@@ -87,7 +87,7 @@ func main() {
 	dtoResult := converter.ToDto(model)
 
 	// 测试 ToDto 方法，传入不存在的值
-	tmpModelThree := ModelType(3)
+	tmpModelThree := ModelType("Three")
 	modelInvalid = &tmpModelThree
 	dtoInvalidResult := converter.ToDto(modelInvalid)
 }
