@@ -17,26 +17,26 @@ func main() {
 		Age  int
 	}
 
-	type ModelType struct {
+	type EntityType struct {
 		Name string
 		Age  int
 	}
 
-	mapper := mapper.NewCopierMapper[DtoType, ModelType]()
+	mapper := mapper.NewCopierMapper[DtoType, EntityType]()
 
-	// 测试 ToModel 方法
+	// 测试 ToEntity 方法
 	dto := &DtoType{Name: "Alice", Age: 25}
-	model := mapper.ToModel(dto)
+	entity := mapper.ToEntity(dto)
 
-	// 测试 ToModel 方法，传入 nil
-	modelNil := mapper.ToModel(nil)
+	// 测试 ToEntity 方法，传入 nil
+	entityNil := mapper.ToEntity(nil)
 
-	// 测试 ToDto 方法
-	model = &ModelType{Name: "Bob", Age: 30}
-	dtoResult := mapper.ToDto(model)
+	// 测试 ToDTO 方法
+	entity = &EntityType{Name: "Bob", Age: 30}
+	dtoResult := mapper.ToDTO(entity)
 
-	// 测试 ToDto 方法，传入 nil
-	dtoNil := mapper.ToDto(nil)
+	// 测试 ToDTO 方法，传入 nil
+	dtoNil := mapper.ToDTO(nil)
 }
 
 ```
@@ -50,7 +50,7 @@ import "github.com/tx7do/go-utils/mapper"
 
 func main() {
 	type DtoType int32
-	type ModelType string
+	type EntityType string
 
 	const (
 		DtoTypeOne DtoType = 1
@@ -58,8 +58,8 @@ func main() {
 	)
 
 	const (
-		ModelTypeOne ModelType = "One"
-		ModelTypeTwo ModelType = "Two"
+		EntityTypeOne EntityType = "One"
+		EntityTypeTwo EntityType = "Two"
 	)
 
 	nameMap := map[int32]string{
@@ -71,25 +71,25 @@ func main() {
 		"Two": 2,
 	}
 
-	converter := mapper.NewEnumTypeConverter[DtoType, ModelType](nameMap, valueMap)
+	converter := mapper.NewEnumTypeConverter[DtoType, EntityType](nameMap, valueMap)
 
-	// 测试 ToModel 方法
+	// 测试 ToEntity 方法
 	dto := DtoTypeOne
-	model := converter.ToModel(&dto)
+	entity := converter.ToEntity(&dto)
 
-	// 测试 ToModel 方法，传入不存在的值
+	// 测试 ToEntity 方法，传入不存在的值
 	dtoInvalid := DtoType(3)
-	modelInvalid := converter.ToModel(&dtoInvalid)
+	entityInvalid := converter.ToEntity(&dtoInvalid)
 
-	// 测试 ToDto 方法
-	tmpModelTwo := ModelTypeTwo
-	model = &tmpModelTwo
-	dtoResult := converter.ToDto(model)
+	// 测试 ToDTO 方法
+	tmpEntityTwo := EntityTypeTwo
+	entity = &tmpEntityTwo
+	dtoResult := converter.ToDTO(entity)
 
-	// 测试 ToDto 方法，传入不存在的值
-	tmpModelThree := ModelType("Three")
-	modelInvalid = &tmpModelThree
-	dtoInvalidResult := converter.ToDto(modelInvalid)
+	// 测试 ToDTO 方法，传入不存在的值
+	tmpEntityThree := EntityType("Three")
+	entityInvalid = &tmpEntityThree
+	dtoInvalidResult := converter.ToDTO(entityInvalid)
 }
 
 ```

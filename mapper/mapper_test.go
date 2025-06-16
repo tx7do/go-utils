@@ -12,39 +12,39 @@ func TestCopierMapper(t *testing.T) {
 		Age  int
 	}
 
-	type ModelType struct {
+	type EntityType struct {
 		Name string
 		Age  int
 	}
 
-	mapper := NewCopierMapper[DtoType, ModelType]()
+	mapper := NewCopierMapper[DtoType, EntityType]()
 
-	// 测试 ToModel 方法
+	// 测试 ToEntity 方法
 	dto := &DtoType{Name: "Alice", Age: 25}
-	model := mapper.ToModel(dto)
-	assert.NotNil(t, model)
-	assert.Equal(t, "Alice", model.Name)
-	assert.Equal(t, 25, model.Age)
+	entity := mapper.ToEntity(dto)
+	assert.NotNil(t, entity)
+	assert.Equal(t, "Alice", entity.Name)
+	assert.Equal(t, 25, entity.Age)
 
-	// 测试 ToModel 方法，传入 nil
-	modelNil := mapper.ToModel(nil)
-	assert.Nil(t, modelNil)
+	// 测试 ToEntity 方法，传入 nil
+	entityNil := mapper.ToEntity(nil)
+	assert.Nil(t, entityNil)
 
-	// 测试 ToDto 方法
-	model = &ModelType{Name: "Bob", Age: 30}
-	dtoResult := mapper.ToDto(model)
+	// 测试 ToDTO 方法
+	entity = &EntityType{Name: "Bob", Age: 30}
+	dtoResult := mapper.ToDTO(entity)
 	assert.NotNil(t, dtoResult)
 	assert.Equal(t, "Bob", dtoResult.Name)
 	assert.Equal(t, 30, dtoResult.Age)
 
-	// 测试 ToDto 方法，传入 nil
-	dtoNil := mapper.ToDto(nil)
+	// 测试 ToDTO 方法，传入 nil
+	dtoNil := mapper.ToDTO(nil)
 	assert.Nil(t, dtoNil)
 }
 
 func TestEnumTypeConverter(t *testing.T) {
 	type DtoType int32
-	type ModelType string
+	type EntityType string
 
 	const (
 		DtoTypeOne DtoType = 1
@@ -52,8 +52,8 @@ func TestEnumTypeConverter(t *testing.T) {
 	)
 
 	const (
-		ModelTypeOne ModelType = "One"
-		ModelTypeTwo ModelType = "Two"
+		EntityTypeOne EntityType = "One"
+		EntityTypeTwo EntityType = "Two"
 	)
 
 	nameMap := map[int32]string{
@@ -65,29 +65,29 @@ func TestEnumTypeConverter(t *testing.T) {
 		"Two": 2,
 	}
 
-	converter := NewEnumTypeConverter[DtoType, ModelType](nameMap, valueMap)
+	converter := NewEnumTypeConverter[DtoType, EntityType](nameMap, valueMap)
 
-	// 测试 ToModel 方法
+	// 测试 ToEntity 方法
 	dto := DtoTypeOne
-	model := converter.ToModel(&dto)
-	assert.NotNil(t, model)
-	assert.Equal(t, "One", string(*model))
+	entity := converter.ToEntity(&dto)
+	assert.NotNil(t, entity)
+	assert.Equal(t, "One", string(*entity))
 
-	// 测试 ToModel 方法，传入不存在的值
+	// 测试 ToEntity 方法，传入不存在的值
 	dtoInvalid := DtoType(3)
-	modelInvalid := converter.ToModel(&dtoInvalid)
-	assert.Nil(t, modelInvalid)
+	entityInvalid := converter.ToEntity(&dtoInvalid)
+	assert.Nil(t, entityInvalid)
 
-	// 测试 ToDto 方法
-	tmpModelTwo := ModelTypeTwo
-	model = &tmpModelTwo
-	dtoResult := converter.ToDto(model)
+	// 测试 ToDTO 方法
+	tmpEntityTwo := EntityTypeTwo
+	entity = &tmpEntityTwo
+	dtoResult := converter.ToDTO(entity)
 	assert.NotNil(t, dtoResult)
 	assert.Equal(t, DtoType(2), *dtoResult)
 
-	// 测试 ToDto 方法，传入不存在的值
-	tmpModelThree := ModelType("Three")
-	modelInvalid = &tmpModelThree
-	dtoInvalidResult := converter.ToDto(modelInvalid)
+	// 测试 ToDTO 方法，传入不存在的值
+	tmpEntityThree := EntityType("Three")
+	entityInvalid = &tmpEntityThree
+	dtoInvalidResult := converter.ToDTO(entityInvalid)
 	assert.Nil(t, dtoInvalidResult)
 }

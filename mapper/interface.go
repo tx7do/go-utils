@@ -1,10 +1,10 @@
 package mapper
 
-// Mapper defines the interface for converting between DTOs and models.
-type Mapper[DTO any, MODEL any] interface {
-	// ToModel converts a DTO to a MODEL.
-	ToModel(*DTO) *MODEL
+// Mapper defines the interface for converting between Data Transfer Objects (DTOs) and Database Entities.
+type Mapper[DTO any, ENTITY any] interface {
+	// ToEntity converts a DTO to a Database Entity.
+	ToEntity(*DTO) *ENTITY
 
-	// ToDto converts a MODEL to a DTO.
-	ToDto(*MODEL) *DTO
+	// ToDTO converts a Database Entity to a DTO.
+	ToDTO(*ENTITY) *DTO
 }

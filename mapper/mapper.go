@@ -4,46 +4,46 @@ import (
 	"github.com/jinzhu/copier"
 )
 
-type CopierMapper[DTO any, MODEL any] struct {
+type CopierMapper[DTO any, ENTITY any] struct {
 	copierOption copier.Option
 }
 
-func NewCopierMapper[DTO any, MODEL any]() *CopierMapper[DTO, MODEL] {
-	return &CopierMapper[DTO, MODEL]{
+func NewCopierMapper[DTO any, ENTITY any]() *CopierMapper[DTO, ENTITY] {
+	return &CopierMapper[DTO, ENTITY]{
 		copierOption: copier.Option{
 			Converters: []copier.TypeConverter{},
 		},
 	}
 }
 
-func (m *CopierMapper[DTO, MODEL]) AppendConverter(converter copier.TypeConverter) {
+func (m *CopierMapper[DTO, ENTITY]) AppendConverter(converter copier.TypeConverter) {
 	m.copierOption.Converters = append(m.copierOption.Converters, converter)
 }
 
-func (m *CopierMapper[DTO, MODEL]) AppendConverters(converters []copier.TypeConverter) {
+func (m *CopierMapper[DTO, ENTITY]) AppendConverters(converters []copier.TypeConverter) {
 	m.copierOption.Converters = append(m.copierOption.Converters, converters...)
 }
 
-func (m *CopierMapper[DTO, MODEL]) ToModel(dto *DTO) *MODEL {
+func (m *CopierMapper[DTO, ENTITY]) ToEntity(dto *DTO) *ENTITY {
 	if dto == nil {
 		return nil
 	}
 
-	var model MODEL
-	if err := copier.CopyWithOption(&model, dto, m.copierOption); err != nil {
+	var entity ENTITY
+	if err := copier.CopyWithOption(&entity, dto, m.copierOption); err != nil {
 		panic(err) // Handle error appropriately in production code
 	}
 
-	return &model
+	return &entity
 }
 
-func (m *CopierMapper[DTO, MODEL]) ToDto(model *MODEL) *DTO {
-	if model == nil {
+func (m *CopierMapper[DTO, ENTITY]) ToDTO(entity *ENTITY) *DTO {
+	if entity == nil {
 		return nil
 	}
 
 	var dto DTO
-	if err := copier.CopyWithOption(&dto, model, m.copierOption); err != nil {
+	if err := copier.CopyWithOption(&dto, entity, m.copierOption); err != nil {
 		panic(err) // Handle error appropriately in production code
 	}
 
