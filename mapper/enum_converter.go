@@ -4,12 +4,12 @@ import (
 	"github.com/jinzhu/copier"
 )
 
-type EnumTypeConverter[DTO ~string, MODEL ~int32] struct {
+type EnumTypeConverter[DTO ~int32, MODEL ~string] struct {
 	nameMap  map[int32]string
 	valueMap map[string]int32
 }
 
-func NewEnumTypeConverter[DTO ~string, MODEL ~int32](nameMap map[int32]string, valueMap map[string]int32) *EnumTypeConverter[DTO, MODEL] {
+func NewEnumTypeConverter[DTO ~int32, MODEL ~string](nameMap map[int32]string, valueMap map[string]int32) *EnumTypeConverter[DTO, MODEL] {
 	return &EnumTypeConverter[DTO, MODEL]{
 		valueMap: valueMap,
 		nameMap:  nameMap,
@@ -21,7 +21,7 @@ func (m *EnumTypeConverter[DTO, MODEL]) ToModel(dto *DTO) *MODEL {
 		return nil
 	}
 
-	find, ok := m.valueMap[string(*dto)]
+	find, ok := m.nameMap[int32(*dto)]
 	if !ok {
 		return nil
 	}
@@ -35,7 +35,7 @@ func (m *EnumTypeConverter[DTO, MODEL]) ToDto(model *MODEL) *DTO {
 		return nil
 	}
 
-	find, ok := m.nameMap[int32(*model)]
+	find, ok := m.valueMap[string(*model)]
 	if !ok {
 		return nil
 	}
@@ -45,8 +45,8 @@ func (m *EnumTypeConverter[DTO, MODEL]) ToDto(model *MODEL) *DTO {
 }
 
 func (m *EnumTypeConverter[DTO, MODEL]) NewConverterPair() []copier.TypeConverter {
-	srcType := MODEL(0)
-	dstType := DTO("")
+	srcType := MODEL("")
+	dstType := DTO(0)
 
 	fromFn := m.ToDto
 	toFn := m.ToModel

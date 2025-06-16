@@ -43,17 +43,17 @@ func TestCopierMapper(t *testing.T) {
 }
 
 func TestEnumTypeConverter(t *testing.T) {
-	type DtoType string
-	type ModelType int32
+	type DtoType int32
+	type ModelType string
 
 	const (
-		DtoTypeOne DtoType = "One"
-		DtoTypeTwo DtoType = "Two"
+		DtoTypeOne DtoType = 1
+		DtoTypeTwo DtoType = 2
 	)
 
 	const (
-		ModelTypeOne ModelType = 1
-		ModelTypeTwo ModelType = 2
+		ModelTypeOne ModelType = "One"
+		ModelTypeTwo ModelType = "Two"
 	)
 
 	nameMap := map[int32]string{
@@ -71,10 +71,10 @@ func TestEnumTypeConverter(t *testing.T) {
 	dto := DtoTypeOne
 	model := converter.ToModel(&dto)
 	assert.NotNil(t, model)
-	assert.Equal(t, int32(1), int32(*model))
+	assert.Equal(t, "One", string(*model))
 
 	// 测试 ToModel 方法，传入不存在的值
-	dtoInvalid := DtoType("Three")
+	dtoInvalid := DtoType(3)
 	modelInvalid := converter.ToModel(&dtoInvalid)
 	assert.Nil(t, modelInvalid)
 
@@ -83,10 +83,10 @@ func TestEnumTypeConverter(t *testing.T) {
 	model = &tmpModelTwo
 	dtoResult := converter.ToDto(model)
 	assert.NotNil(t, dtoResult)
-	assert.Equal(t, "Two", string(*dtoResult))
+	assert.Equal(t, DtoType(2), *dtoResult)
 
 	// 测试 ToDto 方法，传入不存在的值
-	tmpModelThree := ModelType(3)
+	tmpModelThree := ModelType("Three")
 	modelInvalid = &tmpModelThree
 	dtoInvalidResult := converter.ToDto(modelInvalid)
 	assert.Nil(t, dtoInvalidResult)
