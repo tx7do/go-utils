@@ -58,7 +58,7 @@ func TestParseFilterJSONString(t *testing.T) {
 	err = ParseFilterJSONString(`{"na!me__exact":"Jo@hn"}`, handler)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(results))
-	assert.Equal(t, "na!me", results[0].Field)
+	assert.Equal(t, "na_me", results[0].Field)
 	assert.Equal(t, "exact", results[0].Operator)
 	assert.Equal(t, "Jo@hn", results[0].Value)
 
@@ -67,10 +67,10 @@ func TestParseFilterJSONString(t *testing.T) {
 	err = ParseFilterJSONString(`[{"ag#e__gte":"30"},{"sta$tus__exact":"ac^tive"}]`, handler)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(results))
-	assert.Equal(t, "ag#e", results[0].Field)
+	assert.Equal(t, "ag_e", results[0].Field)
 	assert.Equal(t, "gte", results[0].Operator)
 	assert.Equal(t, "30", results[0].Value)
-	assert.Equal(t, "sta$tus", results[1].Field)
+	assert.Equal(t, "sta_tus", results[1].Field)
 	assert.Equal(t, "exact", results[1].Operator)
 	assert.Equal(t, "ac^tive", results[1].Value)
 
