@@ -53,8 +53,13 @@ const (
 )
 
 const (
-	QueryDelimiter     = "__" // 分隔符
-	JsonFieldDelimiter = "."  // JSONB字段分隔符
+	JSONFilterFieldOperatorDelimiter = "__" // JSON过滤器 - 字段名和操作符的分隔符
+
+	QueryFilterFieldOperatorDelimiter = ":" // 自定义查询字符串过滤器 - 字段名和操作符的分隔符
+	QueryFilterQueriesDelimiter       = "," // 自定义查询字符串过滤器 - 多个键值对的分隔符
+	QueryFilterValuesDelimiter        = "|" // 自定义查询字符串过滤器 - 多个值的分隔符
+
+	JsonFieldDelimiter = "." // JSON字段分隔符
 )
 
 type FilterHandler func(field, operator, value string)
@@ -89,6 +94,40 @@ func ParseFilterJSONString(query string, handler FilterHandler) error {
 	return err
 }
 
+// ParseFilterQueryString 解析过滤条件的查询字符串，调用处理函数
+func ParseFilterQueryString(query string, handler FilterHandler) error {
+	if query == "" {
+		return nil // 如果查询字符串为空，直接返回
+	}
+
+	// 按逗号分割查询字符串，得到多个键值对
+	pairs := SplitQueryQueries(query)
+	for _, pair := range pairs {
+		// 按冒号分割键值对，提取字段名和值
+		parts := SplitQueryFieldAndOperator(pair)
+		if len(parts) != 2 {
+			continue // 跳过无效的键值对
+		}
+
+		// 解码字段名
+		key, err := DecodeSpecialCharacters(strings.TrimSpace(parts[0]))
+		if err != nil {
+			continue // 跳过解码失败的键值对
+		}
+
+		// 解码字段值
+		value, err := DecodeSpecialCharacters(strings.TrimSpace(parts[1]))
+		if err != nil {
+			continue // 跳过解码失败的键值对
+		}
+
+		// 调用 ParseFilterField 解析字段和操作符
+		ParseFilterField(key, value, handler)
+	}
+
+	return nil
+}
+
 // ParseFilterField 解析过滤条件字符串，调用处理函数
 func ParseFilterField(key, value string, handler FilterHandler) {
 	if key == "" || value == "" {
@@ -96,7 +135,7 @@ func ParseFilterField(key, value string, handler FilterHandler) {
 	}
 
 	// 处理字段和操作符
-	parts := SplitFieldAndOperator(key)
+	parts := SplitJsonFieldAndOperator(key)
 	if len(parts) < 1 {
 		return // 无效的字段格式
 	}
@@ -115,9 +154,24 @@ func ParseFilterField(key, value string, handler FilterHandler) {
 	handler(field, op, value)
 }
 
-// SplitFieldAndOperator 将字段字符串按分隔符分割成字段名和操作符
-func SplitFieldAndOperator(field string) []string {
-	return strings.Split(field, QueryDelimiter)
+// SplitJsonFieldAndOperator JSON过滤器 - 分割“字段名”和“操作符”
+func SplitJsonFieldAndOperator(field string) []string {
+	return strings.Split(field, JSONFilterFieldOperatorDelimiter)
+}
+
+// SplitQueryFieldAndOperator 自定义查询字符串过滤器 - 分割“字段名”和“操作符”
+func SplitQueryFieldAndOperator(field string) []string {
+	return strings.Split(field, QueryFilterFieldOperatorDelimiter)
+}
+
+// SplitQueryQueries 自定义查询字符串过滤器 - 分割多个键值对
+func SplitQueryQueries(field string) []string {
+	return strings.Split(field, QueryFilterQueriesDelimiter)
+}
+
+// SplitQueryValues 自定义查询字符串过滤器 - 分割多个值
+func SplitQueryValues(field string) []string {
+	return strings.Split(field, QueryFilterValuesDelimiter)
 }
 
 // SplitJSONField 将JSONB字段字符串按分隔符分割成多个字段
