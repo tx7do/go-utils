@@ -442,3 +442,29 @@ func TestDurationpbToString(t *testing.T) {
 	result = DurationpbToString(nil)
 	assert.Nil(t, result)
 }
+
+func TestTimestampConversions(t *testing.T) {
+	// 测试秒转换
+	seconds := int64(1672531200)
+	ts := SecondsToTimestamp(&seconds)
+	assert.NotNil(t, ts)
+	assert.Equal(t, seconds, TimestampToSeconds(ts))
+
+	// 测试毫秒转换
+	milliseconds := int64(1672531200123)
+	ts = MillisecondsToTimestamp(&milliseconds)
+	assert.NotNil(t, ts)
+	assert.Equal(t, milliseconds, TimestampToMilliseconds(ts))
+
+	// 测试微秒转换
+	microseconds := int64(1672531200123456)
+	ts = MicrosecondsToTimestamp(&microseconds)
+	assert.NotNil(t, ts)
+	assert.Equal(t, microseconds, TimestampToMicroseconds(ts))
+
+	// 测试纳秒转换
+	nanoseconds := int64(1672531200123456789)
+	ts = NanosecondsToTimestamp(&nanoseconds)
+	assert.NotNil(t, ts)
+	assert.Equal(t, nanoseconds, TimestampToNanoseconds(ts))
+}

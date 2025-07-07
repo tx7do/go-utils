@@ -296,3 +296,67 @@ func DurationpbToString(in *durationpb.Duration) *string {
 
 	return trans.Ptr(in.AsDuration().String())
 }
+
+// TimestampToSeconds 将 timestamppb.Timestamp 转换为秒
+func TimestampToSeconds(ts *timestamppb.Timestamp) int64 {
+	if ts == nil {
+		return 0
+	}
+	return ts.AsTime().Unix()
+}
+
+// SecondsToTimestamp 将秒转换为 timestamppb.Timestamp
+func SecondsToTimestamp(seconds *int64) *timestamppb.Timestamp {
+	if seconds == nil {
+		return nil
+	}
+	return timestamppb.New(time.Unix(*seconds, 0))
+}
+
+func TimestampToMilliseconds(ts *timestamppb.Timestamp) int64 {
+	if ts == nil {
+		return 0
+	}
+
+	return ts.AsTime().UnixMilli()
+}
+
+func MillisecondsToTimestamp(milliseconds *int64) *timestamppb.Timestamp {
+	if milliseconds == nil {
+		return nil
+	}
+
+	return timestamppb.New(time.UnixMilli(*milliseconds))
+}
+
+func TimestampToMicroseconds(ts *timestamppb.Timestamp) int64 {
+	if ts == nil {
+		return 0
+	}
+
+	return ts.AsTime().UnixMicro()
+}
+
+func MicrosecondsToTimestamp(microseconds *int64) *timestamppb.Timestamp {
+	if microseconds == nil {
+		return nil
+	}
+
+	return timestamppb.New(time.UnixMicro(*microseconds))
+}
+
+// TimestampToNanoseconds 将 timestamppb.Timestamp 转换为纳秒
+func TimestampToNanoseconds(ts *timestamppb.Timestamp) int64 {
+	if ts == nil {
+		return 0
+	}
+	return ts.AsTime().UnixNano()
+}
+
+// NanosecondsToTimestamp 将纳秒转换为 timestamppb.Timestamp
+func NanosecondsToTimestamp(nanoseconds *int64) *timestamppb.Timestamp {
+	if nanoseconds == nil {
+		return nil
+	}
+	return timestamppb.New(time.Unix(0, *nanoseconds))
+}
