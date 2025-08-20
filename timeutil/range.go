@@ -173,3 +173,26 @@ func GetCurrentYearRangeTimeString() (string, string) {
 
 	return startDate, endDate
 }
+
+func RangeStringDateToTime(startDate, endDate string) (time.Time, time.Time) {
+	var startTime, endTime time.Time
+
+	if len(startDate) > 0 {
+		start := StringDateToTime(&startDate)
+		if start != nil {
+			startTime = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
+		}
+	}
+
+	if len(endDate) > 0 {
+		end := StringDateToTime(&endDate)
+		if end != nil {
+			endTime = end.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+		}
+	} else if !startTime.IsZero() {
+		// 如果 endDate 为空，且 startTime 不为零，则将 endTime 设置为 startDate 的最后一秒
+		endTime = startTime.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	}
+
+	return startTime, endTime
+}
