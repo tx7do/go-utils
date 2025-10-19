@@ -1,8 +1,9 @@
 package geolite
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGeoLite(t *testing.T) {
@@ -14,4 +15,10 @@ func TestGeoLite(t *testing.T) {
 	assert.Equal(t, ret.Country, "中国")
 	assert.Equal(t, ret.Province, "四川省")
 	assert.Equal(t, ret.City, "成都")
+
+	ret, err = g.Query("::1")
+	assert.Nil(t, err)
+
+	ret, err = g.Query("127.0.0.1")
+	assert.Nil(t, err)
 }

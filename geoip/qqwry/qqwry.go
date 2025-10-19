@@ -3,10 +3,11 @@ package qqwry
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/tx7do/go-utils/geoip"
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/tx7do/go-utils/geoip"
 
 	"github.com/tx7do/go-utils/geoip/qqwry/assets"
 )
@@ -143,6 +144,14 @@ func (c *Client) Query(queryIp string) (res geoip.Result, err error) {
 
 	ip32, err := c.parseIp(queryIp)
 	if err != nil {
+		return
+	}
+
+	// 判断是否为内网IP
+	isPrivate := IsPrivateIP(queryIp)
+	if isPrivate {
+		res.Province = "局域网"
+		res.City = "局域网"
 		return
 	}
 

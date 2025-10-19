@@ -42,18 +42,26 @@ func (g *Client) SetLanguage(code string) {
 }
 
 // query 查询城市级别数据
-func (g *Client) query(rawIP string) (city *geoip2.City, err error) {
-	ip := net.ParseIP(rawIP)
-	if ip == nil {
-		return nil, errors.New("invalid ip")
-	}
-
+func (g *Client) query(ip net.IP) (city *geoip2.City, err error) {
 	return g.db.City(ip)
 }
 
 // Query 通过IP获取地区
 func (g *Client) Query(rawIP string) (ret geoip.Result, err error) {
-	record, err := g.query(rawIP)
+	ip := net.ParseIP(rawIP)
+	if ip == nil {
+		return ret, errors.New("invalid ip address")
+	}
+
+	isPrivate := IsPrivateIP(ip)
+	if isPrivate {
+		ret.Country = "局域网"
+		ret.Province = "局域网"
+		ret.City = "局域网"
+		return ret, nil
+	}
+
+	record, err := g.query(ip)
 	if err != nil {
 		log.Fatal(err)
 		return ret, err

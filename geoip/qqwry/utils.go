@@ -3,7 +3,9 @@ package qqwry
 import (
 	"bytes"
 	"io"
+	"net"
 	"regexp"
+	"strings"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -32,4 +34,33 @@ func byte3ToUInt32(data []byte) uint32 {
 
 func SpiltAddress(addr string) []string {
 	return regSpiltAddress.FindAllString(addr, -1)
+}
+
+// IsPrivateIP 判断 IP 是否为内网地址
+func IsPrivateIP(ipStr string) bool {
+	// 处理 IPv6 或无效 IP（qqwry 主要支持 IPv4，可直接返回 true 视为内网）
+	ip := net.ParseIP(ipStr)
+	if ip == nil || strings.Contains(ipStr, ":") {
+		return true
+	}
+
+	// 定义内网网段（IPv4）
+	privateCIDRs := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",    // 本地回环地址
+		"169.254.0.0/16", // 链路本地地址
+	}
+
+	for _, cidr := range privateCIDRs {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			continue
+		}
+		if ipNet.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

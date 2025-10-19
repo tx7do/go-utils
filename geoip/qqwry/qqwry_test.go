@@ -18,4 +18,11 @@ func TestClient(t *testing.T) {
 	assert.Equal(t, res.Province, "四川省")
 	assert.Equal(t, res.City, "成都市")
 	assert.Equal(t, res.ISP, "阿里云")
+
+	res, err = g.Query("::1")
+	assert.NotNil(t, err)
+
+	res, err = g.Query("127.0.0.1")
+	assert.Nil(t, err)
+	assert.Equal(t, res.City, "本机地址")
 }
