@@ -16,7 +16,6 @@ func (TenantID) Fields() []ent.Field {
 	return []ent.Field{
 		field.Uint32("tenant_id").
 			Comment("租户ID").
-			Positive().
 			Immutable().
 			Nillable().
 			Optional(),
