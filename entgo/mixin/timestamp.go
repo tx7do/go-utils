@@ -66,15 +66,13 @@ var _ ent.Mixin = (*Timestamp)(nil)
 
 type Timestamp struct{ mixin.Schema }
 
-func (Timestamp) Fields() []ent.Field {
-	var fields []ent.Field
-	fields = append(fields, CreateTimestamp{}.Fields()...)
-	fields = append(fields, UpdateTimestamp{}.Fields()...)
-	fields = append(fields, DeleteTimestamp{}.Fields()...)
-	return fields
+func (Timestamp) Mixin() []ent.Mixin {
+	return []ent.Mixin{
+		CreateTimestamp{},
+		UpdateTimestamp{},
+		DeleteTimestamp{},
+	}
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -134,12 +132,12 @@ var _ ent.Mixin = (*TimestampAt)(nil)
 
 type TimestampAt struct{ mixin.Schema }
 
-func (TimestampAt) Fields() []ent.Field {
-	var fields []ent.Field
-	fields = append(fields, CreatedAtTimestamp{}.Fields()...)
-	fields = append(fields, UpdatedAtTimestamp{}.Fields()...)
-	fields = append(fields, DeletedAtTimestamp{}.Fields()...)
-	return fields
+func (TimestampAt) Mixin() []ent.Mixin {
+	return []ent.Mixin{
+		CreatedAtTimestamp{},
+		UpdatedAtTimestamp{},
+		DeletedAtTimestamp{},
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

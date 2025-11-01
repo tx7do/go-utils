@@ -1,12 +1,15 @@
 package mixin
 
 import (
+	"regexp"
+
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
-	"entgo.io/ent/schema/index"
 	"entgo.io/ent/schema/mixin"
-	"regexp"
 )
+
+// 确保 StringId 实现了 ent.Mixin 接口
+var _ ent.Mixin = (*StringId)(nil)
 
 type StringId struct {
 	mixin.Schema
@@ -18,16 +21,7 @@ func (StringId) Fields() []ent.Field {
 			Comment("id").
 			MaxLen(25).
 			NotEmpty().
-			Unique().
-			Immutable().
 			Match(regexp.MustCompile("^[0-9a-zA-Z_\\-]+$")).
 			StructTag(`json:"id,omitempty"`),
-	}
-}
-
-// Indexes of the StringId.
-func (StringId) Indexes() []ent.Index {
-	return []ent.Index{
-		index.Fields("id"),
 	}
 }

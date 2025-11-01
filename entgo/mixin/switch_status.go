@@ -3,8 +3,12 @@ package mixin
 import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 	"entgo.io/ent/schema/mixin"
 )
+
+// 确保 SwitchStatus 实现了 ent.Mixin 接口
+var _ ent.Mixin = (*SwitchStatus)(nil)
 
 type SwitchStatus struct {
 	mixin.Schema
@@ -30,9 +34,16 @@ func (SwitchStatus) Fields() []ent.Field {
 			//	dialect.Postgres: "switch_status",
 			//}).
 			Default("ON").
-			Values(
-				"OFF",
-				"ON",
+			NamedValues(
+				"Off", "OFF",
+				"On", "ON",
 			),
+	}
+}
+
+// Indexes of the SwitchStatus mixin.
+func (SwitchStatus) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("status"),
 	}
 }

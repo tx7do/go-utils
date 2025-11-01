@@ -10,6 +10,9 @@ import (
 	"github.com/tx7do/go-utils/id"
 )
 
+// 确保 SnowflackId 实现了 ent.Mixin 接口
+var _ ent.Mixin = (*SnowflackId)(nil)
+
 type SnowflackId struct {
 	mixin.Schema
 }

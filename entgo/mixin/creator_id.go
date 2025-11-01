@@ -3,19 +3,30 @@ package mixin
 import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
-	_mixin "entgo.io/ent/schema/mixin"
+	"entgo.io/ent/schema/index"
+	"entgo.io/ent/schema/mixin"
 )
 
+// 确保 CreatorId 实现了 ent.Mixin 接口
+var _ ent.Mixin = (*CreatorId)(nil)
+
 type CreatorId struct {
-	_mixin.Schema
+	mixin.Schema
 }
 
 func (CreatorId) Fields() []ent.Field {
 	return []ent.Field{
-		field.Uint64("creator_id").
+		field.Uint32("creator_id").
 			Comment("创建者用户ID").
 			Immutable().
 			Optional().
 			Nillable(),
+	}
+}
+
+// Indexes of the CreatorId mixin.
+func (CreatorId) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("creator_id"),
 	}
 }
