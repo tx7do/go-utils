@@ -100,10 +100,10 @@ var _ ent.Mixin = (*OperatorID)(nil)
 
 type OperatorID struct{ mixin.Schema }
 
-func (OperatorID) Mixin() []ent.Mixin {
-	return []ent.Mixin{
-		CreatedBy{},
-		UpdatedBy{},
-		DeletedBy{},
-	}
+func (OperatorID) Fields() []ent.Field {
+	var fields []ent.Field
+	fields = append(fields, CreatedBy{}.Fields()...)
+	fields = append(fields, UpdatedBy{}.Fields()...)
+	fields = append(fields, DeletedBy{}.Fields()...)
+	return fields
 }

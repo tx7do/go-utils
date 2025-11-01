@@ -69,12 +69,12 @@ var _ ent.Mixin = (*TimeAt)(nil)
 
 type TimeAt struct{ mixin.Schema }
 
-func (TimeAt) Mixin() []ent.Mixin {
-	return []ent.Mixin{
-		CreatedAt{},
-		UpdatedAt{},
-		DeletedAt{},
-	}
+func (TimeAt) Fields() []ent.Field {
+	var fields []ent.Field
+	fields = append(fields, CreatedAt{}.Fields()...)
+	fields = append(fields, UpdatedAt{}.Fields()...)
+	fields = append(fields, DeletedAt{}.Fields()...)
+	return fields
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,12 +139,12 @@ var _ ent.Mixin = (*Time)(nil)
 
 type Time struct{ mixin.Schema }
 
-func (Time) Mixin() []ent.Mixin {
-	return []ent.Mixin{
-		CreateTime{},
-		UpdateTime{},
-		DeleteTime{},
-	}
+func (Time) Fields() []ent.Field {
+	var fields []ent.Field
+	fields = append(fields, CreateTime{}.Fields()...)
+	fields = append(fields, UpdateTime{}.Fields()...)
+	fields = append(fields, DeleteTime{}.Fields()...)
+	return fields
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

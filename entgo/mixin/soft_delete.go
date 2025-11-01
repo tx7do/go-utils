@@ -9,9 +9,9 @@ type SoftDelete struct {
 	mixin.Schema
 }
 
-func (SoftDelete) Mixin() []ent.Mixin {
-	return []ent.Mixin{
-		DeletedAt{},
-		DeletedBy{},
-	}
+func (SoftDelete) Fields() []ent.Field {
+	var fields []ent.Field
+	fields = append(fields, DeletedAt{}.Fields()...)
+	fields = append(fields, DeletedBy{}.Fields()...)
+	return fields
 }
