@@ -17,7 +17,9 @@ func (TenantID) Fields() []ent.Field {
 		field.Uint32("tenant_id").
 			Comment("租户ID").
 			Positive().
-			Immutable(),
+			Immutable().
+			Nillable().
+			Optional(),
 	}
 }
 
