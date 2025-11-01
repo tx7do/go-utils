@@ -10,8 +10,6 @@ import (
 // 确保 TenantID 实现了 ent.Mixin 接口
 var _ ent.Mixin = (*TenantID)(nil)
 
-var _ ent.Mixin = (*TenantID)(nil)
-
 type TenantID struct{ mixin.Schema }
 
 func (TenantID) Fields() []ent.Field {
