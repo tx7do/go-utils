@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"entgo.io/ent/dialect/sql"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	"github.com/tx7do/go-utils/fieldmaskutil"
 	"github.com/tx7do/go-utils/stringcase"
@@ -96,5 +97,24 @@ func SetJsonFieldValueUpdateBuilder(fieldName string, msg proto.Message, paths [
 				fmt.Sprintf("\"%s\" || jsonb_build_object(%s)", fieldName, strings.Join(keyValues, ",")),
 			),
 		)
+	}
+}
+
+// ApplyNilFieldMask 应用字段掩码以设置字段为NULL
+func ApplyNilFieldMask[T interface {
+	Modify(...func(*sql.UpdateBuilder)) T
+}](
+	msg proto.Message,
+	updateMask *fieldmaskpb.FieldMask,
+	builder T,
+) {
+	if updateMask == nil {
+		return
+	}
+
+	nilPaths := fieldmaskutil.NilValuePaths(msg, updateMask.GetPaths())
+	nilUpdater := BuildSetNullUpdater(nilPaths)
+	if nilUpdater != nil {
+		builder.Modify(nilUpdater)
 	}
 }
