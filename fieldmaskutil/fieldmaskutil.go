@@ -3,6 +3,7 @@ package fieldmaskutil
 import (
 	"fmt"
 
+	"github.com/tx7do/go-utils/stringcase"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
@@ -114,4 +115,19 @@ func OverwriteByFieldMask(msg *proto.Message, fm *fieldmaskpb.FieldMask) error {
 
 	NestedMaskFromPaths(fm.GetPaths()).Overwrite(*msg, *msg)
 	return nil
+}
+
+// NormalizeFieldMaskPaths normalizes the paths in the given FieldMask to snake_case
+func NormalizeFieldMaskPaths(fm *fieldmaskpb.FieldMask) {
+	if fm == nil || len(fm.GetPaths()) == 0 {
+		return
+	}
+
+	paths := make([]string, len(fm.Paths))
+	for i, field := range fm.GetPaths() {
+		if field == "id_" || field == "_id" {
+			field = "id"
+		}
+		paths[i] = stringcase.ToSnakeCase(field)
+	}
 }
