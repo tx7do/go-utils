@@ -12,7 +12,7 @@ git tag mapper/v0.0.3
 git tag password/v0.0.1
 git tag query_parser/v0.0.2
 
-git tag entgo/v1.1.38
+git tag entgo/v1.1.39
 git tag gorm/v1.1.6
 
 git push origin --tags
