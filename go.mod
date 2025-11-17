@@ -1,16 +1,16 @@
 module github.com/tx7do/go-utils
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.1
 
 require (
 	github.com/gobwas/glob v0.2.3
 	github.com/google/uuid v1.6.0
-	github.com/stretchr/testify v1.10.0
-	golang.org/x/crypto v0.39.0
-	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
-	google.golang.org/protobuf v1.36.6
+	github.com/stretchr/testify v1.11.1
+	golang.org/x/crypto v0.44.0
+	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6
+	google.golang.org/protobuf v1.36.10
 )
 
 require (
