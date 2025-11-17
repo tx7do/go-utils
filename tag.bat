@@ -1,4 +1,4 @@
-git tag v1.1.30
+git tag v1.1.31
 
 git tag bank_card/v1.1.5
 git tag geoip/v1.1.6
@@ -12,7 +12,7 @@ git tag mapper/v0.0.3
 git tag password/v0.0.1
 git tag query_parser/v0.0.2
 
-git tag entgo/v1.1.40
+git tag entgo/v1.1.41
 git tag gorm/v1.1.6
 
 git push origin --tags

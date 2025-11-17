@@ -123,11 +123,22 @@ func NormalizeFieldMaskPaths(fm *fieldmaskpb.FieldMask) {
 		return
 	}
 
-	paths := make([]string, len(fm.Paths))
-	for i, field := range fm.GetPaths() {
+	fm.Normalize()
+
+	fm.Paths = NormalizePaths(fm.Paths)
+}
+
+func NormalizePaths(paths []string) []string {
+	if len(paths) == 0 {
+		return paths
+	}
+
+	for i, field := range paths {
 		if field == "id_" || field == "_id" {
 			field = "id"
 		}
 		paths[i] = stringcase.ToSnakeCase(field)
 	}
+
+	return paths
 }
