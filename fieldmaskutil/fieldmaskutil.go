@@ -66,6 +66,7 @@ func FilterByFieldMask(msg *proto.Message, fm *fieldmaskpb.FieldMask) error {
 
 	// normalize and validate field mask
 	fm.Normalize()
+	NormalizeFieldMaskPaths(fm)
 
 	if err := ValidateFieldMask(*msg, fm); err != nil {
 		return err
@@ -125,7 +126,12 @@ func NormalizeFieldMaskPaths(fm *fieldmaskpb.FieldMask) {
 
 	fm.Normalize()
 
-	fm.Paths = NormalizePaths(fm.Paths)
+	for i, field := range fm.GetPaths() {
+		if field == "id_" || field == "_id" {
+			field = "id"
+		}
+		fm.Paths[i] = stringcase.ToSnakeCase(field)
+	}
 }
 
 func NormalizePaths(paths []string) []string {
