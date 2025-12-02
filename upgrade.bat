@@ -1,4 +1,4 @@
-echo off
+echo on
 
 ::指定起始文件夹
 set DIR="%cd%"
