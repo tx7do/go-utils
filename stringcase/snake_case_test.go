@@ -30,10 +30,16 @@ func TestToSnakeCase(t *testing.T) {
 		{"A", "a"},
 		{"z", "z"},
 		{"Special-Characters_Test", "special_characters_test"},
-		{"Numbers123Test", "numbers_123_test"},
+		{"Numbers123Test", "numbers123_test"},
 		{"Hello World!", "hello_world"},
 		{"Test@With#Symbols", "test_with_symbols"},
-		{"ComplexCase123!@#", "complex_case_123"},
+		{"ComplexCase123!@#", "complex_case123"},
+		{"md5_hash", "md5_hash"},
+		{"md5Hash", "md5_hash"},
+		{"md5SHA", "md5_sha"},
+		{"userID", "user_id"},
+		{"ID123", "id123"},
+		{"ID123Test", "id123_test"},
 	}
 
 	for _, test := range tests {
@@ -70,10 +76,10 @@ func TestUpperSnakeCase(t *testing.T) {
 		{"A", "A"},
 		{"z", "Z"},
 		{"Special-Characters_Test", "SPECIAL_CHARACTERS_TEST"},
-		{"Numbers123Test", "NUMBERS_123_TEST"},
+		{"Numbers123Test", "NUMBERS123_TEST"},
 		{"Hello World!", "HELLO_WORLD"},
 		{"Test@With#Symbols", "TEST_WITH_SYMBOLS"},
-		{"ComplexCase123!@#", "COMPLEX_CASE_123"},
+		{"ComplexCase123!@#", "COMPLEX_CASE123"},
 	}
 
 	for _, test := range tests {
@@ -81,5 +87,38 @@ func TestUpperSnakeCase(t *testing.T) {
 		if result != test.expected {
 			t.Errorf("UpperSnakeCase(%q) = %q; expected %q", test.input, result, test.expected)
 		}
+	}
+}
+
+func TestIsSnakeCase(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"valid_simple", "snake_case", true},
+		{"valid_md5", "md5_hash", true},
+		{"valid_digits", "123", true},
+		{"single_letter", "a", true},
+		{"mixed_valid", "foo_bar123_baz", true},
+		{"uppercase_letter", "Snake_case", false},
+		{"camel_case_like", "md5Hash", false},
+		{"empty", "", false},
+		{"leading_underscore", "_a", false},
+		{"trailing_underscore", "a_", false},
+		{"consecutive_underscores", "a__b", false},
+		{"only_underscore", "_", false},
+		{"invalid_char_hyphen", "hello-world", false},
+		{"invalid_char_symbol", "hello!", false},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := IsSnakeCase(tc.input)
+			if got != tc.want {
+				t.Errorf("IsSnakeCase(%q) = %v; want %v", tc.input, got, tc.want)
+			}
+		})
 	}
 }
