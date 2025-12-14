@@ -5,10 +5,12 @@ import (
 	"unicode"
 )
 
+// UpperCamelCase 把字符转换为 帕斯卡命名/大驼峰命名法（CamelCase）
 func UpperCamelCase(input string) string {
 	return camelCase(input, true)
 }
 
+// LowerCamelCase 把字符转换为 小驼峰命名法（lowerCamelCase）
 func LowerCamelCase(input string) string {
 	return camelCase(input, false)
 }
@@ -18,6 +20,25 @@ func ToPascalCase(input string) string {
 	return camelCase(input, true)
 }
 
+// ToCamelCase 把字符转换为 小驼峰命名法（lowerCamelCase）
+func ToCamelCase(input string) string {
+	return camelCase(input, false)
+}
+
+// PascalCase 把字符转换为 帕斯卡命名/大驼峰命名法（CamelCase）
+func PascalCase(input string) string {
+	return camelCase(input, true)
+}
+
+// CamelCase 把字符转换为 小驼峰命名法（lowerCamelCase）
+func CamelCase(input string) string {
+	return camelCase(input, false)
+}
+
+// camelCase 是一个通用的驼峰命名转换函数。
+// 参数 upper 决定了首字母是否大写：
+//   - upper 为 true 时，生成 UpperCamelCase（帕斯卡命名法）
+//   - upper 为 false 时，生成 lowerCamelCase（小驼峰命名法）
 func camelCase(input string, upper bool) string {
 	input = strings.TrimSpace(input)
 	if input == "" {

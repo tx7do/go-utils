@@ -40,6 +40,9 @@ func TestToSnakeCase(t *testing.T) {
 		{"userID", "user_id"},
 		{"ID123", "id123"},
 		{"ID123Test", "id123_test"},
+		{"id", "id"},
+		{"Id", "id"},
+		{"ID", "id"},
 	}
 
 	for _, test := range tests {
