@@ -2,7 +2,6 @@ package eventloop
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,11 +26,14 @@ type EventLoop struct {
 	wg sync.WaitGroup // 等待组
 
 	running atomic.Bool // 运行状态
+	started atomic.Pointer[chan struct{}]
 
 	cbInline   bool              // 回调是否内联执行
 	mu         sync.Mutex        // 互斥锁（用于保护 cbInline/cbTimeout 等可变配置）
 	callbackCh chan callbackItem // 回调通道
 	cbTimeout  time.Duration     // 回调超时设置
+
+	logger Logger // 注入式日志接口（默认 NoopLogger）
 }
 
 // NewEventLoop 创建并返回一个 EventLoop 实例
@@ -52,7 +54,18 @@ func NewEventLoop(bufferSize int, processor EventProcessor) *EventLoop {
 
 		callbackCh: make(chan callbackItem, bufferSize),
 		cbTimeout:  defaultTimeout,
+
+		logger: NoopLogger{}, // 默认无操作日志
 	}
+}
+
+// SetLogger 在运行时注入自定义 Logger（可传 NoopLogger / StdLogger）
+func (el *EventLoop) SetLogger(l Logger) {
+	if l == nil {
+		el.logger = NoopLogger{}
+		return
+	}
+	el.logger = l
 }
 
 // SetCallbackInline 切换回调投递模式；inline=true 表示在事件循环内同步投递，timeout 控制同步投递的超时（0 表示无限等待）。
@@ -72,19 +85,29 @@ func (el *EventLoop) Start() error {
 		return nil
 	}
 
+	startedCh := make(chan struct{})
+	el.mu.Lock()
+	el.started.Store(&startedCh)
+	inline := el.cbInline
+	el.mu.Unlock()
+
 	el.wg.Add(1)
 	go el.eventLoop()
 
 	// 仅在异步回调模式启动回调分发器
-	el.mu.Lock()
-	inline := el.cbInline
-	el.mu.Unlock()
 	if !inline {
 		el.wg.Add(1)
 		go el.callbackDispatcher()
 	}
 
-	return nil
+	select {
+	case <-startedCh:
+		return nil
+	case <-time.After(50 * time.Millisecond):
+		// 仍然返回 nil，但打印日志帮助排查启动延迟
+		el.logger.Warnf("warning: eventLoop start timeout waiting for readiness")
+		return nil
+	}
 }
 
 // Stop 停止逻辑引擎，等待所有事件处理完成。
@@ -98,19 +121,8 @@ func (el *EventLoop) Stop() {
 	el.wg.Wait()
 }
 
-// Dispatch 分发事件到逻辑引擎进行处理。
-func (el *EventLoop) Dispatch(e Event) error {
-	if !el.running.Load() {
-		return ErrEventLoopNotRunning
-	}
-	select {
-	case <-el.ctx.Done():
-		return ErrEventLoopStopped
-	case el.lowChan <- e:
-		return nil
-	default:
-		return ErrLowQueueFull
-	}
+func (el *EventLoop) IsRunning() bool {
+	return el.running.Load()
 }
 
 // Submit 提交事件到事件循环
@@ -190,6 +202,22 @@ func (el *EventLoop) SubmitBlocking(ctx context.Context, event Event) error {
 func (el *EventLoop) eventLoop() {
 	defer el.wg.Done()
 
+	// 通知 Start 就绪（保持原有 started 实现）
+	if p := el.started.Load(); p != nil {
+		el.mu.Lock()
+		startedPtr := el.started.Load()
+		if startedPtr != nil {
+			close(*startedPtr)
+			el.started.Store(nil)
+		}
+		el.mu.Unlock()
+	}
+
+	//el.logger.Infof("EventLoop started")
+
+	// 本地缓冲低优先级事件，保证在无高/中优先级事件时再处理
+	var deferredLow []Event
+
 	for {
 		// 快速检查取消
 		select {
@@ -198,24 +226,48 @@ func (el *EventLoop) eventLoop() {
 		default:
 		}
 
-		// 优先级调度：高 -> 中 -> 阻塞等待低（或取消）
+		// 1. 先尽可能清空所有高优先级事件
+		for {
+			select {
+			case ev := <-el.highChan:
+				el.handleEvent(ev)
+			default:
+				goto drainMedium
+			}
+		}
+
+	drainMedium:
+		// 2. 然后尽可能清空所有中优先级事件
+		for {
+			select {
+			case ev := <-el.mediumChan:
+				el.handleEvent(ev)
+			default:
+				goto handleDeferred
+			}
+		}
+
+	handleDeferred:
+		// 3. 若有 deferred low，优先处理（在处理前会再次清空高/中）
+		if len(deferredLow) > 0 {
+			ev := deferredLow[0]
+			deferredLow = deferredLow[1:]
+			el.handleEvent(ev)
+			continue
+		}
+
+		// 4. 阻塞等待任一个事件到达：如果收到 low，先放入 deferred 再回到顶部继续优先级检查
 		select {
 		case ev := <-el.highChan:
 			el.handleEvent(ev)
 			continue
-		default:
-		}
-
-		select {
 		case ev := <-el.mediumChan:
 			el.handleEvent(ev)
 			continue
-		default:
-		}
-
-		select {
 		case ev := <-el.lowChan:
-			el.handleEvent(ev)
+			// 不立即处理，先缓冲，回到循环顶部会优先尝试清空 high/medium
+			deferredLow = append(deferredLow, ev)
+			continue
 		case <-el.ctx.Done():
 			return
 		}
@@ -286,7 +338,7 @@ func (el *EventLoop) enqueueCallback(item callbackItem) {
 				return
 			case <-timer.C:
 				// 超时后放弃并记录
-				fmt.Printf("enqueue callback timeout, discard result\n")
+				el.logger.Warnf("enqueue callback timeout, discard result")
 				return
 			}
 		}
@@ -317,7 +369,7 @@ func (el *EventLoop) callbackDispatcher() {
 					goto next
 				case <-deadline:
 					// 超时后放弃并记录
-					fmt.Printf("callback deliver timeout, discard result\n")
+					el.logger.Warnf("callback deliver timeout, discard result")
 					goto next
 				}
 			}
@@ -370,7 +422,7 @@ func (el *EventLoop) deliverResult(event Event, result Result) {
 		case <-el.ctx.Done():
 			// loop stopped
 		case <-timer.C:
-			fmt.Printf("inline callback deliver timeout, discard result for event priority: %v\n", event.Priority)
+			el.logger.Warnf("inline callback deliver timeout, discard result for event priority: %v", event.Priority)
 		}
 		return
 	}

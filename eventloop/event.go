@@ -25,7 +25,7 @@ type Event struct {
 	Priority Priority // 事件优先级
 	Type     string   // 事件类型
 
-	Payload any // 事件数据
+	Data any // 事件数据
 
 	Callback chan Result // 回调
 	Ctx      context.Context
@@ -55,7 +55,7 @@ func NewEvent(typ string, payload any, opts ...EventOption) Event {
 	ev := Event{
 		Priority: PriorityLow,
 		Type:     typ,
-		Payload:  payload,
+		Data:     payload,
 		TS:       time.Now(),
 	}
 	for _, opt := range opts {

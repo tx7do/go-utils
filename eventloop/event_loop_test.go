@@ -13,11 +13,8 @@ type testProcessor struct {
 }
 
 func (p *testProcessor) Process(ev Event) Result {
-	// 非阻塞写入以防意外阻塞测试（通道有足够缓冲）
-	select {
-	case p.ch <- fmt.Sprint(ev.Payload):
-	default:
-	}
+	fmt.Println("Process", ev)
+	p.ch <- fmt.Sprint(ev.Data) // 阻塞写入，确保不丢事件
 	return Result{Err: nil}
 }
 
@@ -33,13 +30,13 @@ func TestSubmitPriorityProcessing(t *testing.T) {
 	defer el.Stop()
 
 	// 先提交低、中、高
-	if err := el.Submit(Event{Priority: PriorityLow, Payload: "low", Ctx: context.Background()}); err != nil {
+	if err := el.Submit(NewEvent("low", "low", WithPriority(PriorityLow), WithContext(context.Background()))); err != nil {
 		t.Fatalf("Submit low failed: %v", err)
 	}
-	if err := el.Submit(Event{Priority: PriorityMedium, Payload: "medium", Ctx: context.Background()}); err != nil {
+	if err := el.Submit(NewEvent("medium", "medium", WithPriority(PriorityMedium), WithContext(context.Background()))); err != nil {
 		t.Fatalf("Submit medium failed: %v", err)
 	}
-	if err := el.Submit(Event{Priority: PriorityHigh, Payload: "high", Ctx: context.Background()}); err != nil {
+	if err := el.Submit(NewEvent("high", "high", WithPriority(PriorityHigh), WithContext(context.Background()))); err != nil {
 		t.Fatalf("Submit high failed: %v", err)
 	}
 
@@ -73,7 +70,7 @@ func TestNilProcessorCallbackError(t *testing.T) {
 	defer el.Stop()
 
 	cb := make(chan Result, 1)
-	ev := Event{Priority: PriorityHigh, Callback: cb, Ctx: context.Background()}
+	ev := NewEvent("high", "high", WithPriority(PriorityHigh), WithContext(context.Background()), WithCallback(cb))
 
 	if err := el.Submit(ev); err != nil {
 		t.Fatalf("Submit failed: %v", err)
@@ -95,8 +92,6 @@ func TestCallbackDiscardWhenFull(t *testing.T) {
 	proc := &testProcessor{ch: procCh}
 
 	el := NewEventLoop(10, proc)
-
-	// 使用 inline 模式并设置超时，确保在回调通道已满时主循环会在超时后放弃投递（确定性）
 	el.SetCallbackInline(true, 100*time.Millisecond)
 
 	if err := el.Start(); err != nil {
@@ -104,30 +99,34 @@ func TestCallbackDiscardWhenFull(t *testing.T) {
 	}
 	defer el.Stop()
 
-	// 回调通道容量为1，先填满一个占位项
 	cb := make(chan Result, 1)
-	cb <- Result{Err: fmt.Errorf("placeholder")}
+	cb <- Result{Err: fmt.Errorf("placeholder")} // fill the buffer
 
-	ev := Event{Priority: PriorityMedium, Callback: cb, Payload: "p", Ctx: context.Background()}
+	ev := NewEvent("Medium", "p", WithPriority(PriorityMedium), WithContext(context.Background()), WithCallback(cb))
 	if err := el.Submit(ev); err != nil {
 		t.Fatalf("Submit failed: %v", err)
 	}
 
-	// 等待一小段时间让事件被处理（若有额外写入会增加长度）
-	time.Sleep(200 * time.Millisecond)
-
-	// 通道长度应仍为1（未被追加）
-	if l := len(cb); l != 1 {
-		t.Fatalf("expected callback channel length 1, got %d", l)
+	// 等待事件被处理（证明 Process 被调用）
+	select {
+	case <-procCh:
+		// processed
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for event to be processed")
 	}
 
-	// 读取并确认仍为占位项
+	// 此时回调应已尝试投递并因超时丢弃
+	if len(cb) != 1 {
+		t.Fatalf("expected callback channel length 1, got %d", len(cb))
+	}
+
+	// 确认仍是 placeholder
 	select {
 	case r := <-cb:
 		if r.Err == nil || r.Err.Error() != "placeholder" {
 			t.Fatalf("unexpected callback content: %v", r)
 		}
 	default:
-		t.Fatal("expected to read placeholder from callback channel")
+		t.Fatal("expected to read placeholder")
 	}
 }

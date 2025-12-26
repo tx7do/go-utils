@@ -18,7 +18,6 @@
 - `func (el *EventLoop) Start() error`：启动事件循环（在单独 goroutine 中运行）。
 - `func (el *EventLoop) Stop()`：优雅停止并等待循环结束。
 - `func (el *EventLoop) Submit(ev Event) error`：将事件入队（行为详见下文）。
-- `func (el *EventLoop) Dispatch(ev Event) error`：直接调度或同步路径（实现可能与 Submit 不同，文档中应注明具体差异，例如是否绕过某些队列策略或是否阻塞调用方）。
 - `func (el *EventLoop) SetCallbackInline(inline bool, timeout time.Duration)`：切换回调投递模式。`inline=true` 表示在事件循环的 goroutine 内同步投递回调（可能阻塞事件循环）；`timeout` 控制同步投递的超时（`0` 表示无限等待）。注意建议在 `Start()` 之前设置以获得更确定的行为。
 
 ## 回调投递语义（重要）
