@@ -83,7 +83,8 @@ import (
   "context"
   "fmt"
   "time"
-  "your/module/path/pkg/core/eventloop"
+
+  "github.com/tx7do/go-utils/eventloop"
 )
 
 type myProc struct{}
