@@ -14,6 +14,12 @@ const (
 	PriorityLow
 )
 
+const (
+	FrameInterval = 50 * time.Millisecond // 20Hz 逻辑帧
+	FrameBudget   = 25 * time.Millisecond // 预留50%缓冲
+	MaxLowTime    = 2 * time.Millisecond  // 低优先级最多占用2ms/帧
+)
+
 // Result 回调结果载体
 type Result struct {
 	Data any

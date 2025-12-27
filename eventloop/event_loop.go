@@ -2,6 +2,7 @@ package eventloop
 
 import (
 	"context"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,8 +19,6 @@ type EventLoop struct {
 	mediumChan chan Event // 中
 	lowChan    chan Event // 低
 
-	processor EventProcessor // 事件处理器
-
 	ctx    context.Context    // 上下文
 	cancel context.CancelFunc // 取消函数
 
@@ -28,16 +27,24 @@ type EventLoop struct {
 	running atomic.Bool // 运行状态
 	started atomic.Pointer[chan struct{}]
 
+	processor EventProcessor // 事件处理器
+
+	logger  Logger  // 注入式日志接口（默认 NoopLogger）
+	metrics Metrics // 注入式统计接口（默认 NoopMetrics）
+
 	cbInline   bool              // 回调是否内联执行
 	mu         sync.Mutex        // 互斥锁（用于保护 cbInline/cbTimeout 等可变配置）
 	callbackCh chan callbackItem // 回调通道
 	cbTimeout  time.Duration     // 回调超时设置
 
-	logger Logger // 注入式日志接口（默认 NoopLogger）
+	frameInterval time.Duration // 帧间隔
+	frameBudget   time.Duration // 帧时间预算
+	maxLowTime    time.Duration // 每帧最大低优先级处理时间
+	frameDriven   bool          // 是否启用帧驱动模式
 }
 
 // NewEventLoop 创建并返回一个 EventLoop 实例
-func NewEventLoop(bufferSize int, processor EventProcessor) *EventLoop {
+func NewEventLoop(bufferSize int, processor EventProcessor, frameDriven bool) *EventLoop {
 	if bufferSize <= 0 {
 		bufferSize = defaultBufferSize
 	}
@@ -55,7 +62,13 @@ func NewEventLoop(bufferSize int, processor EventProcessor) *EventLoop {
 		callbackCh: make(chan callbackItem, bufferSize),
 		cbTimeout:  defaultTimeout,
 
-		logger: NoopLogger{}, // 默认无操作日志
+		logger:  NoopLogger{},  // 默认无操作日志
+		metrics: NoopMetrics{}, // 默认无统计实现
+
+		frameInterval: FrameInterval,
+		frameBudget:   FrameBudget,
+		maxLowTime:    MaxLowTime,
+		frameDriven:   frameDriven,
 	}
 }
 
@@ -68,6 +81,15 @@ func (el *EventLoop) SetLogger(l Logger) {
 	el.logger = l
 }
 
+// SetMetrics 允许注入自定义 Metrics 实现（例如 NewSimpleMetrics()）
+func (el *EventLoop) SetMetrics(m Metrics) {
+	if m == nil {
+		el.metrics = NoopMetrics{}
+		return
+	}
+	el.metrics = m
+}
+
 // SetCallbackInline 切换回调投递模式；inline=true 表示在事件循环内同步投递，timeout 控制同步投递的超时（0 表示无限等待）。
 func (el *EventLoop) SetCallbackInline(inline bool, timeout time.Duration) {
 	el.mu.Lock()
@@ -76,6 +98,23 @@ func (el *EventLoop) SetCallbackInline(inline bool, timeout time.Duration) {
 	el.cbInline = inline
 	if timeout >= 0 {
 		el.cbTimeout = timeout
+	}
+}
+
+// SetFrameParameters 设置帧驱动模式下的参数：interval 为帧间隔，budget 为每帧时间预算，maxLow 为每帧最大低优先级处理时间。
+// 传入 0 或负值表示保持当前设置不变。
+func (el *EventLoop) SetFrameParameters(interval, budget, maxLow time.Duration) {
+	el.mu.Lock()
+	defer el.mu.Unlock()
+
+	if interval > 0 {
+		el.frameInterval = interval
+	}
+	if budget > 0 {
+		el.frameBudget = budget
+	}
+	if maxLow >= 0 {
+		el.maxLowTime = maxLow
 	}
 }
 
@@ -91,8 +130,14 @@ func (el *EventLoop) Start() error {
 	inline := el.cbInline
 	el.mu.Unlock()
 
-	el.wg.Add(1)
-	go el.eventLoop()
+	// 根据模式选择启动循环
+	if el.frameDriven {
+		el.wg.Add(1)
+		go el.startFrameLoop()
+	} else {
+		el.wg.Add(1)
+		go el.eventLoop()
+	}
 
 	// 仅在异步回调模式启动回调分发器
 	if !inline {
@@ -110,6 +155,36 @@ func (el *EventLoop) Start() error {
 	}
 }
 
+// startFrameLoop 启动帧驱动事件循环
+func (el *EventLoop) startFrameLoop() {
+	defer el.wg.Done()
+
+	// 通知 Start 就绪（与 eventLoop 保持一致）
+	if p := el.started.Load(); p != nil {
+		el.mu.Lock()
+		startedPtr := el.started.Load()
+		if startedPtr != nil {
+			close(*startedPtr)
+			el.started.Store(nil)
+		}
+		el.mu.Unlock()
+	}
+
+	ticker := time.NewTicker(el.frameInterval)
+	defer ticker.Stop()
+	log.Println("EventLoop (frame-driven) started")
+
+	for {
+		select {
+		case <-el.ctx.Done():
+			log.Println("EventLoop (frame-driven) stopped")
+			return
+		case <-ticker.C:
+			el.processFrame()
+		}
+	}
+}
+
 // Stop 停止逻辑引擎，等待所有事件处理完成。
 func (el *EventLoop) Stop() {
 	if !el.running.CompareAndSwap(true, false) {
@@ -121,8 +196,21 @@ func (el *EventLoop) Stop() {
 	el.wg.Wait()
 }
 
+// IsRunning 返回事件循环是否正在运行
 func (el *EventLoop) IsRunning() bool {
 	return el.running.Load()
+}
+
+// QueueLengths 返回当前各内部通道的缓冲长度快照。
+// 该方法为非阻塞读取，只反映当前瞬时长度。
+func (el *EventLoop) QueueLengths() QueueLengths {
+	// len(chan) 是并发安全的，用于获取当前缓冲中的元素数
+	return QueueLengths{
+		High:     len(el.highChan),
+		Medium:   len(el.mediumChan),
+		Low:      len(el.lowChan),
+		Callback: len(el.callbackCh),
+	}
 }
 
 // Submit 提交事件到事件循环
@@ -202,7 +290,7 @@ func (el *EventLoop) SubmitBlocking(ctx context.Context, event Event) error {
 func (el *EventLoop) eventLoop() {
 	defer el.wg.Done()
 
-	// 通知 Start 就绪（保持原有 started 实现）
+	// 通知 Start 就绪
 	if p := el.started.Load(); p != nil {
 		el.mu.Lock()
 		startedPtr := el.started.Load()
@@ -301,11 +389,48 @@ func (el *EventLoop) handleEvent(event Event) {
 	}
 
 	// 3. 执行处理（由业务负责不阻塞太久）
+	start := time.Now()
 	result := el.processor.Process(event)
+	elapsed := time.Since(start)
+
+	// 上报耗时（由具体 Metrics 实现决定如何采集）
+	el.metrics.ObserveProcessingDuration(event.Priority, elapsed)
 
 	// 4. 统一回调投递（根据模式选择 inline 或异步）
 	if event.Callback != nil {
 		el.deliverResult(event, result)
+	}
+}
+
+// processFrame 处理单帧事件，按优先级顺序处理，遵守时间预算。
+func (el *EventLoop) processFrame() {
+	frameStart := time.Now()
+
+	// 1. 处理 High 优先级（直到空）
+	for len(el.highChan) > 0 {
+		ev := <-el.highChan
+		el.handleEvent(ev)
+		if time.Since(frameStart) >= el.frameBudget {
+			log.Println("Frame budget exceeded during high-priority processing")
+			return
+		}
+	}
+
+	// 2. 处理 Medium 优先级（直到空）
+	for len(el.mediumChan) > 0 {
+		ev := <-el.mediumChan
+		el.handleEvent(ev)
+		if time.Since(frameStart) >= el.frameBudget {
+			log.Println("Frame budget exceeded during medium-priority processing")
+			return
+		}
+	}
+
+	// 3. 有限处理 Low 优先级
+	lowDeadline := frameStart.Add(el.maxLowTime)
+	for time.Now().Before(lowDeadline) && len(el.lowChan) > 0 {
+		ev := <-el.lowChan
+		el.handleEvent(ev)
 	}
 }
 

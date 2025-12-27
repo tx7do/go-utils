@@ -23,7 +23,7 @@ func TestSubmitPriorityProcessing(t *testing.T) {
 	ch := make(chan string, 10)
 	proc := &testProcessor{ch: ch}
 
-	el := NewEventLoop(10, proc)
+	el := NewEventLoop(10, proc, false)
 	if err := el.Start(); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestSubmitPriorityProcessing(t *testing.T) {
 
 // TestNilProcessorCallbackError 验证当 processor 为 nil 时，会通过回调返回错误。
 func TestNilProcessorCallbackError(t *testing.T) {
-	el := NewEventLoop(10, nil)
+	el := NewEventLoop(10, nil, false)
 
 	// 保证回调在事件循环 goroutine 内以可控超时同步投递，避免异步分发带来的不可确定性
 	el.SetCallbackInline(true, time.Second)
@@ -91,7 +91,7 @@ func TestCallbackDiscardWhenFull(t *testing.T) {
 	procCh := make(chan string, 1)
 	proc := &testProcessor{ch: procCh}
 
-	el := NewEventLoop(10, proc)
+	el := NewEventLoop(10, proc, false)
 	el.SetCallbackInline(true, 100*time.Millisecond)
 
 	if err := el.Start(); err != nil {

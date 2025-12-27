@@ -12,7 +12,7 @@ git tag mapper/v0.0.3
 git tag password/v0.0.1
 git tag query_parser/v0.0.2
 git tag code_generator/v0.0.1
-git tag eventloop/v0.0.2
+git tag eventloop/v0.0.3
 
 git tag entgo/v1.1.42
 git tag gorm/v1.1.7
