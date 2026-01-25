@@ -1,8 +1,11 @@
 package jwtutil
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 	"time"
 
@@ -516,4 +519,76 @@ func TestGetJWTClaims(t *testing.T) {
 	claims, err = GetJWTClaims("")
 	assert.Error(t, err)
 	assert.Nil(t, claims)
+}
+
+func TestNewRefreshToken(t *testing.T) {
+	// 基本行为检查
+	token, err := NewRefreshToken()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, token)
+
+	// 不应包含填充字符 '='
+	assert.NotContains(t, token, "=")
+
+	// 只包含 URL-safe base64 字符
+	ok, err := regexp.MatchString(`^[A-Za-z0-9_-]+$`, token)
+	assert.NoError(t, err)
+	assert.True(t, ok, "token should contain only URL-safe base64 characters")
+
+	// 长度检查（32 字节经 base64.RawURLEncoding 应为 43 个字符）
+	assert.Equal(t, 43, len(token), "expected length 43 for 32 bytes encoded with RawURLEncoding")
+
+	// 可解码回 32 字节
+	b, err := base64.RawURLEncoding.DecodeString(token)
+	assert.NoError(t, err)
+	assert.Equal(t, 32, len(b), "decoded token should be 32 bytes")
+
+	// 简单碰撞检测（次数适中以避免测试过慢）
+	const testCount = 10000
+	seen := make(map[string]struct{}, testCount)
+	for i := 0; i < testCount; i++ {
+		tk, err := NewRefreshToken()
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
+		if _, exists := seen[tk]; exists {
+			t.Fatalf("collision detected at iteration %d: %s", i, tk)
+		}
+		seen[tk] = struct{}{}
+	}
+}
+
+func TestNewJWTIdFormat(t *testing.T) {
+	id := NewJWTId()
+	assert.NotEmpty(t, id, "jti should not be empty")
+
+	// 应为 32 个十六进制字符（16 字节的 hex 表示）
+	assert.Equal(t, 32, len(id), "jti length should be 32")
+
+	// 不应包含连字符
+	assert.NotContains(t, id, "-", "jti should not contain hyphens")
+
+	// 仅包含小写十六进制字符
+	ok, err := regexp.MatchString(`^[0-9a-f]{32}$`, id)
+	assert.NoError(t, err)
+	assert.True(t, ok, "jti should be valid lowercase hex")
+
+	// 解码回 16 字节
+	b, err := hex.DecodeString(id)
+	assert.NoError(t, err)
+	assert.Equal(t, 16, len(b), "decoded jti should be 16 bytes")
+}
+
+func TestNewJWTIdCollisionRate(t *testing.T) {
+	const testCount = 10000
+
+	seen := make(map[string]struct{}, testCount)
+	for i := 0; i < testCount; i++ {
+		id := NewJWTId()
+		if _, exists := seen[id]; exists {
+			t.Fatalf("collision detected at iteration %d: %s", i, id)
+		}
+		seen[id] = struct{}{}
+	}
+	t.Logf("generated %d jti without collisions", testCount)
 }

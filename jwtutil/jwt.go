@@ -1,12 +1,16 @@
 package jwtutil
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/encoding"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 // ParseJWTPayload 使用 github.com/golang-jwt/jwt/v5 从 JWT 中解析出 payload
@@ -352,4 +356,30 @@ func GetJWTIssuedAt(tokenString string) (*time.Time, error) {
 	}
 
 	return &iat.Time, nil
+}
+
+// NewRefreshToken 生成一个安全的随机刷新令牌
+func NewRefreshToken() (string, error) {
+	b := make([]byte, 32) // 256位随机性，足以抵抗 2026 年的暴力破解
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	// 使用 Base64URL 保证在 URL 和 Header 中传输安全，且比 Hex 更短
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// NewJWTId 生成一个唯一的 JWT ID (jti)
+func NewJWTId() string {
+	u7, err := uuid.NewV7()
+	if err != nil {
+		// Fallback to v4 if system clock is unreliable
+		u4 := uuid.New()
+		var buf [32]byte
+		hex.Encode(buf[:], u4[:])
+		return string(buf[:])
+	}
+
+	var buf [32]byte
+	hex.Encode(buf[:], u7[:])
+	return string(buf[:])
 }

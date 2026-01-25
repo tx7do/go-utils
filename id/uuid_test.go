@@ -1,6 +1,7 @@
 package id
 
 import (
+	"encoding/hex"
 	"strings"
 	"sync"
 	"testing"
@@ -9,37 +10,83 @@ import (
 )
 
 func TestNewGUIDv4(t *testing.T) {
-	// 测试带有连字符的 GUID
+	// 带连字符
 	withHyphen := NewGUIDv4(true)
 	assert.NotEmpty(t, withHyphen)
 	assert.Equal(t, 4, strings.Count(withHyphen, "-"), "GUID 应包含 4 个连字符")
+	assert.Equal(t, 36, len(withHyphen), "带连字符的 GUID 长度应为 36")
 
-	// 测试不带连字符的 GUID
+	// 验证带连字符的 GUID 去掉连字符后为合法的 16 字节十六进制
+	hexStr := strings.ReplaceAll(withHyphen, "-", "")
+	b, err := hex.DecodeString(hexStr)
+	assert.NoError(t, err, "带连字符 GUID 去掉连字符后应为有效的十六进制")
+	assert.Equal(t, 16, len(b), "去掉连字符后的字节长度应为 16")
+
+	// 不带连字符
 	withoutHyphen := NewGUIDv4(false)
 	assert.NotEmpty(t, withoutHyphen)
 	assert.Equal(t, 0, strings.Count(withoutHyphen, "-"), "GUID 不应包含连字符")
-
-	// 验证 GUID 的长度
-	assert.Equal(t, 36, len(withHyphen), "带连字符的 GUID 长度应为 36")
 	assert.Equal(t, 32, len(withoutHyphen), "不带连字符的 GUID 长度应为 32")
+
+	// 验证不带连字符的 GUID 为合法十六进制并为 16 字节
+	b2, err2 := hex.DecodeString(withoutHyphen)
+	assert.NoError(t, err2, "不带连字符的 GUID 应为有效的十六进制")
+	assert.Equal(t, 16, len(b2), "不带连字符的 GUID 解码后字节长度应为 16")
 }
 
 func TestNewGUIDv4CollisionRate(t *testing.T) {
-	const (
-		testCount  = 100000 // 测试生成的GUID数量
-		withHyphen = true   // 是否带连字符
-	)
+	const testCount = 100000
 
 	ids := make(map[string]struct{})
 	for i := 0; i < testCount; i++ {
-		id := NewGUIDv4(withHyphen)
+		id := NewGUIDv4(true)
 		if _, exists := ids[id]; exists {
 			t.Errorf("碰撞发生: %s 已存在", id)
 		}
 		ids[id] = struct{}{}
 	}
 
-	t.Logf("生成了 %d 个GUID，无碰撞。", testCount)
+	t.Logf("生成了 %d 个GUIDv4，无碰撞。", testCount)
+}
+
+func TestNewGUIDv7(t *testing.T) {
+	// 带连字符
+	withHyphen := NewGUIDv7(true)
+	assert.NotEmpty(t, withHyphen)
+	assert.Equal(t, 4, strings.Count(withHyphen, "-"), "GUID 应包含 4 个连字符")
+	assert.Equal(t, 36, len(withHyphen), "带连字符的 GUID 长度应为 36")
+
+	// 验证带连字符的 GUID 去掉连字符后为合法的 16 字节十六进制
+	hexStr := strings.ReplaceAll(withHyphen, "-", "")
+	b, err := hex.DecodeString(hexStr)
+	assert.NoError(t, err, "带连字符 GUID 去掉连字符后应为有效的十六进制")
+	assert.Equal(t, 16, len(b), "去掉连字符后的字节长度应为 16")
+
+	// 不带连字符
+	withoutHyphen := NewGUIDv7(false)
+	assert.NotEmpty(t, withoutHyphen)
+	assert.Equal(t, 0, strings.Count(withoutHyphen, "-"), "GUID 不应包含连字符")
+	assert.Equal(t, 32, len(withoutHyphen), "不带连字符的 GUID 长度应为 32")
+
+	// 验证不带连字符的 GUID 为合法十六进制并为 16 字节
+	b2, err2 := hex.DecodeString(withoutHyphen)
+	assert.NoError(t, err2, "不带连字符的 GUID 应为有效的十六进制")
+	assert.Equal(t, 16, len(b2), "不带连字符的 GUID 解码后字节长度应为 16")
+}
+
+func TestNewGUIDv7CollisionRate(t *testing.T) {
+	const testCount = 100000
+
+	ids := make(map[string]struct{})
+	for i := 0; i < testCount; i++ {
+		id := NewGUIDv7(true)
+		if _, exists := ids[id]; exists {
+			t.Errorf("碰撞发生: %s 已存在", id)
+		}
+		ids[id] = struct{}{}
+	}
+
+	t.Logf("生成了 %d 个GUIDv7，无碰撞。", testCount)
 }
 
 func TestNewShortUUID(t *testing.T) {

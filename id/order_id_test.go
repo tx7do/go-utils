@@ -65,7 +65,7 @@ func TestGenerateOrderIdWithTenantId(t *testing.T) {
 	tenantID := "M9876"
 	orderID := GenerateOrderIdWithTenantId(tenantID)
 
-	t.Logf(orderID)
+	t.Logf("order ID: %s", orderID)
 
 	// 验证订单号长度是否正确
 	assert.Equal(t, 14+5+4, len(orderID))
