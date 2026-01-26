@@ -1,9 +1,5 @@
 ﻿# Package aggregator
 
-这是一个为 aggregator 包设计的 README.md 模板，遵循 2026 年现代 Go 微服务最佳实践，重点突出了高性能并发、泛型支持与声明式回填。
-
-## Package aggregator
-
 `aggregator` 是一个高性能的分布式数据聚合工具包，旨在解决微服务架构中的 **N+1 查询问题** 以及 **DTO 关联数据回填（Data Populating）** 的复杂性。
 
 ## 核心特性
