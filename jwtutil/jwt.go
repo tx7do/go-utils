@@ -360,7 +360,7 @@ func GetJWTIssuedAt(tokenString string) (*time.Time, error) {
 
 // NewRefreshToken 生成一个安全的随机刷新令牌
 func NewRefreshToken() (string, error) {
-	b := make([]byte, 32) // 256位随机性，足以抵抗 2026 年的暴力破解
+	b := make([]byte, 32) // 256位随机性，足以抵抗暴力破解
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
