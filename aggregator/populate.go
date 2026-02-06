@@ -31,7 +31,7 @@ func Populate[K comparable, T any, R any](
 
 	for _, item := range items {
 		if val, ok := data[idGetter(item)]; ok {
-			if item == nil || val == nil {
+			if isNil(item) || isNil(val) {
 				continue
 			}
 
@@ -54,7 +54,7 @@ func PopulateTree[K comparable, T any, R any](
 
 	for _, item := range items {
 		if val, ok := data[idGetter(item)]; ok {
-			if item == nil || val == nil {
+			if isNil(item) || isNil(val) {
 				continue
 			}
 
@@ -75,7 +75,7 @@ func PopulateOne[K comparable, T any, R any](
 	setter Setter[R, T],
 ) {
 	if val, ok := data[idGetter(item)]; ok {
-		if item == nil || val == nil {
+		if isNil(item) || isNil(val) {
 			return
 		}
 
@@ -107,7 +107,7 @@ func PopulateMulti[K comparable, T any, R any](
 			}
 		}
 
-		if item == nil {
+		if isNil(item) {
 			continue
 		}
 
@@ -139,7 +139,7 @@ func PopulateTreeMulti[K comparable, T any, R any](
 				}
 			}
 
-			if item == nil {
+			if isNil(item) {
 				continue
 			}
 

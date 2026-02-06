@@ -43,7 +43,7 @@ func PopulateWithLoader[R any, T any](
 			continue
 		}
 
-		if p.item == nil || val == nil {
+		if isNil(p.item) || isNil(val) {
 			continue
 		}
 
@@ -98,7 +98,7 @@ func PopulateTreeWithLoader[R any, T any](
 			continue
 		}
 
-		if p.item == nil || val == nil {
+		if isNil(p.item) || isNil(val) {
 			continue
 		}
 
