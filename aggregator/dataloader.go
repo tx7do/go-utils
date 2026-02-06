@@ -34,10 +34,19 @@ func PopulateWithLoader[R any, T any](
 	}
 
 	for _, p := range pairs {
+		if isNil(p) {
+			continue
+		}
+
 		val, err := p.thunk()
 		if err != nil {
 			continue
 		}
+
+		if p.item == nil || val == nil {
+			continue
+		}
+
 		setter(p.item, val)
 	}
 
@@ -80,10 +89,19 @@ func PopulateTreeWithLoader[R any, T any](
 
 	// 执行所有 Thunk 并回填数据
 	for _, p := range pairs {
+		if isNil(p) {
+			continue
+		}
+
 		val, err := p.thunk()
 		if err != nil {
 			continue
 		}
+
+		if p.item == nil || val == nil {
+			continue
+		}
+
 		setter(p.item, val)
 	}
 
