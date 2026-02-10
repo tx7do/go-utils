@@ -982,3 +982,108 @@ func ExampleParseCreateTables() {
 	// users
 	// orders
 }
+
+func TestParseCreateTable_Comment(t *testing.T) {
+	sql := `CREATE TABLE users (
+		id INT PRIMARY KEY,
+		name VARCHAR(255) NOT NULL
+	) COMMENT='用户表'`
+
+	table, err := ParseCreateTable(sql)
+	require.NoError(t, err)
+	assert.Equal(t, "users", table.Name)
+	assert.Equal(t, "用户表", table.Comment)
+}
+
+func TestParseCreateTable_CommentWithDoubleQuotes(t *testing.T) {
+	sql := `CREATE TABLE products (
+		id INT PRIMARY KEY,
+		name VARCHAR(255)
+	) COMMENT="产品表"`
+
+	table, err := ParseCreateTable(sql)
+	require.NoError(t, err)
+	assert.Equal(t, "products", table.Name)
+	assert.Equal(t, "产品表", table.Comment)
+}
+
+func TestParseCreateTable_Collation(t *testing.T) {
+	sql := `CREATE TABLE orders (
+		id INT PRIMARY KEY,
+		content TEXT
+	) COLLATION=utf8mb4_unicode_ci`
+
+	table, err := ParseCreateTable(sql)
+	require.NoError(t, err)
+	assert.Equal(t, "orders", table.Name)
+	assert.Equal(t, "utf8mb4_unicode_ci", table.Collation)
+}
+
+func TestParseCreateTable_CollateKeyword(t *testing.T) {
+	sql := `CREATE TABLE articles (
+		id INT PRIMARY KEY,
+		title VARCHAR(255)
+	) COLLATE=utf8mb4_general_ci`
+
+	table, err := ParseCreateTable(sql)
+	require.NoError(t, err)
+	assert.Equal(t, "articles", table.Name)
+	assert.Equal(t, "utf8mb4_general_ci", table.Collation)
+}
+
+func TestParseCreateTable_CommentAndCollation(t *testing.T) {
+	sql := `CREATE TABLE users_v2 (
+		id INT PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		email VARCHAR(255)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表'`
+
+	table, err := ParseCreateTable(sql)
+	require.NoError(t, err)
+	assert.Equal(t, "users_v2", table.Name)
+	assert.Equal(t, "utf8mb4", table.Charset)
+	assert.Equal(t, "utf8mb4_unicode_ci", table.Collation)
+	assert.Equal(t, "用户表", table.Comment)
+	assert.Equal(t, "innodb", table.Engine)
+}
+
+func TestParseCreateTable_MultipleAttributes(t *testing.T) {
+	sql := `CREATE TABLE logs (
+		id BIGINT PRIMARY KEY,
+		message TEXT NOT NULL,
+		created_at TIMESTAMP
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATION=utf8mb4_bin COMMENT="系统日志表"`
+
+	table, err := ParseCreateTable(sql)
+	require.NoError(t, err)
+	assert.Equal(t, "logs", table.Name)
+	assert.Equal(t, "innodb", table.Engine)
+	assert.Equal(t, "utf8mb4", table.Charset)
+	assert.Equal(t, "utf8mb4_bin", table.Collation)
+	assert.Equal(t, "系统日志表", table.Comment)
+}
+
+func TestParseCreateTable_CommentWithSpecialChars(t *testing.T) {
+	sql := `CREATE TABLE config (
+		id INT PRIMARY KEY,
+		value TEXT
+	) COMMENT='配置表: 用于存储系统配置'`
+
+	table, err := ParseCreateTable(sql)
+	require.NoError(t, err)
+	assert.Equal(t, "config", table.Name)
+	assert.Equal(t, "配置表: 用于存储系统配置", table.Comment)
+}
+
+func TestParseCreateTable_Latin1Collation(t *testing.T) {
+	sql := `CREATE TABLE archive (
+		id INT PRIMARY KEY,
+		data VARCHAR(255)
+	) DEFAULT CHARSET=latin1 COLLATE=latin1_general_ci`
+
+	table, err := ParseCreateTable(sql)
+	require.NoError(t, err)
+	assert.Equal(t, "archive", table.Name)
+	assert.Equal(t, "latin1", table.Charset)
+	assert.Equal(t, "latin1_general_ci", table.Collation)
+}
