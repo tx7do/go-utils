@@ -14,7 +14,7 @@ git tag query_parser/v0.0.2
 git tag code_generator/v0.0.1
 git tag eventloop/v0.0.3
 git tag aggregator/v0.0.4
-git tag ddl_parser/v0.0.1
+git tag ddl_parser/v0.0.2
 
 
 git push origin --tags

@@ -56,6 +56,33 @@ func ParseCreateTable(sql string) (*TableDef, error) {
 	}, nil
 }
 
+// ParseCreateTables parses multiple CREATE TABLE statements in one SQL string.
+// Non-CREATE TABLE statements are ignored.
+func ParseCreateTables(sql string) ([]*TableDef, error) {
+	statements := splitSQLStatements(sql)
+	var tables []*TableDef
+
+	for _, stmt := range statements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+
+		// Only handle CREATE TABLE statements.
+		if !regexp.MustCompile(`(?i)\bcreate\s+table\b`).MatchString(stmt) {
+			continue
+		}
+
+		table, err := ParseCreateTable(stmt)
+		if err != nil {
+			return nil, fmt.Errorf("parse create table failed: %w", err)
+		}
+		tables = append(tables, table)
+	}
+
+	return tables, nil
+}
+
 // normalizeSQL 标准化：转小写（保留引号内内容）、移除注释
 func normalizeSQL(sql string) string {
 	// 移除多行注释 /* ... */
@@ -330,4 +357,52 @@ func extractTableAttributes(sql string) map[string]string {
 	}
 
 	return attrs
+}
+
+// splitSQLStatements splits SQL by semicolons, respecting quotes and parentheses.
+func splitSQLStatements(sql string) []string {
+	var parts []string
+	var current strings.Builder
+
+	inSingle, inDouble, inBacktick := false, false, false
+	parenLevel := 0
+
+	for _, ch := range sql {
+		switch ch {
+		case '\'':
+			if !inDouble && !inBacktick {
+				inSingle = !inSingle
+			}
+		case '"':
+			if !inSingle && !inBacktick {
+				inDouble = !inDouble
+			}
+		case '`':
+			if !inSingle && !inDouble {
+				inBacktick = !inBacktick
+			}
+		case '(':
+			if !inSingle && !inDouble && !inBacktick {
+				parenLevel++
+			}
+		case ')':
+			if !inSingle && !inDouble && !inBacktick && parenLevel > 0 {
+				parenLevel--
+			}
+		case ';':
+			if !inSingle && !inDouble && !inBacktick && parenLevel == 0 {
+				parts = append(parts, current.String())
+				current.Reset()
+				continue
+			}
+		}
+
+		current.WriteRune(ch)
+	}
+
+	if strings.TrimSpace(current.String()) != "" {
+		parts = append(parts, current.String())
+	}
+
+	return parts
 }

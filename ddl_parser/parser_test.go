@@ -911,3 +911,74 @@ func TestCrossDB_QuotedIdentifiers(t *testing.T) {
 		})
 	}
 }
+
+func TestParseCreateTables_MultipleCreate(t *testing.T) {
+	sql := `
+	CREATE TABLE users (
+		id INT PRIMARY KEY,
+		name VARCHAR(100)
+	);
+	CREATE TABLE orders (
+		order_id INT PRIMARY KEY,
+		user_id INT NOT NULL
+	);
+	`
+
+	tables, err := ParseCreateTables(sql)
+	require.NoError(t, err)
+	require.Len(t, tables, 2)
+	assert.Equal(t, "users", tables[0].Name)
+	assert.Equal(t, "orders", tables[1].Name)
+}
+
+func TestParseCreateTables_IgnoresNonCreate(t *testing.T) {
+	sql := `
+	CREATE TABLE users (id INT PRIMARY KEY);
+	SELECT * FROM users;
+	CREATE TABLE logs (id INT, msg TEXT);
+	`
+
+	tables, err := ParseCreateTables(sql)
+	require.NoError(t, err)
+	require.Len(t, tables, 2)
+	assert.Equal(t, "users", tables[0].Name)
+	assert.Equal(t, "logs", tables[1].Name)
+}
+
+func TestParseCreateTables_SemicolonInString(t *testing.T) {
+	sql := `
+	CREATE TABLE messages (
+		id INT PRIMARY KEY,
+		content VARCHAR(100) DEFAULT 'a; b; c'
+	);
+	CREATE TABLE audit (
+		id INT PRIMARY KEY,
+		note TEXT
+	);
+	`
+
+	tables, err := ParseCreateTables(sql)
+	require.NoError(t, err)
+	require.Len(t, tables, 2)
+	assert.Equal(t, "messages", tables[0].Name)
+	assert.Equal(t, "audit", tables[1].Name)
+}
+
+func ExampleParseCreateTables() {
+	sql := `
+	CREATE TABLE users (id INT PRIMARY KEY, name TEXT);
+	CREATE TABLE orders (id INT PRIMARY KEY, user_id INT);
+	`
+
+	tables, err := ParseCreateTables(sql)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	for _, t := range tables {
+		fmt.Println(t.Name)
+	}
+	// Output:
+	// users
+	// orders
+}
