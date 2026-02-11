@@ -1087,3 +1087,180 @@ func TestParseCreateTable_Latin1Collation(t *testing.T) {
 	assert.Equal(t, "latin1", table.Charset)
 	assert.Equal(t, "latin1_general_ci", table.Collation)
 }
+
+// ============================================================================
+// Bug Fix: 测试 DECIMAL 类型中的空格和字段注释解析问题
+// ============================================================================
+
+func TestParseCreateTable_DecimalWithSpaceAndFieldComments(t *testing.T) {
+	// 这个测试用例来自真实的解析错误报告
+	// SQL 中 DECIMAL(10, 2) 含有空格，且每个字段都有 COMMENT 注释
+	sqlContent := `
+	CREATE TABLE products (
+		id INT PRIMARY KEY COMMENT 'Product ID',
+		name VARCHAR(255) NOT NULL COMMENT 'Product Name',
+		price DECIMAL(10, 2) NOT NULL COMMENT 'Product Price',
+		stock INT DEFAULT 0 COMMENT 'Stock Quantity'
+	) COMMENT 'Products Table';
+	`
+
+	table, err := ParseCreateTable(sqlContent)
+	require.NoError(t, err, "should parse successfully")
+	assert.NotNil(t, table)
+
+	// 验证表名
+	assert.Equal(t, "products", table.Name)
+
+	// 验证表注释
+	assert.Equal(t, "Products Table", table.Comment)
+
+	// 验证字段数量
+	assert.Len(t, table.Columns, 4)
+
+	// 验证第一个字段：id
+	assert.Equal(t, "id", table.Columns[0].Name)
+	assert.Equal(t, "int", table.Columns[0].Type)
+	assert.True(t, table.Columns[0].PrimaryKey)
+	assert.Equal(t, "Product ID", table.Columns[0].Comment)
+
+	// 验证第二个字段：name
+	assert.Equal(t, "name", table.Columns[1].Name)
+	assert.Equal(t, "varchar(255)", table.Columns[1].Type)
+	assert.False(t, table.Columns[1].Nullable)
+	assert.Equal(t, "Product Name", table.Columns[1].Comment)
+
+	// 验证第三个字段：price (关键测试：DECIMAL with space)
+	assert.Equal(t, "price", table.Columns[2].Name)
+	// DECIMAL(10, 2) 应该被正确解析，空格应该被处理
+	assert.True(t, strings.Contains(strings.ToLower(table.Columns[2].Type), "decimal"),
+		"type should contain 'decimal', got: %s", table.Columns[2].Type)
+	assert.False(t, table.Columns[2].Nullable)
+	assert.Equal(t, "Product Price", table.Columns[2].Comment)
+
+	// 验证第四个字段：stock
+	assert.Equal(t, "stock", table.Columns[3].Name)
+	assert.Equal(t, "int", table.Columns[3].Type)
+	assert.True(t, table.Columns[3].Nullable) // 默认可为空
+	assert.Equal(t, "0", table.Columns[3].Default)
+	assert.Equal(t, "Stock Quantity", table.Columns[3].Comment)
+}
+
+func TestParseCreateTable_DecimalVariationsWithComments(t *testing.T) {
+	// 测试各种 DECIMAL 格式
+	tests := []struct {
+		name    string
+		sql     string
+		expType string
+	}{
+		{
+			name: "DECIMAL with space (10, 2)",
+			sql: `CREATE TABLE t (
+				amount DECIMAL(10, 2) NOT NULL COMMENT 'Amount'
+			)`,
+			expType: "decimal",
+		},
+		{
+			name: "DECIMAL without space (10,2)",
+			sql: `CREATE TABLE t (
+				amount DECIMAL(10,2) NOT NULL COMMENT 'Amount'
+			)`,
+			expType: "decimal",
+		},
+		{
+			name: "NUMERIC with space (12, 4)",
+			sql: `CREATE TABLE t (
+				value NUMERIC(12, 4) COMMENT 'Value'
+			)`,
+			expType: "numeric",
+		},
+		{
+			name: "DECIMAL(10) without precision",
+			sql: `CREATE TABLE t (
+				price DECIMAL(10) COMMENT 'Price'
+			)`,
+			expType: "decimal",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			table, err := ParseCreateTable(tt.sql)
+			require.NoError(t, err)
+			assert.Len(t, table.Columns, 1)
+
+			col := table.Columns[0]
+			assert.Contains(t, strings.ToLower(col.Type), tt.expType)
+			assert.NotEmpty(t, col.Comment, "field comment should be captured")
+		})
+	}
+}
+
+func TestParseCreateTable_AllFieldsWithComments(t *testing.T) {
+	// 测试所有字段都有注释的情况
+	sql := `CREATE TABLE users (
+		id BIGINT PRIMARY KEY COMMENT '用户ID',
+		username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
+		email VARCHAR(100) NOT NULL COMMENT '邮箱地址',
+		age INT DEFAULT 18 COMMENT '年龄',
+		balance DECIMAL(15, 2) DEFAULT 0.00 COMMENT '账户余额',
+		is_active BOOLEAN DEFAULT true COMMENT '是否激活',
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表'`
+
+	table, err := ParseCreateTable(sql)
+	require.NoError(t, err)
+	assert.Equal(t, "users", table.Name)
+	assert.Equal(t, "用户表", table.Comment)
+
+	// 验证所有字段都有注释
+	for i, col := range table.Columns {
+		assert.NotEmpty(t, col.Comment, "column %d (%s) should have a comment", i, col.Name)
+	}
+
+	// 验证特定字段
+	balanceCol := table.Columns[4]
+	assert.Equal(t, "balance", balanceCol.Name)
+	assert.Equal(t, "账户余额", balanceCol.Comment)
+	assert.Equal(t, "0.00", balanceCol.Default)
+	assert.Contains(t, strings.ToLower(balanceCol.Type), "decimal")
+}
+
+func TestParseCreateTable_CommentWithSpecialCharactersInFields(t *testing.T) {
+	// 测试字段注释中含有特殊字符的情况
+	tests := []struct {
+		name        string
+		sql         string
+		expectedCol string
+		expectedCmt string
+	}{
+		{
+			name:        "comment with colon",
+			sql:         "CREATE TABLE t (id INT COMMENT 'ID: 主键')",
+			expectedCol: "id",
+			expectedCmt: "ID: 主键",
+		},
+		{
+			name:        "comment with comma",
+			sql:         "CREATE TABLE t (val INT COMMENT 'Value, important')",
+			expectedCol: "val",
+			expectedCmt: "Value, important",
+		},
+		{
+			name:        "comment with parentheses",
+			sql:         "CREATE TABLE t (code VARCHAR(50) COMMENT '代码(编码)')",
+			expectedCol: "code",
+			expectedCmt: "代码(编码)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			table, err := ParseCreateTable(tt.sql)
+			require.NoError(t, err)
+			assert.Len(t, table.Columns, 1)
+			assert.Equal(t, tt.expectedCol, table.Columns[0].Name)
+			assert.Equal(t, tt.expectedCmt, table.Columns[0].Comment)
+		})
+	}
+}

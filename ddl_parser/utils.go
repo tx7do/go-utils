@@ -180,16 +180,32 @@ func splitColumns(block string) []string {
 	var parts []string
 	var current strings.Builder
 	parenLevel := 0
+	inSingle, inDouble := false, false
 
 	for _, ch := range block {
-		if ch == '(' {
-			parenLevel++
-		} else if ch == ')' {
-			parenLevel--
-		} else if ch == ',' && parenLevel == 0 {
-			parts = append(parts, current.String())
-			current.Reset()
-			continue
+		switch ch {
+		case '\'':
+			if !inDouble {
+				inSingle = !inSingle
+			}
+		case '"':
+			if !inSingle {
+				inDouble = !inDouble
+			}
+		case '(':
+			if !inSingle && !inDouble {
+				parenLevel++
+			}
+		case ')':
+			if !inSingle && !inDouble {
+				parenLevel--
+			}
+		case ',':
+			if parenLevel == 0 && !inSingle && !inDouble {
+				parts = append(parts, current.String())
+				current.Reset()
+				continue
+			}
 		}
 		current.WriteRune(ch)
 	}
@@ -207,6 +223,30 @@ func parseColumn(def string) (ColumnDef, error) {
 	// 示例: "id int auto_increment primary key"
 	//       "name varchar(255) not null comment '用户名'"
 
+	// 首先提取 COMMENT（因为它可能包含空格）
+	var comment string
+	defLower := strings.ToLower(def)
+	commentIdx := strings.Index(defLower, "comment")
+	if commentIdx != -1 {
+		// 提取 COMMENT 之后的内容
+		commentPart := def[commentIdx+7:] // "comment" 长度为 7
+		commentPart = strings.TrimSpace(commentPart)
+
+		// 匹配引号内的内容
+		if len(commentPart) > 0 {
+			quote := commentPart[0]
+			if quote == '\'' || quote == '"' {
+				// 找到匹配的结束引号
+				endIdx := strings.IndexRune(commentPart[1:], rune(quote))
+				if endIdx != -1 {
+					comment = commentPart[1 : endIdx+1]
+					// 从定义中移除 COMMENT 部分
+					def = def[:commentIdx]
+				}
+			}
+		}
+	}
+
 	// 提取字段名（第一个单词，可能带引号或反引号）
 	parts := strings.Fields(def)
 	if len(parts) < 2 {
@@ -216,11 +256,13 @@ func parseColumn(def string) (ColumnDef, error) {
 	col := ColumnDef{
 		Name:     strings.Trim(parts[0], "`\""), // 移除字段名的引号/反引号
 		Nullable: true,                          // 默认可为空
+		Comment:  comment,                       // 设置已提取的注释
 	}
 
-	// 提取类型（合并可能带括号的类型，如 varchar(255)）
+	// 提取类型（合并可能带括号的类型，如 varchar(255) 或 decimal(10, 2)）
 	typeParts := []string{strings.Trim(parts[1], "`\"")} // 也移除类型的引号/反引号
 	i := 2
+	// 继续收集类型定义直到遇到完整的括号或非类型关键字
 	for i < len(parts) && strings.Contains(parts[i-1], "(") && !strings.Contains(parts[i-1], ")") {
 		typeParts = append(typeParts, strings.Trim(parts[i], "`\""))
 		i++
@@ -247,13 +289,6 @@ func parseColumn(def string) (ColumnDef, error) {
 				col.Default = parts[j+1]
 				j++ // 跳过值
 			}
-		case "comment":
-			if j+1 < len(parts) {
-				// 移除引号
-				comment := strings.Trim(parts[j+1], "'\"")
-				col.Comment = comment
-				j++ // 跳过值
-			}
 		}
 	}
 
@@ -269,23 +304,34 @@ func parseColumn(def string) (ColumnDef, error) {
 func extractTableAttributes(sql string) map[string]string {
 	attrs := make(map[string]string)
 
+	attrsSQL := sql
+	leftIdx := strings.Index(sql, "(")
+	if leftIdx != -1 {
+		rightIdx := findMatchingParen(sql, leftIdx)
+		if rightIdx != -1 && rightIdx+1 < len(sql) {
+			// Only parse table attributes after the column block.
+			attrsSQL = sql[rightIdx+1:]
+		}
+	}
+
 	// ENGINE=InnoDB
-	if matches := regexp.MustCompile(`engine\s*=\s*(\w+)`).FindStringSubmatch(sql); len(matches) > 1 {
+	if matches := regexp.MustCompile(`engine\s*=\s*(\w+)`).FindStringSubmatch(attrsSQL); len(matches) > 1 {
 		attrs["engine"] = matches[1]
 	}
 
 	// DEFAULT CHARSET=utf8mb4 或 CHARACTER SET latin1
-	if matches := regexp.MustCompile(`(?:default\s+)?(?:charset|character\s+set)\s*=?\s*(\w+)`).FindStringSubmatch(sql); len(matches) > 1 {
+	if matches := regexp.MustCompile(`(?:default\s+)?(?:charset|character\s+set)\s*=?\s*(\w+)`).FindStringSubmatch(attrsSQL); len(matches) > 1 {
 		attrs["charset"] = matches[1]
 	}
 
 	// COLLATE=utf8mb4_unicode_ci 或 COLLATION=utf8mb4_unicode_ci
-	if matches := regexp.MustCompile(`(?:collate|collation)\s*=\s*([a-zA-Z0-9_]+)`).FindStringSubmatch(sql); len(matches) > 1 {
+	if matches := regexp.MustCompile(`(?:collate|collation)\s*=\s*([a-zA-Z0-9_]+)`).FindStringSubmatch(attrsSQL); len(matches) > 1 {
 		attrs["collation"] = matches[1]
 	}
 
-	// COMMENT='...' 或 COMMENT="..."
-	if matches := regexp.MustCompile(`comment\s*=\s*['"]([^'"]*)['"]\s*(?:;|$|[a-z])`).FindStringSubmatch(sql); len(matches) > 1 {
+	// COMMENT='...' 或 COMMENT="..." 或 COMMENT '...' 或 COMMENT "..."
+	// 修复：支持带等号和不带等号的语法
+	if matches := regexp.MustCompile(`comment\s*=?\s*['"]([^'"]*)['"]`).FindStringSubmatch(attrsSQL); len(matches) > 1 {
 		attrs["comment"] = matches[1]
 	}
 
