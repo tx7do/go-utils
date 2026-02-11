@@ -283,7 +283,13 @@ func parseColumn(def string) (ColumnDef, error) {
 			// 处理 "primary key"
 			if j > 0 && strings.ToLower(parts[j-1]) == "primary" {
 				col.PrimaryKey = true
+				col.Nullable = false
 			}
+		case "auto_increment":
+			col.Nullable = false
+			col.AutoIncrement = true
+		case "unique":
+			col.Unique = true
 		case "default":
 			if j+1 < len(parts) {
 				col.Default = parts[j+1]

@@ -2,12 +2,14 @@ package ddlparser
 
 // ColumnDef 列定义
 type ColumnDef struct {
-	Name       string
-	Type       string // 原始类型（如 "VARCHAR(255)"）
-	Nullable   bool
-	PrimaryKey bool
-	Default    string
-	Comment    string
+	Name          string
+	Type          string // 原始类型（如 "VARCHAR(255)"）
+	Nullable      bool
+	PrimaryKey    bool
+	Default       string
+	Comment       string
+	AutoIncrement bool
+	Unique        bool
 }
 
 // TableDef 表定义
