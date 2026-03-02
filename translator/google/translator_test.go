@@ -1,7 +1,6 @@
 package google
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,20 +18,28 @@ func TestTranslateV1(t *testing.T) {
 	// so, translator will detect language
 	result, err := translator.TranslateV1(text, "en", "es")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 	// Output: "Hola, Mundo!"
 
 	result, err = translator.TranslateV1(text, "en", "zh-CN")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 
 	result, err = translator.TranslateV1(text, "en", "lo")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 
 	result, err = translator.TranslateV1(text, "en", "my")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
+
+	result, err = translator.TranslateV1(text, "auto", "zh-TW")
+	assert.Nil(t, err)
+	t.Log(result)
+
+	result, err = translator.TranslateV1(text, "auto", "fr-FR")
+	assert.Nil(t, err)
+	t.Log(result)
 }
 
 func TestTranslateV2(t *testing.T) {
@@ -46,20 +53,20 @@ func TestTranslateV2(t *testing.T) {
 
 	result, _, err := translator.TranslateV2(text, "en", "es")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 	// Output: "Hola, Mundo!"
 
 	result, _, err = translator.TranslateV2(text, "en", "zh-CN")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 
 	result, _, err = translator.TranslateV2(text, "en", "lo")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 
 	result, _, err = translator.TranslateV2(text, "en", "my")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 }
 
 func TestTranslateV3(t *testing.T) {
@@ -74,25 +81,25 @@ func TestTranslateV3(t *testing.T) {
 	// so, translator will detect language
 	result, err := translator.TranslateV3(text, "en", "es")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 	// Output: "Hola, Mundo!"
 
 	result, err = translator.TranslateV3(text, "en", "zh-CN")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 
 	result, err = translator.TranslateV3(text, "en", "lo")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 
 	result, err = translator.TranslateV3(text, "en", "my")
 	assert.Nil(t, err)
-	fmt.Println(result)
+	t.Log(result)
 }
 
 func TestLanguageParse(t *testing.T) {
 	lang, _ := language.Parse("en")
 	assert.Equal(t, lang, language.English)
-	fmt.Println(lang)
-	fmt.Println(language.English.String())
+	t.Log(lang)
+	t.Log(language.English.String())
 }
