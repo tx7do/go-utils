@@ -7,7 +7,7 @@ import (
 	"github.com/lithammer/shortuuid/v4"
 	"github.com/rs/xid"
 	"github.com/segmentio/ksuid"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // NewGUIDv4 generates a new GUID/UUID v4 string.
@@ -57,6 +57,6 @@ func NewXID() string {
 
 // NewMongoObjectID generates a new MongoDB ObjectID string.
 func NewMongoObjectID() string {
-	objID := primitive.NewObjectID()
+	objID := bson.NewObjectID()
 	return objID.String()
 }

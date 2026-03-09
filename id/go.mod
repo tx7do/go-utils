@@ -11,7 +11,7 @@ require (
 	github.com/sony/sonyflake v1.3.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tx7do/go-utils v1.1.34
-	go.mongodb.org/mongo-driver v1.17.7
+	go.mongodb.org/mongo-driver/v2 v2.5.0
 )
 
 require (
