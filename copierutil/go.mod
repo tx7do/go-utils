@@ -1,8 +1,6 @@
 module github.com/tx7do/go-utils/copierutil
 
-go 1.24.0
-
-toolchain go1.24.3
+go 1.25.0
 
 require (
 	github.com/jinzhu/copier v0.4.0
@@ -11,7 +9,7 @@ require (
 
 require (
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
