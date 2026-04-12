@@ -14,15 +14,30 @@ const hostidPath = "/etc/hostid"
 // If the returned value is empty, the uuid from a call to `kenv -q smbios.system.uuid` is returned.
 // If there is an error an empty string is returned.
 func machineID() (string, error) {
-	id, err := readHostid()
-	if err != nil {
-		// try fallback
+	// OpenBSD: 优先 sysctl -n hw.uuid
+	id, err := readSysctlUUID()
+	if err == nil && id != "" {
+		return id, nil
+	}
+	// 其他 BSD: hostid/kenv
+	id, err = readHostid()
+	if err != nil || id == "" {
 		id, err = readKenv()
 	}
 	if err != nil {
 		return "", err
 	}
 	return id, nil
+}
+
+// readSysctlUUID 尝试通过 sysctl -n hw.uuid 获取主板UUID（OpenBSD专用，其他BSD会报错忽略）
+func readSysctlUUID() (string, error) {
+	buf := &bytes.Buffer{}
+	err := run(buf, os.Stderr, "sysctl", "-n", "hw.uuid")
+	if err != nil {
+		return "", err
+	}
+	return trim(buf.String()), nil
 }
 
 func readHostid() (string, error) {

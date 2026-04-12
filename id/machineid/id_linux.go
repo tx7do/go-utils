@@ -22,6 +22,8 @@ const (
 	// Modern docker versions should contain this information and
 	// can be used as the machine-id
 	mountInfoPath = "/proc/self/mountinfo"
+	// DMI product UUID (部分云主机/容器环境)
+	dmiProductUUIDPath = "/sys/class/dmi/id/product_uuid"
 )
 
 // machineID returns the uuid specified at `/var/lib/dbus/machine-id` or `/etc/machine-id`.
@@ -32,15 +34,27 @@ func machineID() (string, error) {
 	id, err := getFirstValidValue(
 		getIDFromFile(dbusPath),
 		getIDFromFile(dbusPathEtc),
+		getIDFromDMI,
 		getCGroup,
 		getMountInfo,
 	)
-
 	if err != nil {
 		return "", err
 	}
-
 	return trim(id), nil
+}
+
+// getIDFromDMI 读取 /sys/class/dmi/id/product_uuid
+func getIDFromDMI() (string, error) {
+	idBytes, err := readFile(dmiProductUUIDPath)
+	if err != nil {
+		return "", nil
+	}
+	id := strings.TrimSpace(string(idBytes))
+	if id == "" || id == "00000000-0000-0000-0000-000000000000" {
+		return "", nil
+	}
+	return id, nil
 }
 
 func getCGroup() (string, error) {
