@@ -5,7 +5,7 @@ git tag geoip/v1.1.8
 git tag translator/v1.1.3
 git tag copierutil/v0.0.6
 git tag jwtutil/v0.0.3
-git tag id/v0.0.4
+git tag id/v0.0.5
 git tag slug/v0.0.1
 git tag name_generator/v0.0.1
 git tag mapper/v0.0.3
