@@ -1,11 +1,10 @@
 package crypto
 
 import (
-	"fmt"
-
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"fmt"
 )
 
 // DefaultAESKey 默认AES密钥(16字节)
@@ -124,4 +123,62 @@ func AesDecrypt(cryptedText, key, iv []byte) ([]byte, error) {
 	blockMode.CryptBlocks(plainText, cryptedText)
 	plainText = PKCS5UnPadding(plainText)
 	return plainText, nil
+}
+
+type AESGCMCipher struct {
+	key []byte
+}
+
+// NewAESGCMCipher 创建AES-GCM模式的Cipher
+func NewAESGCMCipher(key []byte) (*AESGCMCipher, error) {
+	if len(key) != 16 && len(key) != 24 && len(key) != 32 {
+		return nil, fmt.Errorf("invalid key length: %d, must be 16, 24, or 32 bytes", len(key))
+	}
+	return &AESGCMCipher{key: key}, nil
+}
+
+// Encrypt 使用AES-GCM加密
+func (a *AESGCMCipher) Encrypt(plain []byte) ([]byte, error) {
+	block, err := aes.NewCipher(a.key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	// 生成随机nonce
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	ciphertext := gcm.Seal(nil, nonce, plain, nil)
+	// 输出格式: nonce|ciphertext
+	return append(nonce, ciphertext...), nil
+}
+
+// Decrypt 使用AES-GCM解密
+func (a *AESGCMCipher) Decrypt(ciphertext []byte) ([]byte, error) {
+	block, err := aes.NewCipher(a.key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if len(ciphertext) < gcm.NonceSize() {
+		return nil, fmt.Errorf("ciphertext too short")
+	}
+	nonce := ciphertext[:gcm.NonceSize()]
+	ct := ciphertext[gcm.NonceSize():]
+	plain, err := gcm.Open(nil, nonce, ct, nil)
+	if err != nil {
+		return nil, err
+	}
+	return plain, nil
+}
+
+func (a *AESGCMCipher) Name() string {
+	return "AES-GCM"
 }

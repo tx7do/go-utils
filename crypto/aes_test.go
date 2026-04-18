@@ -146,3 +146,58 @@ func TestAESCipher_InvalidKeyIV(t *testing.T) {
 		t.Fatal("Encrypt should fail on invalid key length")
 	}
 }
+
+func TestAESGCMCipher_EncryptDecrypt(t *testing.T) {
+	key, _ := GenerateAESKey(16)
+	cipher, err := NewAESGCMCipher(key)
+	if err != nil {
+		t.Fatalf("NewAESGCMCipher failed: %v", err)
+	}
+	plain := []byte("hello, aes-gcm!")
+	crypted, err := cipher.Encrypt(plain)
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+	if len(crypted) == 0 {
+		t.Fatal("Encrypted result is empty")
+	}
+	decrypted, err := cipher.Decrypt(crypted)
+	if err != nil {
+		t.Fatalf("Decrypt failed: %v", err)
+	}
+	if !bytes.Equal(plain, decrypted) {
+		t.Fatalf("Decrypted text not match, got: %s, want: %s", decrypted, plain)
+	}
+}
+
+func TestAESGCMCipher_EmptyPlaintext(t *testing.T) {
+	key, _ := GenerateAESKey(16)
+	cipher, _ := NewAESGCMCipher(key)
+	crypted, err := cipher.Encrypt([]byte{})
+	if err != nil {
+		t.Fatalf("Encrypt failed on empty plaintext: %v", err)
+	}
+	decrypted, err := cipher.Decrypt(crypted)
+	if err != nil {
+		t.Fatalf("Decrypt failed on empty plaintext: %v", err)
+	}
+	if len(decrypted) != 0 {
+		t.Fatalf("Decrypted empty plaintext should be empty, got: %v", decrypted)
+	}
+}
+
+func TestAESGCMCipher_InvalidKey(t *testing.T) {
+	_, err := NewAESGCMCipher([]byte("short"))
+	if err == nil {
+		t.Fatal("NewAESGCMCipher should fail on invalid key length")
+	}
+}
+
+func TestAESGCMCipher_InvalidCiphertext(t *testing.T) {
+	key, _ := GenerateAESKey(16)
+	cipher, _ := NewAESGCMCipher(key)
+	_, err := cipher.Decrypt([]byte("short"))
+	if err == nil {
+		t.Fatal("Decrypt should fail on invalid ciphertext length")
+	}
+}
