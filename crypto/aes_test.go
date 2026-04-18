@@ -1,10 +1,11 @@
 package crypto
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"testing"
-
-	"encoding/base64"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -95,4 +96,53 @@ func TestAesDecrypt_InvalidCases(t *testing.T) {
 	assert.Error(t, err)
 	_, err = AesDecrypt([]byte("1234"), key, iv)
 	assert.Error(t, err) // 密文长度不是blockSize倍数
+}
+
+func TestAESCipher_EncryptDecrypt(t *testing.T) {
+	key := make([]byte, 16)
+	iv := make([]byte, 16)
+	_, _ = rand.Read(key)
+	_, _ = rand.Read(iv)
+
+	cipher := NewAESCipher(key, iv)
+	plain := []byte("hello, aes cipher test!")
+
+	crypted, err := cipher.Encrypt(plain)
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+	if len(crypted) == 0 {
+		t.Fatal("Encrypted result is empty")
+	}
+
+	decrypted, err := cipher.Decrypt(crypted)
+	if err != nil {
+		t.Fatalf("Decrypt failed: %v", err)
+	}
+	if !bytes.Equal(plain, decrypted) {
+		t.Fatalf("Decrypted text not match, got: %s, want: %s", decrypted, plain)
+	}
+}
+
+func TestAESCipher_EmptyPlaintext(t *testing.T) {
+	key := make([]byte, 16)
+	iv := make([]byte, 16)
+	_, _ = rand.Read(key)
+	_, _ = rand.Read(iv)
+
+	cipher := NewAESCipher(key, iv)
+	_, err := cipher.Encrypt([]byte{})
+	if err == nil {
+		t.Fatal("Encrypt should fail on empty plaintext")
+	}
+}
+
+func TestAESCipher_InvalidKeyIV(t *testing.T) {
+	key := make([]byte, 8) // invalid key
+	iv := make([]byte, 16)
+	cipher := NewAESCipher(key, iv)
+	_, err := cipher.Encrypt([]byte("test"))
+	if err == nil {
+		t.Fatal("Encrypt should fail on invalid key length")
+	}
 }

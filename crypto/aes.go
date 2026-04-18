@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"bytes"
 	"fmt"
 
 	"crypto/aes"
@@ -11,6 +10,34 @@ import (
 
 // DefaultAESKey 默认AES密钥(16字节)
 var DefaultAESKey = []byte("f51d66a73d8a0927")
+
+type AESCipher struct {
+	key []byte
+	iv  []byte
+}
+
+func NewAESCipher(key, iv []byte) *AESCipher {
+	if len(key) == 0 {
+		key = DefaultAESKey
+	}
+
+	return &AESCipher{
+		key: key,
+		iv:  iv,
+	}
+}
+
+func (a *AESCipher) Encrypt(plain []byte) ([]byte, error) {
+	return AesEncrypt(plain, a.key, a.iv)
+}
+
+func (a *AESCipher) Decrypt(cipher []byte) ([]byte, error) {
+	return AesDecrypt(cipher, a.key, a.iv)
+}
+
+func (a *AESCipher) Name() string {
+	return "AES"
+}
 
 // GenerateAESKey 生成AES密钥
 func GenerateAESKey(length int) ([]byte, error) {
@@ -23,38 +50,6 @@ func GenerateAESKey(length int) ([]byte, error) {
 		return nil, err
 	}
 	return key, nil
-}
-
-// PKCS5Padding 填充明文
-func PKCS5Padding(plaintext []byte, blockSize int) []byte {
-	if blockSize <= 0 || blockSize > 255 {
-		panic("blockSize must be in 1..255 for PKCS5Padding")
-	}
-	if len(plaintext) < 0 {
-		panic("plaintext length invalid")
-	}
-	padding := blockSize - len(plaintext)%blockSize
-	padText := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(plaintext, padText...)
-}
-
-// PKCS5UnPadding 去除填充数据
-func PKCS5UnPadding(origData []byte) []byte {
-	length := len(origData)
-	if length == 0 {
-		return []byte{}
-	}
-	unpadding := int(origData[length-1])
-	if unpadding == 0 || unpadding > length {
-		return []byte{}
-	}
-	// 检查填充内容是否都等于 unpadding
-	for i := length - unpadding; i < length; i++ {
-		if int(origData[i]) != unpadding {
-			return []byte{}
-		}
-	}
-	return origData[:(length - unpadding)]
 }
 
 // AesEncrypt AES加密

@@ -6,15 +6,24 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type BCryptCrypto struct{}
+type BCryptCrypto struct {
+	cost int
+}
 
-func NewBCryptCrypto() *BCryptCrypto {
-	return &BCryptCrypto{}
+func NewBCryptCrypto(cost ...int) *BCryptCrypto {
+	useCost := bcrypt.DefaultCost
+	if len(cost) > 0 && cost[0] >= bcrypt.MinCost && cost[0] <= bcrypt.MaxCost {
+		useCost = cost[0]
+	}
+
+	return &BCryptCrypto{
+		cost: useCost,
+	}
 }
 
 // Encrypt 使用 bcrypt 加密密码，返回加密后的字符串和空盐值
 func (b *BCryptCrypto) Encrypt(password string) (encrypted string, err error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), b.cost)
 	if err != nil {
 		return "", err
 	}

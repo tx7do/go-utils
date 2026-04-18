@@ -1,21 +1,104 @@
 # 加解密算法
 
-## bcrypt
+## 主要接口
 
-bcrypt是一个由美国计算机科学家尼尔斯·普罗沃斯（Niels Provos）以及大卫·马齐耶（David Mazières）根据Blowfish加密算法所设计的密码散列函数，于1999年在USENIX中展示[1]。实现中bcrypt会使用一个加盐的流程以防御彩虹表攻击，同时bcrypt还是适应性函数，它可以借由增加迭代之次数来抵御日益增进的电脑运算能力透过暴力法破解。
+本包统一定义了如下接口，便于不同算法的无缝切换和组合：
 
-由bcrypt加密的文件可在所有支持的操作系统和处理器上进行转移。它的口令必须是8至56个字符，并将在内部被转化为448位的密钥。然而，所提供的所有字符都具有十分重要的意义。密码越强大，数据就越安全。
+- `Cipher`：对称/非对称加密接口
+- `Signer`：签名接口（如SM2、ECDSA等）
+- `Verifier`：验签接口
+- `Hasher`：哈希接口（如SM3、SHA256等）
+- `KeyExchanger`：密钥协商接口（如ECDH、SM2密钥交换）
 
-除了对数据进行加密，默认情况下，bcrypt在删除数据之前将使用随机数据三次覆盖原始输入文件，以阻挠可能会获得计算机数据的人恢复数据的尝试。如果您不想使用此功能，可设置禁用此功能。
+接口定义见 `interface.go`，如：
 
-具体来说，bcrypt使用美国密码学家保罗·柯切尔的算法实现。随bcrypt一起发布的源代码对原始版本作了略微改动。
+```go
+// Cipher
+Encrypt(plain []byte) ([]byte, error)
+Decrypt(cipher []byte) ([]byte, error)
+Name() string
 
-bcrypt哈希由多个部分组成。这些部分用于确定创建哈希的设置，从而可以在不需要任何其他信息的情况下对其进行验证。
+// Signer
+Sign(data []byte) (string, error)
+Name() string
 
-```text
-$2a$10$ygWrRwHCzg2GUpz0UK40kuWAGva121VkScpcdMNsDCih2U/bL2qYy
+// Verifier
+Verify(data []byte, signature string) (bool, error)
+Name() string
 ```
 
-- $2a$：Prefix 表示使用bcrypt的算法版本。
-- 10$：Cost factor 表示加密的复杂度，值越大，计算时间越长。
-- ygWrRwHCzg2GUpz0UK40kuWAGva121VkScpcdMNsDCih2U/bL2qYy：Salt 和 Hash，前22个字符是盐值，后面的字符是哈希值。
+---
+
+## SM2Cipher 用法示例
+
+```go
+cipher, _ := NewSM2Cipher()
+plain := []byte("hello, sm2!")
+
+// 加解密
+crypted, _ := cipher.Encrypt(plain)
+decrypted, _ := cipher.Decrypt(crypted)
+
+// 签名/验签
+sig, _ := cipher.Sign(plain)
+ok, _ := cipher.Verify(plain, sig)
+```
+
+---
+
+## AES 用法示例
+
+```go
+key := []byte("1234567890abcdef") // 16字节
+cipher, _ := NewAESCipher(key, nil)
+plain := []byte("hello, aes!")
+crypted, _ := cipher.Encrypt(plain)
+decrypted, _ := cipher.Decrypt(crypted)
+```
+
+---
+
+## RSA 用法示例
+
+```go
+cipher, _ := NewRSACipher(2048)
+plain := []byte("hello, rsa!")
+crypted, _ := cipher.Encrypt(plain)
+decrypted, _ := cipher.Decrypt(crypted)
+```
+
+---
+
+## SM4 用法示例
+
+```go
+key := []byte("1234567890abcdef") // 16字节
+cipher, _ := NewSM4Cipher(key)
+plain := []byte("hello, sm4!")
+crypted, _ := cipher.Encrypt(plain)
+decrypted, _ := cipher.Decrypt(crypted)
+```
+
+---
+
+## HMAC/SM3 用法示例
+
+```go
+h := NewHMAC([]byte("key"))
+mac := h.Sum([]byte("hello"))
+
+h2 := NewSM3Hasher()
+hash := h2.Sum([]byte("hello"))
+```
+
+---
+
+## 其它说明
+
+- AES/SM4：对称加密，均实现 Cipher 接口
+- RSA：非对称加密，Cipher 接口
+- HMAC/SM3/SHA256：哈希算法，实现 Hasher 接口
+- ECDSA/SM2：签名验签，Signer/Verifier 接口
+- ECDH/SM2：密钥协商，实现 KeyExchanger 接口
+
+所有算法均可通过接口组合和替换，便于扩展和测试。

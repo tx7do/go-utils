@@ -9,12 +9,13 @@ git tag id/v0.0.5
 git tag slug/v0.0.1
 git tag name_generator/v0.0.1
 git tag mapper/v0.0.3
-git tag password/v0.0.1
+git tag password/v0.0.2
 git tag query_parser/v0.0.2
 git tag code_generator/v0.0.1
 git tag eventloop/v0.0.3
 git tag aggregator/v0.0.4
 git tag ddl_parser/v0.0.5
+git tag crypto/v0.0.1
 
 
 git push origin --tags
