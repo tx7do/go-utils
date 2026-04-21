@@ -360,3 +360,27 @@ func NanosecondsToTimestamp(nanoseconds *int64) *timestamppb.Timestamp {
 	}
 	return timestamppb.New(time.Unix(0, *nanoseconds))
 }
+
+// StringToTimestamppb 字符串 -> timestamppb.Timestamp
+func StringToTimestamppb(str *string) *timestamppb.Timestamp {
+	if str == nil {
+		return nil
+	}
+	tm := StringTimeToTime(str)
+	if tm == nil {
+		return nil
+	}
+	return timestamppb.New(*tm)
+}
+
+// TimestamppbToString timestamppb.Timestamp -> 字符串
+func TimestamppbToString(ts *timestamppb.Timestamp) *string {
+	if ts == nil {
+		return nil
+	}
+	tm := TimestamppbToTime(ts)
+	if tm == nil {
+		return nil
+	}
+	return TimeToTimeString(tm)
+}
