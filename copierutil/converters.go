@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/copier"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/tx7do/go-utils/timeutil"
@@ -88,6 +89,20 @@ func NewStringTimestamppbConverterPair() []copier.TypeConverter {
 
 	fromFn := timeutil.StringToTimestamppb
 	toFn := timeutil.TimestamppbToString
+
+	return NewGenericTypeConverterPair(srcType, dstType, fromFn, toFn)
+}
+
+func NewDurationpbNumberConverterPair[T int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | float32 | float64](timePrecision time.Duration) []copier.TypeConverter {
+	srcType := &durationpb.Duration{}
+	dstType := trans.Ptr(T(0))
+
+	fromFn := func(src *durationpb.Duration) *T {
+		return timeutil.DurationpbToNumber[T](src, timePrecision)
+	}
+	toFn := func(src *T) *durationpb.Duration {
+		return timeutil.NumberToDurationpb(src, timePrecision)
+	}
 
 	return NewGenericTypeConverterPair(srcType, dstType, fromFn, toFn)
 }
