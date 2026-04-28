@@ -83,7 +83,7 @@ func NewRedisLocker(rdb *redis.Client, opts Options) Locker {
 //   - 成功：返回 Lock，调用方必须在完成后调用 Release。
 //   - 锁已被持有：返回 ErrNotObtained（可用 errors.Is 判断）。
 //   - 其他错误：返回底层 Redis 错误。
-func (l *RedisLocker) Obtain(ctx context.Context, key string) (Lock, error) {
+func (l *RedisLocker) Obtain(ctx context.Context, key string, opts ...LockOption) (Lock, error) {
 	inner, err := l.client.Obtain(ctx, key, l.opts.TTL, &redislock.Options{
 		RetryStrategy: redislock.LimitRetry(
 			redislock.LinearBackoff(l.opts.RetryDelay),
@@ -97,6 +97,20 @@ func (l *RedisLocker) Obtain(ctx context.Context, key string) (Lock, error) {
 		return nil, err
 	}
 	return &redisLock{inner: inner, ttl: l.opts.TTL, interval: l.opts.RefreshInterval}, nil
+}
+
+// IsLocked 检查 key 是否已被锁定；仅供监控/调试使用，不能替代 Obtain 的原子性保证。
+func (l *RedisLocker) IsLocked(ctx context.Context, key string) (bool, error) {
+	lock, err := l.Obtain(ctx, key)
+	if err != nil {
+		if errors.Is(err, ErrNotObtained) {
+			return true, nil // 已被加锁
+		}
+		return false, err // 其它错误
+	}
+	// 获取到锁，说明未加锁，需立即释放
+	_ = lock.Release(ctx)
+	return false, nil
 }
 
 // Close 对 redislock 为 no-op，保留接口一致性。

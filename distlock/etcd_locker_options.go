@@ -6,6 +6,7 @@ const (
 	defaultEtcdDialTimeout    = 5 * time.Second
 	defaultEtcdSessionTTL     = 5
 	defaultEtcdSessionTimeout = 5 * time.Second
+	defaultEtcdLockTimeout    = 0
 )
 
 // EtcdOptions 配置 etcd 分布式锁行为。
@@ -16,6 +17,8 @@ type EtcdOptions struct {
 	SessionTTL int
 	// SessionTimeout 是创建会话超时；默认 5s。
 	SessionTimeout time.Duration
+	// 锁超时，超过这个时间未释放锁会被自动释放；默认 0（不自动释放）
+	LockTimeout time.Duration
 }
 
 func (o EtcdOptions) withDefaults() EtcdOptions {
@@ -28,5 +31,9 @@ func (o EtcdOptions) withDefaults() EtcdOptions {
 	if o.SessionTimeout <= 0 {
 		o.SessionTimeout = defaultEtcdSessionTimeout
 	}
+	if o.LockTimeout <= 0 {
+		o.LockTimeout = defaultEtcdLockTimeout
+	}
+
 	return o
 }

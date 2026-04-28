@@ -32,8 +32,11 @@ type Locker interface {
 	//   - 成功：返回 Lock，调用方必须在完成后调用 Release。
 	//   - 锁已被持有：返回 ErrNotObtained（可用 errors.Is 判断）。
 	//   - 其他错误：返回底层错误。
-	Obtain(ctx context.Context, key string) (Lock, error)
+	Obtain(ctx context.Context, key string, opts ...LockOption) (Lock, error)
 
 	// Close 关闭后端资源；不再使用时调用。
 	Close() error
+
+	// IsLocked 检查 key 是否已被锁定；仅供监控/调试使用，不能替代 Obtain 的原子性保证。
+	IsLocked(ctx context.Context, key string) (bool, error)
 }
