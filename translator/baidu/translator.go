@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -42,7 +42,7 @@ type baiduResponse struct {
 }
 
 func (t *Translator) Translate(source, sourceLang, targetLang string) (string, error) {
-	salt := rand.Int63()
+	salt := rand.Int64()
 	sign := t.generateSign(source, salt)
 
 	// 构建请求参数

@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"strings"
 
@@ -161,7 +161,7 @@ func (g *Generator) randomWordFromDict(dictType DictionaryType) string {
 		return ""
 	}
 
-	randomIndex := rand.Intn(len(dict))
+	randomIndex := rand.IntN(len(dict))
 	return dict[randomIndex]
 }
 

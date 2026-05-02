@@ -1,63 +1,85 @@
 package rand
 
 import (
+	"math/rand/v2"
+
 	"github.com/tx7do/go-utils/math"
-	"math/rand"
 )
 
-var rnd = rand.New(rand.NewSource(Seed(UnixNanoSeed)))
-
-func init() {
-	if rnd != nil {
-		rnd = rand.New(rand.NewSource(Seed(UnixNanoSeed)))
-	}
-}
-
+// Float32 生成 [0, 1) 随机 float32
 func Float32() float32 {
-	return rnd.Float32()
+	return rand.Float32()
 }
 
+// Float64 生成 [0, 1) 随机 float64
 func Float64() float64 {
-	return rnd.Float64()
+	return rand.Float64()
 }
 
-func Intn(n int) int {
-	return rnd.Intn(n)
+// IntN 生成 [0, n) 随机 int
+func IntN(n int) int {
+	return rand.IntN(n)
 }
 
-func Int31n(n int32) int32 {
-	return rnd.Int31n(n)
+// Int32N 生成 [0, n) 随机 int32
+func Int32N(n int32) int32 {
+	return rand.Int32N(n)
 }
 
-func Int63n(n int64) int64 {
-	return rnd.Int63n(n)
+// Int64N 生成 [0, n) 随机 int64
+func Int64N(n int64) int64 {
+	return rand.Int64N(n)
 }
 
-// RandomInt 根据区间产生随机数
+// RandomInt 生成 [min, max] 范围内随机 int
 func RandomInt(min, max int) int {
 	if min >= max {
 		return max
 	}
-	return min + Intn(max-min+1)
+	return min + IntN(max-min+1)
 }
 
-// RandomInt32 根据区间产生随机数
+// RandomInt32 生成 [min, max] 范围内随机 int32
 func RandomInt32(min, max int32) int32 {
 	if min >= max {
 		return max
 	}
-	return min + Int31n(max-min+1)
+	return min + Int32N(max-min+1)
 }
 
-// RandomInt64 根据区间产生随机数
+// RandomInt64 生成 [min, max] 范围内随机 int64
 func RandomInt64(min, max int64) int64 {
 	if min >= max {
 		return max
 	}
-	return min + Int63n(max-min+1)
+	return min + Int64N(max-min+1)
 }
 
-// RandomString 随机字符串，包含大小写字母和数字
+// RandomUint 生成 [min, max] 范围内随机 uint
+func RandomUint(min, max uint) uint {
+	if min >= max {
+		return max
+	}
+	return min + rand.UintN(max-min+1)
+}
+
+// RandomUint32 生成 [min, max] 范围内随机 uint32
+func RandomUint32(min, max uint32) uint32 {
+	if min >= max {
+		return max
+	}
+	return min + rand.Uint32N(max-min+1)
+}
+
+// RandomUint64 生成 [min, max] 范围内随机 uint64
+func RandomUint64(min, max uint64) uint64 {
+	if min >= max {
+		return max
+	}
+	return min + rand.Uint64N(max-min+1)
+}
+
+// RandomString 生成指定长度随机字符串（大小写字母+数字）
 func RandomString(l int) string {
 	if l <= 0 {
 		return ""
@@ -67,52 +89,60 @@ func RandomString(l int) string {
 
 	bytes := make([]byte, l)
 	for i := 0; i < l; i++ {
-		bytes[i] = charset[Intn(len(charset))]
+		bytes[i] = charset[IntN(len(charset))]
 	}
 
 	return string(bytes)
 }
 
-// RandomChoice 随机选择数组中的元素
+// RandomChoice 从数组随机选择 n 个元素（不修改原数组）
 func RandomChoice[T any](array []T, n int) []T {
-	if n <= 0 {
+	if n <= 0 || len(array) == 0 {
 		return nil
 	}
+
+	// 只需要1个
 	if n == 1 {
-		return []T{array[Intn(len(array))]}
+		return []T{array[IntN(len(array))]}
 	}
 
+	// 复制原数组
 	tmp := make([]T, len(array))
 	copy(tmp, array)
+
+	// 超过长度直接返回全部
 	if len(tmp) <= n {
 		return tmp
 	}
 
 	Shuffle(tmp)
-
 	return tmp[:n]
 }
 
-// Shuffle 随机打乱数组
+// Shuffle 均匀打乱切片（标准 Fisher–Yates 算法）
 func Shuffle[T any](array []T) {
-	if array == nil {
+	if len(array) < 2 {
 		return
 	}
 
-	for i := range array {
-		j := Intn(i + 1)
+	for i := len(array) - 1; i > 0; i-- {
+		j := IntN(i + 1)
 		array[i], array[j] = array[j], array[i]
 	}
 }
 
 // WeightedChoice 根据权重随机，返回对应选项的索引，O(n)
 func WeightedChoice(weightArray []int) int {
-	if weightArray == nil {
+	if len(weightArray) == 0 {
 		return -1
 	}
 
 	total := math.SumInt(weightArray)
-	rv := Int63n(total)
+	if total <= 0 {
+		return 0
+	}
+
+	rv := Int64N(total)
 	for i, v := range weightArray {
 		if rv < int64(v) {
 			return i
@@ -123,26 +153,35 @@ func WeightedChoice(weightArray []int) int {
 	return len(weightArray) - 1
 }
 
-// NonWeightedChoice 根据权重随机，返回对应选项的索引，O(n). 权重大于等于0
+// NonWeightedChoice 权重非负随机选择，返回对应选项的索引，O(n). 权重大于等于0
 func NonWeightedChoice(weightArray []int) int {
 	if weightArray == nil {
 		return -1
 	}
 
-	for i, weight := range weightArray {
-		if weight < 0 {
-			weightArray[i] = 0
+	// 复制避免修改原数组
+	weights := make([]int, len(weightArray))
+	copy(weights, weightArray)
+
+	// 确保权重 >= 0
+	for i := range weights {
+		if weights[i] < 0 {
+			weights[i] = 0
 		}
 	}
 
-	total := math.SumInt(weightArray)
-	rv := Int63n(total)
-	for i, v := range weightArray {
+	total := math.SumInt(weights)
+	if total <= 0 {
+		return 0
+	}
+
+	rv := Int64N(total)
+	for i, v := range weights {
 		if rv < int64(v) {
 			return i
 		}
 		rv -= int64(v)
 	}
 
-	return len(weightArray) - 1
+	return len(weights) - 1
 }

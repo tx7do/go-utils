@@ -1,8 +1,9 @@
 package rand
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRandomizer_RangeUint32_MinEqualsMax(t *testing.T) {

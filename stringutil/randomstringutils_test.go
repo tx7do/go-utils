@@ -2,7 +2,7 @@ package stringutil
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"regexp"
 	"strconv"
 	"testing"
@@ -13,8 +13,8 @@ import (
 func TestRandomSeed(t *testing.T) {
 
 	// count, start, end, letters, numbers := 5, 0, 0, true, true
-	random := rand.New(rand.NewSource(10))
-	out := "3ip9v"
+	random := rand.New(rand.NewPCG(10, 0))
+	out := "UOGFM"
 
 	// Test 1: Simulating RandomAlphaNumeric(count int)
 	if x, _ := RandomSeed(5, 0, 0, true, true, nil, random); x != out {
@@ -22,21 +22,21 @@ func TestRandomSeed(t *testing.T) {
 	}
 
 	// Test 2: Simulating RandomAlphabetic(count int)
-	out = "MBrbj"
+	out = "OUiKn"
 
 	if x, _ := RandomSeed(5, 0, 0, true, false, nil, random); x != out {
 		t.Errorf("RandomSeed(%v, %v, %v, %v, %v, %v, %v) = %v, want %v", 5, 0, 0, true, false, nil, random, x, out)
 	}
 
 	// Test 3: Simulating RandomNumeric(count int)
-	out = "88935"
+	out = "23353"
 
 	if x, _ := RandomSeed(5, 0, 0, false, true, nil, random); x != out {
 		t.Errorf("RandomSeed(%v, %v, %v, %v, %v, %v, %v) = %v, want %v", 5, 0, 0, false, true, nil, random, x, out)
 	}
 
 	// Test 4: Simulating RandomAscii(count int)
-	out = "H_I;E"
+	out = "AEQz9"
 
 	if x, _ := RandomSeed(5, 32, 127, false, false, nil, random); x != out {
 		t.Errorf("RandomSeed(%v, %v, %v, %v, %v, %v, %v) = %v, want %v", 5, 32, 127, false, false, nil, random, x, out)
@@ -44,7 +44,7 @@ func TestRandomSeed(t *testing.T) {
 
 	// Test 5: Simulating RandomSeed(...) with custom chars
 	chars := []rune{'1', '2', '3', 'a', 'b', 'c'}
-	out = "2b2ca"
+	out = "ab3ab"
 
 	if x, _ := RandomSeed(5, 0, 0, false, false, chars, random); x != out {
 		t.Errorf("RandomSeed(%v, %v, %v, %v, %v, %v, %v) = %v, want %v", 5, 0, 0, false, false, chars, random, x, out)
@@ -57,7 +57,7 @@ func TestRandomSeed(t *testing.T) {
 func ExampleRandomSeed() {
 
 	var seed int64 = 10 // If you change this seed #, the random sequence below will change
-	random := rand.New(rand.NewSource(seed))
+	random := rand.New(rand.NewPCG(uint64(seed), 0))
 	chars := []rune{'1', '2', '3', 'a', 'b', 'c'}
 
 	rand1, _ := RandomSeed(5, 0, 0, true, true, nil, random)      // RandomAlphaNumeric (Alphabets and numbers possible)

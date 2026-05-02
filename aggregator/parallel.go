@@ -3,8 +3,7 @@ package aggregator
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"sync"
+	"math/rand/v2"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -84,11 +83,6 @@ func safeRun(ctx context.Context, f ParallelFetcher) (err error) {
 	return f(ctx)
 }
 
-var (
-	jitterRand   = rand.New(rand.NewSource(time.Now().UnixNano()))
-	jitterRandMu sync.Mutex
-)
-
 // backoffWait 实现指数退避等待
 func backoffWait(ctx context.Context, attempt int) error {
 	// 基础参数配置
@@ -110,9 +104,7 @@ func backoffWait(ctx context.Context, attempt int) error {
 
 	// 引入随机抖动 (Jitter)，防止大量请求在同一瞬间重试
 	// 实际延迟在 [0.5 * delay, 1.5 * delay] 之间波动
-	jitterRandMu.Lock()
-	jitter := time.Duration(jitterRand.Int63n(int64(delay)))
-	jitterRandMu.Unlock()
+	jitter := time.Duration(rand.Int64N(int64(delay)))
 	delay = delay/2 + jitter
 
 	// 执行等待

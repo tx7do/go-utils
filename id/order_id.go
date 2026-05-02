@@ -2,7 +2,7 @@ package id
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -31,7 +31,7 @@ func GenerateOrderIdWithRandom(prefix string, tm *time.Time) string {
 
 	timestamp := tm.Format("20060102150405")
 
-	randNum := rand.Intn(10000) // 生成0-9999之间的随机数
+	randNum := rand.IntN(10000) // 生成0-9999之间的随机数
 
 	return fmt.Sprintf("%s%s%d", prefix, timestamp, randNum)
 }
@@ -67,7 +67,7 @@ func GenerateOrderIdWithTenantId(tenantID string) string {
 	}
 
 	// 随机数部分（4位）
-	n := rand.Int31n(10000)
+	n := rand.Int32N(10000)
 	randomPart := fmt.Sprintf("%04d", n)
 
 	return timestamp + tenantPart + randomPart

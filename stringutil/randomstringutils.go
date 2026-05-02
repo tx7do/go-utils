@@ -3,12 +3,12 @@ package stringutil
 import (
 	"fmt"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 	"unicode"
 )
 
-var RANDOM = rand.New(rand.NewSource(time.Now().UnixNano()))
+var RANDOM = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
 
 func RandomNonAlphaNumeric(count int) (string, error) {
 	return RandomAlphaNumericCustom(count, false, false)
@@ -39,7 +39,6 @@ func Random(count int, start int, end int, letters bool, numbers bool, chars ...
 }
 
 func RandomSeed(count int, start int, end int, letters bool, numbers bool, chars []rune, random *rand.Rand) (string, error) {
-
 	if count == 0 {
 		return "", nil
 	} else if count < 0 {
@@ -84,9 +83,9 @@ func RandomSeed(count int, start int, end int, letters bool, numbers bool, chars
 		count--
 		var ch rune
 		if chars == nil {
-			ch = rune(random.Intn(gap) + start)
+			ch = rune(random.IntN(gap) + start)
 		} else {
-			ch = chars[random.Intn(gap)+start]
+			ch = chars[random.IntN(gap)+start]
 		}
 
 		if letters && unicode.IsLetter(ch) || numbers && unicode.IsDigit(ch) || !letters && !numbers {
@@ -98,14 +97,14 @@ func RandomSeed(count int, start int, end int, letters bool, numbers bool, chars
 					buffer[count] = ch
 					count--
 					// Insert high surrogate
-					buffer[count] = rune(55296 + random.Intn(128))
+					buffer[count] = rune(55296 + random.IntN(128))
 				}
 			} else if ch >= 55296 && ch <= 56191 { // High surrogates range (Partial)
 				if count == 0 {
 					count++
 				} else {
 					// Insert low surrogate
-					buffer[count] = rune(56320 + random.Intn(128))
+					buffer[count] = rune(56320 + random.IntN(128))
 					count--
 					// Insert high surrogate
 					buffer[count] = ch
