@@ -2,6 +2,7 @@ package rand
 
 import (
 	"math/rand/v2"
+	"time"
 
 	"github.com/tx7do/go-utils/math"
 )
@@ -77,6 +78,14 @@ func RandomUint64(min, max uint64) uint64 {
 		return max
 	}
 	return min + rand.Uint64N(max-min+1)
+}
+
+// RandomDuration 生成 [min, max] 范围内随机 time.Duration
+func RandomDuration(min, max time.Duration) time.Duration {
+	if min >= max {
+		return max
+	}
+	return min + time.Duration(Int64N(int64(max-min+1)))
 }
 
 // RandomString 生成指定长度随机字符串（大小写字母+数字）

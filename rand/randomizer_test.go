@@ -57,7 +57,7 @@ func TestRandomizer_WeightedChoice_EmptyArray(t *testing.T) {
 func TestRandomizer_WeightedChoice_AllZeroWeights(t *testing.T) {
 	r := NewRandomizer(UnixNanoSeed)
 	result := r.WeightedChoice([]int{0, 0, 0})
-	assert.Equal(t, 2, result)
+	assert.Equal(t, 0, result)
 }
 
 func TestRandomizer_WeightedChoice_MixedWeights(t *testing.T) {

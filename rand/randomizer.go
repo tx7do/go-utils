@@ -154,11 +154,15 @@ func (r *Randomizer) RandomString(l int) string {
 
 // WeightedChoice 根据权重随机，返回对应选项的索引，O(n)
 func (r *Randomizer) WeightedChoice(weightArray []int) int {
-	if weightArray == nil {
+	if len(weightArray) == 0 {
 		return -1
 	}
 
 	total := math.SumInt(weightArray)
+	if total <= 0 {
+		return 0
+	}
+
 	rv := r.Int64N(total)
 	for i, v := range weightArray {
 		if rv < int64(v) {
@@ -172,24 +176,32 @@ func (r *Randomizer) WeightedChoice(weightArray []int) int {
 
 // NonWeightedChoice 根据权重随机，返回对应选项的索引，O(n). 权重大于等于0
 func (r *Randomizer) NonWeightedChoice(weightArray []int) int {
-	if weightArray == nil {
+	if len(weightArray) == 0 {
 		return -1
 	}
 
-	for i, weight := range weightArray {
+	// 复制避免修改调用方传入的切片
+	weights := make([]int, len(weightArray))
+	copy(weights, weightArray)
+
+	for i, weight := range weights {
 		if weight < 0 {
-			weightArray[i] = 0
+			weights[i] = 0
 		}
 	}
 
-	total := math.SumInt(weightArray)
+	total := math.SumInt(weights)
+	if total <= 0 {
+		return 0
+	}
+
 	rv := r.Int64N(total)
-	for i, v := range weightArray {
+	for i, v := range weights {
 		if rv < int64(v) {
 			return i
 		}
 		rv -= int64(v)
 	}
 
-	return len(weightArray) - 1
+	return len(weights) - 1
 }

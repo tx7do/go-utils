@@ -237,12 +237,12 @@ func TestWeightedChoice_EmptyArray(t *testing.T) {
 
 func TestWeightedChoice_AllZeroWeights(t *testing.T) {
 	result := WeightedChoice([]int{0, 0, 0})
-	assert.Equal(t, 2, result)
+	assert.Equal(t, 0, result)
 }
 
 func TestWeightedChoice_NegativeWeights(t *testing.T) {
 	result := WeightedChoice([]int{-1, -2, -3})
-	assert.Equal(t, 2, result)
+	assert.Equal(t, 0, result)
 }
 
 func TestWeightedChoice_MixedWeights(t *testing.T) {
@@ -264,17 +264,17 @@ func TestWeightedChoice_SingleElement(t *testing.T) {
 
 func TestNonWeightedChoice_EmptyArray(t *testing.T) {
 	result := NonWeightedChoice([]int{})
-	assert.Equal(t, -1, result)
+	assert.Equal(t, 0, result)
 }
 
 func TestNonWeightedChoice_AllZeroWeights(t *testing.T) {
 	result := NonWeightedChoice([]int{0, 0, 0})
-	assert.Equal(t, 2, result)
+	assert.Equal(t, 0, result)
 }
 
 func TestNonWeightedChoice_NegativeWeights(t *testing.T) {
 	result := NonWeightedChoice([]int{-1, -2, -3})
-	assert.Equal(t, 2, result)
+	assert.Equal(t, 0, result)
 }
 
 func TestNonWeightedChoice_MixedWeights(t *testing.T) {

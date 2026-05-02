@@ -1,80 +1,102 @@
 package rand
 
 import (
-	"fmt"
+	"encoding/binary"
+	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestUnixNanoSeed(t *testing.T) {
+func TestSeeder_UnixNano_FallbackOnReadError(t *testing.T) {
+	oldCryptoRead := cryptoRead
+	oldNowUnixNano := nowUnixNano
+	defer func() {
+		cryptoRead = oldCryptoRead
+		nowUnixNano = oldNowUnixNano
+	}()
+
+	const fallbackSeed int64 = 123456789
+	cryptoRead = func(_ []byte) (int, error) {
+		return 0, errors.New("read failed")
+	}
+	nowUnixNano = func() int64 { return fallbackSeed }
+
 	seeder := NewSeeder(UnixNanoSeed)
-
-	var seeds = make(map[int64]bool)
-	for i := 0; i < 100000; i++ {
-		seed := seeder.Seed()
-		seeds[seed] = true
-	}
-	fmt.Println("UnixNano Seed", len(seeds))
+	assert.Equal(t, fallbackSeed, seeder.UnixNano())
 }
 
-func TestMapHashSeed(t *testing.T) {
-	seeder := NewSeeder(MapHashSeed)
+func TestSeeder_CryptoRand_NoPanicAndFallbackOnReadError(t *testing.T) {
+	oldCryptoRead := cryptoRead
+	oldNowUnixNano := nowUnixNano
+	defer func() {
+		cryptoRead = oldCryptoRead
+		nowUnixNano = oldNowUnixNano
+	}()
 
-	var seeds = make(map[int64]bool)
-	for i := 0; i < 100000; i++ {
-		seed := seeder.Seed()
-		seeds[seed] = true
+	const fallbackSeed int64 = 987654321
+	cryptoRead = func(_ []byte) (int, error) {
+		return 0, errors.New("read failed")
 	}
-	fmt.Println("MapHash Seed", len(seeds))
-}
+	nowUnixNano = func() int64 { return fallbackSeed }
 
-func TestCryptoRandSeed(t *testing.T) {
 	seeder := NewSeeder(CryptoRandSeed)
-
-	var seeds = make(map[int64]bool)
-	for i := 0; i < 100000; i++ {
-		seed := seeder.Seed()
-		seeds[seed] = true
-	}
-	fmt.Println("CryptoRand Seed", len(seeds))
+	assert.NotPanics(t, func() {
+		assert.Equal(t, fallbackSeed, seeder.CryptoRand())
+	})
 }
 
-func TestRandomStringSeed(t *testing.T) {
-	seeder := NewSeeder(RandomStringSeed)
+func TestSeeder_CryptoRand_UsesEntropyBytesWhenReadSucceeds(t *testing.T) {
+	oldCryptoRead := cryptoRead
+	defer func() {
+		cryptoRead = oldCryptoRead
+	}()
 
-	var seeds = make(map[int64]bool)
-	for i := 0; i < 100000; i++ {
-		seed := seeder.Seed()
-		seeds[seed] = true
+	bytes := []byte{1, 2, 3, 4, 5, 6, 7, 8}
+	cryptoRead = func(dst []byte) (int, error) {
+		copy(dst, bytes)
+		return len(dst), nil
 	}
-	fmt.Println("RandomString Seed", len(seeds))
+
+	seeder := NewSeeder(CryptoRandSeed)
+	expected := int64(binary.LittleEndian.Uint64(bytes))
+	assert.Equal(t, expected, seeder.CryptoRand())
 }
 
-func TestSeed(t *testing.T) {
-	var seeds = make(map[int64]bool)
-	for i := 0; i < 100000; i++ {
-		seed := Seed(UnixNanoSeed)
-		seeds[seed] = true
+func TestSeeder_BasicDistribution_UniqueCount(t *testing.T) {
+	tests := []struct {
+		name      string
+		seedType  SeedType
+		minUnique int
+	}{
+		{name: "UnixNano", seedType: UnixNanoSeed, minUnique: 950},
+		{name: "MapHash", seedType: MapHashSeed, minUnique: 950},
+		{name: "CryptoRand", seedType: CryptoRandSeed, minUnique: 950},
+		{name: "RandomString", seedType: RandomStringSeed, minUnique: 900},
 	}
-	fmt.Println("UnixNano Seed", len(seeds))
 
-	seeds = make(map[int64]bool)
-	for i := 0; i < 100000; i++ {
-		seed := Seed(MapHashSeed)
-		seeds[seed] = true
+	const sampleSize = 1000
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			seeder := NewSeeder(tt.seedType)
+			seeds := make(map[int64]struct{}, sampleSize)
+			for i := 0; i < sampleSize; i++ {
+				seeds[seeder.Seed()] = struct{}{}
+			}
+			assert.GreaterOrEqual(t, len(seeds), tt.minUnique)
+		})
 	}
-	fmt.Println("MapHash Seed", len(seeds))
+}
 
-	seeds = make(map[int64]bool)
-	for i := 0; i < 100000; i++ {
-		seed := Seed(CryptoRandSeed)
-		seeds[seed] = true
-	}
-	fmt.Println("CryptoRand Seed", len(seeds))
+func TestSeed_Function_BasicDistribution(t *testing.T) {
+	types := []SeedType{UnixNanoSeed, MapHashSeed, CryptoRandSeed, RandomStringSeed}
 
-	seeds = make(map[int64]bool)
-	for i := 0; i < 100000; i++ {
-		seed := Seed(RandomStringSeed)
-		seeds[seed] = true
+	const sampleSize = 1000
+	for _, seedType := range types {
+		seeds := make(map[int64]struct{}, sampleSize)
+		for i := 0; i < sampleSize; i++ {
+			seeds[Seed(seedType)] = struct{}{}
+		}
+		assert.GreaterOrEqual(t, len(seeds), 900)
 	}
-	fmt.Println("RandomString Seed", len(seeds))
 }
