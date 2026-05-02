@@ -1,4 +1,4 @@
-git tag v1.1.37
+git tag v1.1.38
 
 git tag bank_card/v1.1.6
 git tag geoip/v1.1.8
@@ -13,7 +13,7 @@ git tag password/v0.0.2
 git tag query_parser/v0.0.2
 git tag code_generator/v0.0.1
 git tag eventloop/v0.0.3
-git tag aggregator/v0.0.4
+git tag aggregator/v0.0.5
 git tag ddl_parser/v0.0.5
 git tag crypto/v0.0.2
 git tag distlock/v0.0.2
