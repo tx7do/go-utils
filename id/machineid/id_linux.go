@@ -4,6 +4,7 @@
 package machineid
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 )
@@ -71,7 +72,7 @@ func getCGroup() (string, error) {
 	return groups[2], nil
 }
 
-var containerIDRegex = regexp.MustCompile(`\/docker\/containers/([a-f0-9]+)/hostname`)
+var containerIDRegex = regexp.MustCompile(`/docker/containers/([a-f0-9]+)/hostname`)
 
 func getMountInfo() (string, error) {
 	mountInfoBytes, err := readFile(mountInfoPath)
