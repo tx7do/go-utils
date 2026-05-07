@@ -1,6 +1,8 @@
 package rand
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"math/rand/v2"
 	"time"
 
@@ -110,21 +112,24 @@ func RandomChoice[T any](array []T, n int) []T {
 		return nil
 	}
 
-	// 只需要1个
 	if n == 1 {
-		return []T{array[IntN(len(array))]}
+		return []T{array[rand.IntN(len(array))]}
 	}
 
-	// 复制原数组
 	tmp := make([]T, len(array))
 	copy(tmp, array)
 
-	// 超过长度直接返回全部
-	if len(tmp) <= n {
+	if n >= len(tmp) {
+		rand.Shuffle(len(tmp), func(i, j int) {
+			tmp[i], tmp[j] = tmp[j], tmp[i]
+		})
 		return tmp
 	}
 
-	Shuffle(tmp)
+	for i := 0; i < n; i++ {
+		j := i + rand.IntN(len(tmp)-i)
+		tmp[i], tmp[j] = tmp[j], tmp[i]
+	}
 	return tmp[:n]
 }
 
@@ -142,24 +147,37 @@ func Shuffle[T any](array []T) {
 
 // WeightedChoice 根据权重随机，返回对应选项的索引，O(n)
 func WeightedChoice(weightArray []int) int {
-	if len(weightArray) == 0 {
+	n := len(weightArray)
+	if n == 0 {
 		return -1
 	}
+	if n == 1 {
+		return 0
+	}
 
-	total := math.SumInt(weightArray)
+	var total int64
+	for _, w := range weightArray {
+		if w > 0 {
+			total += int64(w)
+		}
+	}
+
 	if total <= 0 {
 		return 0
 	}
 
-	rv := Int64N(total)
+	rv := rand.Int64N(total)
+	var cursor int64
 	for i, v := range weightArray {
-		if rv < int64(v) {
+		if v <= 0 {
+			continue
+		}
+		cursor += int64(v)
+		if rv < cursor {
 			return i
 		}
-		rv -= int64(v)
 	}
-
-	return len(weightArray) - 1
+	return n - 1
 }
 
 // NonWeightedChoice 权重非负随机选择，返回对应选项的索引，O(n). 权重大于等于0
@@ -193,4 +211,18 @@ func NonWeightedChoice(weightArray []int) int {
 	}
 
 	return len(weights) - 1
+}
+
+// SHA256Value 生成基于 serverSeed、clientSeed 和 nonce 的 SHA256 哈希值，并返回前 8 字节作为 uint64。适用于需要基于多个输入生成随机数的场景，如游戏中的随机事件生成等。
+func SHA256Value(serverSeed, clientSeed string, nonce uint64) uint64 {
+	h := sha256.New()
+	h.Write([]byte(serverSeed))
+	h.Write([]byte(clientSeed))
+
+	nBuf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(nBuf, nonce)
+	h.Write(nBuf)
+
+	res := h.Sum(nil)
+	return binary.LittleEndian.Uint64(res[:8])
 }

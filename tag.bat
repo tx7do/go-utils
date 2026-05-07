@@ -17,6 +17,7 @@ git tag aggregator/v0.0.5
 git tag ddl_parser/v0.0.5
 git tag crypto/v0.0.2
 git tag distlock/v0.0.2
+git tag rand/v0.0.1
 
 
 git push origin --tags

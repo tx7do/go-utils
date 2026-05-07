@@ -4,7 +4,6 @@ import (
 	cryptoRand "crypto/rand"
 	"encoding/binary"
 	"hash/maphash"
-	mathRand "math/rand/v2"
 	"runtime"
 	"time"
 )
@@ -67,18 +66,39 @@ func (r *Seeder) CryptoRand() int64 {
 	return seed
 }
 
-var Alpha = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+// CryptoRand32 生成一个 32 字节的密码学安全随机数；读取失败时 panic（因为安全性受损）。适用于需要更高安全性的场景，如加密密钥生成等。
+func (r *Seeder) CryptoRand32() [32]byte {
+	var b [32]byte
+	_, err := cryptoRead(b[:])
+	if err != nil {
+		panic("crypto/rand failed")
+	}
+	return b
+}
 
+// RandomString 生成一个随机字符串并将其转换为 int64；如果 crypto/rand 失败，则降级到 UnixNano。适用于需要基于随机字符串生成种子的场景，如测试用例中需要可读的种子标识等。
 func (r *Seeder) RandomString() int64 {
 	const size = 8
-	buf := make([]byte, size)
-	for i := 0; i < size; i++ {
-		idx := mathRand.IntN(len(Alpha))
-		buf[i] = Alpha[idx]
-	}
-	seed := int64(binary.LittleEndian.Uint64(buf[:]))
+	const alpha = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-	return seed
+	// 1. 生成一个随机字节数组，长度为 size（8 字节），用于后续生成随机字符串。
+	b := make([]byte, size)
+
+	// 2. 使用 crypto/rand 生成随机字节；如果失败，降级到 UnixNano。
+	_, err := cryptoRead(b)
+	if err != nil {
+		return r.UnixNano()
+	}
+
+	// 3. 将随机字节转换为随机字符串，使用 alpha 字符集；每个字节通过取模操作映射到 alpha 中的一个字符。
+	randomChars := make([]byte, size)
+	for i := 0; i < size; i++ {
+		// 通过取模操作将随机字节映射到 alpha 字符集中的一个字符，构建随机字符串。
+		randomChars[i] = alpha[int(b[i])%len(alpha)]
+	}
+
+	// 4. 将生成的随机字符串转换为 int64，使用 binary.LittleEndian 进行字节序转换；如果字符串长度不足 8 字节，剩余部分将被填充为零。
+	return int64(binary.LittleEndian.Uint64(randomChars))
 }
 
 // Seed 根据类型生成最终 int64 种子
