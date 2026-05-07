@@ -1,4 +1,4 @@
-git tag v1.1.38
+git tag v1.1.39
 
 git tag bank_card/v1.1.6
 git tag geoip/v1.1.8
@@ -17,7 +17,7 @@ git tag aggregator/v0.0.5
 git tag ddl_parser/v0.0.5
 git tag crypto/v0.0.2
 git tag distlock/v0.0.2
-git tag rand/v0.0.1
+git tag rand/v0.0.2
 
 
 git push origin --tags
