@@ -14,12 +14,6 @@ import (
 	utilMath "github.com/tx7do/go-utils/math"
 )
 
-// AliasTable 用于实现基于别名方法的加权随机选择算法，提供 O(1) 时间复杂度的随机选择
-type AliasTable struct {
-	prob  []float32 // 每个选项的概率
-	alias []int     // 矩形中选项的索引
-}
-
 // RandType 随机数生成器类型枚举
 type RandType string
 
@@ -419,87 +413,6 @@ func (r *Randomizer) ZipfUint64() uint64 {
 		return r.rnd.Uint64()
 	}
 	return r.zipf.Uint64()
-}
-
-// NewAliasTable 根据权重数组构建别名表，用于 O(1) 时间复杂度的加权随机选择
-func (r *Randomizer) NewAliasTable(weights []int) *AliasTable {
-	n := len(weights)
-	if n == 0 {
-		return nil
-	}
-
-	sum := 0
-	for _, w := range weights {
-		sum += w
-	}
-
-	prob := make([]float32, n)
-	alias := make([]int, n)
-
-	// 计算平均权重，并将权重缩放到平均值的倍数
-	avg := float32(sum) / float32(n)
-	scaledWeights := make([]float32, n)
-
-	var small, large []int
-	for i, w := range weights {
-		sw := float32(w) / avg
-		scaledWeights[i] = sw
-		if sw < 1.0 {
-			small = append(small, i)
-		} else {
-			large = append(large, i)
-		}
-	}
-
-	// 构建别名表
-	for len(small) > 0 && len(large) > 0 {
-		s := small[len(small)-1]
-		small = small[:len(small)-1]
-		l := large[len(large)-1]
-		large = large[:len(large)-1]
-
-		prob[s] = scaledWeights[s]
-		alias[s] = l
-
-		// 更新大权重的剩余权重
-		scaledWeights[l] = (scaledWeights[l] + scaledWeights[s]) - 1.0
-		if scaledWeights[l] < 1.0 {
-			small = append(small, l)
-		} else {
-			large = append(large, l)
-		}
-	}
-
-	// 处理剩余的权重，确保它们的概率为 1.0
-	for len(large) > 0 {
-		l := large[len(large)-1]
-		large = large[:len(large)-1]
-		prob[l] = 1.0
-	}
-	for len(small) > 0 {
-		s := small[len(small)-1]
-		small = small[:len(small)-1]
-		prob[s] = 1.0
-	}
-
-	return &AliasTable{prob: prob, alias: alias}
-}
-
-// AliasChoice 使用别名表进行加权随机选择，返回选项的索引，O(1) 时间复杂度
-func (r *Randomizer) AliasChoice(at *AliasTable) int {
-	if at == nil || len(at.prob) == 0 {
-		return -1
-	}
-
-	n := len(at.prob)
-	// 1. 随机选择一个索引
-	idx := r.IntN(n)
-
-	// 2. 根据概率和别名表进行选择 (0.0 ~ 1.0)
-	if r.Float32() < at.prob[idx] {
-		return idx
-	}
-	return at.alias[idx]
 }
 
 // Bool 随机布尔值 true/false

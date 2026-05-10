@@ -100,3 +100,68 @@ func TestSeed_Function_BasicDistribution(t *testing.T) {
 		assert.GreaterOrEqual(t, len(seeds), 900)
 	}
 }
+
+func TestSeeder_CryptoRand32_Success(t *testing.T) {
+	oldCryptoRead := cryptoRead
+	defer func() { cryptoRead = oldCryptoRead }()
+
+	var expected [32]byte
+	for i := range expected {
+		expected[i] = byte(i + 1)
+	}
+	cryptoRead = func(dst []byte) (int, error) {
+		copy(dst, expected[:])
+		return len(dst), nil
+	}
+
+	seeder := NewSeeder(CryptoRandSeed)
+	result := seeder.CryptoRand32()
+	assert.Equal(t, expected, result)
+}
+
+func TestSeeder_CryptoRand32_Panic(t *testing.T) {
+	oldCryptoRead := cryptoRead
+	defer func() { cryptoRead = oldCryptoRead }()
+
+	cryptoRead = func(_ []byte) (int, error) {
+		return 0, errors.New("forced failure")
+	}
+
+	seeder := NewSeeder(CryptoRandSeed)
+	assert.Panics(t, func() {
+		seeder.CryptoRand32()
+	})
+}
+
+func TestSeeder_FixedSeed_WithManualSeed(t *testing.T) {
+	seeder := NewSeeder(FixedSeed)
+	assert.Equal(t, int64(42), seeder.Seed(42))
+	assert.Equal(t, int64(-999), seeder.Seed(-999))
+}
+
+func TestSeeder_FixedSeed_WithoutManualSeed_FallsToDefault(t *testing.T) {
+	seeder := NewSeeder(FixedSeed)
+	// 未提供 manualSeed，走 default(UnixNano) 路径，不应 panic
+	assert.NotPanics(t, func() {
+		v := seeder.Seed()
+		_ = v
+	})
+}
+
+func TestSeeder_RandomString_ErrorFallback(t *testing.T) {
+	oldCryptoRead := cryptoRead
+	oldNowUnixNano := nowUnixNano
+	defer func() {
+		cryptoRead = oldCryptoRead
+		nowUnixNano = oldNowUnixNano
+	}()
+
+	const fallback int64 = 77777
+	cryptoRead = func(_ []byte) (int, error) {
+		return 0, errors.New("read failed")
+	}
+	nowUnixNano = func() int64 { return fallback }
+
+	seeder := NewSeeder(RandomStringSeed)
+	assert.Equal(t, fallback, seeder.RandomString())
+}

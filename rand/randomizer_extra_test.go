@@ -615,3 +615,476 @@ func TestOption_WithSeedType_FixedSeed_DefaultZero(t *testing.T) {
 	r := New(WithSeedType(FixedSeed))
 	assert.NotNil(t, r)
 }
+
+// ─── 基础原始方法 ─────────────────────────────────────────────────────────────
+
+func TestRandomizer_PrimitiveTypes(t *testing.T) {
+	r := newTestRandomizer()
+
+	// Int / Int32 / Uint32
+	_ = r.Int()
+	_ = r.Int32()
+	_ = r.Uint32()
+
+	// UintN / Uint32N / Uint64N
+	v := r.UintN(100)
+	assert.Less(t, v, uint(100))
+	v32 := r.Uint32N(100)
+	assert.Less(t, v32, uint32(100))
+	v64 := r.Uint64N(100)
+	assert.Less(t, v64, uint64(100))
+}
+
+// ─── RangeInt32 / RangeInt64 / RangeUint 正常区间路径 ────────────────────────
+
+func TestRandomizer_RangeInt32_NormalRange(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 500; i++ {
+		v := r.RangeInt32(-10, 10)
+		assert.GreaterOrEqual(t, v, int32(-10))
+		assert.LessOrEqual(t, v, int32(10))
+	}
+}
+
+func TestRandomizer_RangeInt64_NormalRange(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 500; i++ {
+		v := r.RangeInt64(-100, 100)
+		assert.GreaterOrEqual(t, v, int64(-100))
+		assert.LessOrEqual(t, v, int64(100))
+	}
+}
+
+func TestRandomizer_RangeUint_NormalRange(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 500; i++ {
+		v := r.RangeUint(1, 50)
+		assert.GreaterOrEqual(t, v, uint(1))
+		assert.LessOrEqual(t, v, uint(50))
+	}
+}
+
+// ─── NonWeightedChoice 正常路径 ───────────────────────────────────────────────
+
+func TestRandomizer_NonWeightedChoice_NormalRange(t *testing.T) {
+	r := newTestRandomizer()
+	weights := []int{1, 2, 3, 4, 5}
+	counts := make([]int, len(weights))
+	for i := 0; i < 1000; i++ {
+		idx := r.NonWeightedChoice(weights)
+		assert.GreaterOrEqual(t, idx, 0)
+		assert.Less(t, idx, len(weights))
+		counts[idx]++
+	}
+	// 权重最大的最后一个应被选中更多
+	assert.Greater(t, counts[4], counts[0])
+}
+
+// ─── RandomPickUnique 边界覆盖 ────────────────────────────────────────────────
+
+func TestRandomizer_RandomPickUniqueInt_CountGTLen(t *testing.T) {
+	r := newTestRandomizer()
+	list := []int{1, 2, 3}
+	result := r.RandomPickUniqueInt(list, 10)
+	assert.Len(t, result, 3)
+	assert.ElementsMatch(t, list, result)
+}
+
+func TestRandomizer_RandomPickUnique_CountGTLen(t *testing.T) {
+	r := newTestRandomizer()
+	list := []any{1, "two", 3.0}
+	result := r.RandomPickUnique(list, 10)
+	assert.Len(t, result, 3)
+	assert.ElementsMatch(t, list, result)
+}
+
+// ─── ProbPermilleHit ─────────────────────────────────────────────────────────
+
+func TestRandomizer_ProbPermilleHit(t *testing.T) {
+	r := newTestRandomizer()
+
+	assert.False(t, r.ProbPermilleHit(0))
+	assert.False(t, r.ProbPermilleHit(-1))
+	assert.True(t, r.ProbPermilleHit(1000))
+	assert.True(t, r.ProbPermilleHit(1001))
+
+	hits := 0
+	for i := 0; i < 2000; i++ {
+		if r.ProbPermilleHit(500) {
+			hits++
+		}
+	}
+	assert.Greater(t, hits, 600)
+	assert.Less(t, hits, 1400)
+}
+
+// ─── 游戏/领域辅助方法 ────────────────────────────────────────────────────────
+
+func TestRandomizer_RandomGrade(t *testing.T) {
+	r := newTestRandomizer()
+	weights := []int{5, 3, 2}
+	for i := 0; i < 200; i++ {
+		idx := r.RandomGrade(weights)
+		assert.GreaterOrEqual(t, idx, 0)
+		assert.Less(t, idx, len(weights))
+	}
+}
+
+func TestRandomizer_RandomTwoChoice(t *testing.T) {
+	r := newTestRandomizer()
+
+	// total=0 → false
+	assert.False(t, r.RandomTwoChoice(0, 0))
+
+	// w1 全权重 → 全 true
+	for i := 0; i < 100; i++ {
+		assert.True(t, r.RandomTwoChoice(10, 0))
+	}
+	// w2 全权重 → 全 false
+	for i := 0; i < 100; i++ {
+		assert.False(t, r.RandomTwoChoice(0, 10))
+	}
+
+	// 混合
+	trueCount := 0
+	for i := 0; i < 1000; i++ {
+		if r.RandomTwoChoice(7, 3) {
+			trueCount++
+		}
+	}
+	assert.Greater(t, trueCount, 400)
+}
+
+func TestRandomizer_RandomAttrValue(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.RandomAttrValue(100, 0.8, 1.2)
+		assert.GreaterOrEqual(t, v, 79)
+		assert.LessOrEqual(t, v, 121)
+	}
+}
+
+func TestRandomizer_RandomInterval(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.RandomInterval(10, 3)
+		assert.GreaterOrEqual(t, v, 7)
+		assert.LessOrEqual(t, v, 13)
+	}
+}
+
+func TestRandomizer_RandomSleepMs(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.RandomSleepMs(100, 500)
+		assert.GreaterOrEqual(t, v, 100)
+		assert.LessOrEqual(t, v, 500)
+	}
+}
+
+func TestRandomizer_RandomDir4(t *testing.T) {
+	r := newTestRandomizer()
+	dirs := make(map[int]bool)
+	for i := 0; i < 500; i++ {
+		d := r.RandomDir4()
+		assert.GreaterOrEqual(t, d, 0)
+		assert.Less(t, d, 4)
+		dirs[d] = true
+	}
+	assert.Len(t, dirs, 4, "4个方向应全部出现")
+}
+
+func TestRandomizer_RandomDir8(t *testing.T) {
+	r := newTestRandomizer()
+	dirs := make(map[int]bool)
+	for i := 0; i < 1000; i++ {
+		d := r.RandomDir8()
+		assert.GreaterOrEqual(t, d, 0)
+		assert.Less(t, d, 8)
+		dirs[d] = true
+	}
+	assert.Len(t, dirs, 8, "8个方向应全部出现")
+}
+
+func TestRandomizer_RandomBoolRatio(t *testing.T) {
+	r := newTestRandomizer()
+	assert.False(t, r.RandomBoolRatio(0))
+	assert.True(t, r.RandomBoolRatio(100))
+
+	hits := 0
+	for i := 0; i < 1000; i++ {
+		if r.RandomBoolRatio(50) {
+			hits++
+		}
+	}
+	assert.Greater(t, hits, 300)
+	assert.Less(t, hits, 700)
+}
+
+func TestRandomizer_RandomIndex(t *testing.T) {
+	r := newTestRandomizer()
+	assert.Equal(t, 0, r.RandomIndex(0))
+	assert.Equal(t, 0, r.RandomIndex(-1))
+
+	for i := 0; i < 500; i++ {
+		idx := r.RandomIndex(10)
+		assert.GreaterOrEqual(t, idx, 0)
+		assert.Less(t, idx, 10)
+	}
+}
+
+func TestRandomizer_LuckyValue(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.LuckyValue()
+		assert.GreaterOrEqual(t, v, 1)
+		assert.LessOrEqual(t, v, 100)
+	}
+}
+
+func TestRandomizer_CritHitWithLucky(t *testing.T) {
+	r := newTestRandomizer()
+
+	// rate 溢出 100 仍应 true
+	assert.True(t, r.CritHitWithLucky(50, 100, 1.0)) // 50+100=150>100
+
+	// base 0, lucky 0, bonus 0 → 永不暴击
+	assert.False(t, r.CritHitWithLucky(0, 0, 0))
+
+	// 正常命中率分布
+	hits := 0
+	for i := 0; i < 1000; i++ {
+		if r.CritHitWithLucky(30, 20, 0.5) { // rate = 30+10 = 40%
+			hits++
+		}
+	}
+	assert.Greater(t, hits, 150)
+	assert.Less(t, hits, 650)
+}
+
+func TestRandomizer_ShrinkIntSlice(t *testing.T) {
+	r := newTestRandomizer()
+
+	// dropCnt=0 → 空
+	assert.Equal(t, []int{}, r.ShrinkIntSlice([]int{1, 2, 3}, 0))
+	// dropCnt >= len → 空
+	assert.Equal(t, []int{}, r.ShrinkIntSlice([]int{1, 2, 3}, 3))
+	assert.Equal(t, []int{}, r.ShrinkIntSlice([]int{1, 2, 3}, 5))
+
+	arr := []int{1, 2, 3, 4, 5}
+	result := r.ShrinkIntSlice(arr, 2)
+	assert.Len(t, result, 3)
+	for _, v := range result {
+		assert.Contains(t, arr, v)
+	}
+	// 原数组不变
+	assert.Equal(t, []int{1, 2, 3, 4, 5}, arr)
+}
+
+func TestRandomizer_RoundFloat(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.RoundFloat(1.0, 5.0, 2)
+		assert.GreaterOrEqual(t, v, 1.0)
+		assert.LessOrEqual(t, v, 5.0)
+		// 保留2位小数
+		rounded := math.Round(v*100) / 100
+		assert.InDelta(t, rounded, v, 1e-9)
+	}
+}
+
+func TestRandomizer_RandomContinuousTimes(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.RandomContinuousTimes(10)
+		assert.GreaterOrEqual(t, v, 1)
+		assert.LessOrEqual(t, v, 10)
+	}
+}
+
+func TestRandomizer_SlippagePrice(t *testing.T) {
+	r := newTestRandomizer()
+	price := 100.0
+	rate := 0.01 // 1%
+	for i := 0; i < 200; i++ {
+		v := r.SlippagePrice(price, rate)
+		assert.GreaterOrEqual(t, v, price*(1-rate)-1e-9)
+		assert.LessOrEqual(t, v, price*(1+rate)+1e-9)
+	}
+}
+
+func TestRandomizer_RandomPositionRate(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.RandomPositionRate()
+		assert.GreaterOrEqual(t, v, 0.0)
+		assert.LessOrEqual(t, v, 1.0)
+	}
+}
+
+func TestRandomizer_RandomPositionRateRange(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.RandomPositionRateRange(0.2, 0.8)
+		assert.GreaterOrEqual(t, v, 0.2)
+		assert.LessOrEqual(t, v, 0.8)
+	}
+}
+
+func TestRandomizer_RandomVolatility(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.RandomVolatility(0.01, 0.05)
+		assert.GreaterOrEqual(t, v, 0.01)
+		assert.LessOrEqual(t, v, 0.05)
+	}
+}
+
+func TestRandomizer_RandomReturn(t *testing.T) {
+	r := newTestRandomizer()
+	v := r.RandomReturn(0.001, 0.02)
+	assert.False(t, math.IsNaN(v))
+	assert.False(t, math.IsInf(v, 0))
+}
+
+func TestRandomizer_TruncatedNormal(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 200; i++ {
+		v := r.TruncatedNormal(0, 1, -2, 2)
+		assert.GreaterOrEqual(t, v, -2.0)
+		assert.LessOrEqual(t, v, 2.0)
+	}
+}
+
+func TestRandomizer_LogNormal(t *testing.T) {
+	r := newTestRandomizer()
+	for i := 0; i < 100; i++ {
+		v := r.LogNormal(0, 0.1)
+		assert.Greater(t, v, 0.0)
+		assert.False(t, math.IsNaN(v))
+	}
+}
+
+func TestRandomizer_ProbWithCooldown(t *testing.T) {
+	r := newTestRandomizer()
+
+	// 冷却未满 → 始终 false
+	for i := 0; i < 100; i++ {
+		assert.False(t, r.ProbWithCooldown(100, 5, 3))
+	}
+	// 冷却已满、100% → 始终 true
+	assert.True(t, r.ProbWithCooldown(100, 5, 5))
+	// 冷却已满、0% → 始终 false
+	assert.False(t, r.ProbWithCooldown(0, 5, 5))
+}
+
+func TestRandomizer_ShuffleGrid(t *testing.T) {
+	r := newTestRandomizer()
+	width, height := 4, 3
+	grid := r.ShuffleGrid(width, height)
+	assert.Len(t, grid, height)
+
+	seen := make(map[[2]int]bool)
+	for _, row := range grid {
+		assert.Len(t, row, width)
+		for _, cell := range row {
+			key := [2]int{cell.X, cell.Y}
+			assert.False(t, seen[key], "格子(%d,%d)不应重复", cell.X, cell.Y)
+			seen[key] = true
+			assert.GreaterOrEqual(t, cell.X, 0)
+			assert.Less(t, cell.X, width)
+			assert.GreaterOrEqual(t, cell.Y, 0)
+			assert.Less(t, cell.Y, height)
+		}
+	}
+	assert.Len(t, seen, width*height)
+}
+
+// ─── AliasTable Float32 / Float64 变体 ───────────────────────────────────────
+
+func TestRandomizer_NewAliasTableFloat32(t *testing.T) {
+	r := newTestRandomizer()
+
+	// 空权重 → nil
+	assert.Nil(t, r.NewAliasTableFloat32(nil))
+	assert.Nil(t, r.NewAliasTableFloat32([]float32{}))
+	// 全无效权重 → nil
+	assert.Nil(t, r.NewAliasTableFloat32([]float32{0, -1, 0.00000001}))
+
+	// 正常权重
+	weights := []float32{5.0, 3.0, 2.0}
+	at := r.NewAliasTableFloat32(weights)
+	assert.NotNil(t, at)
+	assert.Len(t, at.prob, 3)
+	assert.Len(t, at.alias, 3)
+	assert.Len(t, at.origIdx, 3)
+
+	// 选择结果应在原始索引范围内
+	counts := make(map[int]int)
+	for i := 0; i < 1000; i++ {
+		idx := r.AliasChoice(at)
+		assert.GreaterOrEqual(t, idx, 0)
+		assert.Less(t, idx, len(weights))
+		counts[idx]++
+	}
+	// 权重最大的索引 0 应被选中最多
+	assert.Greater(t, counts[0], counts[2])
+}
+
+func TestRandomizer_NewAliasTableFloat32_WithInvalidEntries(t *testing.T) {
+	r := newTestRandomizer()
+	// 部分无效，仍应构建（保留原始索引映射）
+	weights := []float32{0, 1.5, 0, 0.5}
+	at := r.NewAliasTableFloat32(weights)
+	assert.NotNil(t, at)
+	assert.Len(t, at.prob, 2)
+	assert.Len(t, at.origIdx, 2)
+	// 有效索引应为 1 和 3
+	assert.ElementsMatch(t, []int{1, 3}, at.origIdx)
+
+	for i := 0; i < 200; i++ {
+		idx := r.AliasChoice(at)
+		assert.Contains(t, []int{1, 3}, idx)
+	}
+}
+
+func TestRandomizer_NewAliasTableFloat64(t *testing.T) {
+	r := newTestRandomizer()
+
+	// 空权重 → nil
+	assert.Nil(t, r.NewAliasTableFloat64(nil))
+	assert.Nil(t, r.NewAliasTableFloat64([]float64{}))
+	// 全无效权重 → nil
+	assert.Nil(t, r.NewAliasTableFloat64([]float64{0, -1, 0.00000001}))
+
+	// 正常权重
+	weights := []float64{5.0, 3.0, 2.0}
+	at := r.NewAliasTableFloat64(weights)
+	assert.NotNil(t, at)
+	assert.Len(t, at.prob, 3)
+	assert.Len(t, at.alias, 3)
+	assert.Len(t, at.origIdx, 3)
+
+	counts := make(map[int]int)
+	for i := 0; i < 1000; i++ {
+		idx := r.AliasChoice(at)
+		assert.GreaterOrEqual(t, idx, 0)
+		assert.Less(t, idx, len(weights))
+		counts[idx]++
+	}
+	assert.Greater(t, counts[0], counts[2])
+}
+
+func TestRandomizer_NewAliasTableFloat64_WithInvalidEntries(t *testing.T) {
+	r := newTestRandomizer()
+	weights := []float64{0, 2.0, 0, 1.0}
+	at := r.NewAliasTableFloat64(weights)
+	assert.NotNil(t, at)
+	assert.Len(t, at.prob, 2)
+	assert.ElementsMatch(t, []int{1, 3}, at.origIdx)
+
+	for i := 0; i < 200; i++ {
+		idx := r.AliasChoice(at)
+		assert.Contains(t, []int{1, 3}, idx)
+	}
+}
