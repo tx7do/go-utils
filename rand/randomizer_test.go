@@ -25,13 +25,16 @@ func TestNewRandomizer_SupportedTypes(t *testing.T) {
 	}
 }
 
-func TestNewRandomizer_ZipfTypeReturnsNil(t *testing.T) {
+func TestNewRandomizer_ZipfTypeReturnsValidRandomizer(t *testing.T) {
 	r := NewRandomizer(ZipfRandType, UnixNanoSeed)
-	assert.Nil(t, r)
+	assert.NotNil(t, r)
+	// Zipf 模式下 ZipfUint64 应正常工作
+	v := r.ZipfUint64()
+	assert.GreaterOrEqual(t, v, uint64(0))
 }
 
 func TestNewRandomizer_DefaultFallback(t *testing.T) {
-	r := NewRandomizer(RandType("UNKNOWN"), FixedSeed)
+	r := NewRandomizer("UNKNOWN", FixedSeed)
 	assert.NotNil(t, r)
 }
 
