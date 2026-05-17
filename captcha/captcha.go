@@ -46,7 +46,7 @@ func NewCaptchaWithConfig(rdb *redis.Client, config *Config) *Captcha {
 }
 
 // Generate 生成验证码:返回 id, base64图片, 答案, err
-func (c *Captcha) Generate() (string, string, string, error) {
+func (c *Captcha) Generate() (id string, b64s string, answer string, err error) {
 	var driver base64Captcha.Driver
 
 	switch c.config.DriverType {
@@ -132,7 +132,7 @@ func (c *Captcha) Generate() (string, string, string, error) {
 	}
 
 	// 转换为 base64
-	b64s := item.EncodeB64string()
+	b64s = item.EncodeB64string()
 
 	return id, b64s, answer, nil
 }
