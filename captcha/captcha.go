@@ -123,7 +123,17 @@ func (c *Captcha) Generate() (string, string, string, error) {
 		)
 	}
 
-	id, b64s, answer := driver.GenerateIdQuestionAnswer()
+	id, question, answer := driver.GenerateIdQuestionAnswer()
+
+	// 绘制验证码图片
+	item, err := driver.DrawCaptcha(question)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to draw captcha: %w", err)
+	}
+
+	// 转换为 base64
+	b64s := item.EncodeB64string()
+
 	return id, b64s, answer, nil
 }
 
