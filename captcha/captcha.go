@@ -402,25 +402,9 @@ func (c *Captcha) initRotateCaptcha() error {
 		return nil
 	}
 
-	rotateCfg := c.config.RotateConfig
-	if rotateCfg == nil {
-		rotateCfg = DefaultRotateConfig()
-	}
-
-	// 创建 builder
-	builder := rotate.NewBuilder(
-		slide.WithImageSize(option.Size{Width: rotateCfg.MasterWidth, Height: rotateCfg.MasterHeight}),
-	)
-
-	// 设置资源配置
-	bgImage, err := loadDefaultBackground()
-	if err != nil {
-		return fmt.Errorf("failed to load background: %w", err)
-	}
-
-	builder.SetResources(
-		slide.WithBackgrounds([]image.Image{bgImage}),
-	)
+	// 创建 builder - 使用默认配置，不设置自定义资源
+	// rotate 模块会使用内置的默认图片资源
+	builder := rotate.NewBuilder()
 
 	c.rotateCaptcha = builder.Make()
 	return nil
