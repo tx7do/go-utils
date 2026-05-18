@@ -581,6 +581,10 @@ func (c *Captcha) verifyRotate(expected, actual string) bool {
 	if diff < 0 {
 		diff = -diff
 	}
+	// 处理360度循环：如果差值大于180，说明应该从另一侧计算
+	if diff > 180 {
+		diff = 360 - diff
+	}
 
 	// 允许 ±5 度的误差
 	return diff <= 5
