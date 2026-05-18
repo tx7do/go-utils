@@ -4,7 +4,7 @@
 
 ## 特性
 
-- ✅ 支持多种验证码类型：数字、字符串、算术、中文、**滑动拼图**
+- ✅ 支持多种验证码类型：数字、字符串、算术、中文、**滑动拼图**、**点击文字**
 - ✅ 完全可定制的外观和行为
 - ✅ 基于 Redis 的存储和验证
 - ✅ 自动过期管理
@@ -302,6 +302,104 @@ function onSlideComplete(userX) {
 }
 ```
 
+### 6. 点击文字验证码 (DriverClick)
+
+点击文字验证码是一种行为式验证码，用户需要按顺序点击图中指定的文字。
+
+**使用 Options：**
+```go
+captchaInstance := captcha.NewCaptcha(rdb,
+	captcha.WithDriverType(captcha.DriverClick),
+	captcha.WithClickMasterSize(300, 220),   // 主图尺寸
+	captcha.WithClickThumbSize(150, 40),     // 缩略图尺寸
+	captcha.WithClickCaptchaCount(6),        // 主图显示6个字符
+	captcha.WithClickVerifyCount(3),         // 需要点击3个字符
+	captcha.WithClickChars("这的是随了机文我你他字"),
+)
+
+// 生成验证码
+id, jsonData, answer, err := captchaInstance.Generate()
+if err != nil {
+	panic(err)
+}
+
+// 解析返回的 JSON 数据
+var clickData captcha.ClickCaptchaData
+json.Unmarshal([]byte(jsonData), &clickData)
+
+// clickData.MasterImage - 主图 base64（随机分布的字符）
+// clickData.ThumbImage  - 缩略图 base64（提示要点击的字符）
+// clickData.Dots        - 正确答案的坐标信息
+
+// 保存验证码
+ctx := context.Background()
+err = captchaInstance.Save(ctx, id, answer)
+
+// 验证用户点击的坐标（允许 ±10 像素误差）
+// 前端传来用户点击的坐标数组：[{x: 100, y: 50}, {x: 150, y: 80}, ...]
+userClicksJSON := `[{"x":100,"y":50},{"x":150,"y":80}]`
+isValid, err := captchaInstance.Verify(ctx, id, userClicksJSON)
+```
+
+**使用配置对象：**
+```go
+config := captcha.DefaultConfig()
+config.DriverType = captcha.DriverClick
+config.ClickConfig = &captcha.ClickConfig{
+	MasterWidth:   300,
+	MasterHeight:  220,
+	ThumbWidth:    150,
+	ThumbHeight:   40,
+	CaptchaCount:  6,    // 主图显示6个字符
+	VerifyCount:   3,    // 需要点击3个字符
+	DisplayShadow: true,
+	ShadowColor:   "#000000",
+	Chars:         "这的是随了机文我你他字",
+	Language:      "zh",
+}
+captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
+```
+
+**前端集成示例：**
+```javascript
+// 1. 从后端获取验证码数据
+fetch('/api/captcha/generate')
+  .then(res => res.json())
+  .then(data => {
+    const clickData = JSON.parse(data.json_data);
+    
+    // 显示主图和缩略图
+    document.getElementById('master').src = clickData.master_image;
+    document.getElementById('thumb').src = clickData.thumb_image;
+    
+    // 记录验证码 ID
+    window.captchaId = data.id;
+    
+    // 存储正确的点击点（用于验证）
+    window.correctDots = clickData.dots;
+  });
+
+// 2. 用户点击后收集坐标
+let userClicks = [];
+document.getElementById('master').addEventListener('click', function(e) {
+  const rect = this.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  userClicks.push({x: x, y: y});
+  
+  // 当点击次数达到要求时提交
+  if (userClicks.length === Object.keys(window.correctDots).length) {
+    fetch('/api/captcha/verify', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: window.captchaId,
+        clicks: userClicks
+      })
+    });
+  }
+});
+```
+
 ## 配置选项详解
 
 ### Options 函数列表（推荐）
@@ -349,6 +447,16 @@ function onSlideComplete(userX) {
 - `WithSlideShadow(offsetX, offsetY, blur int)` - 设置阴影效果
 - `WithSlideConfig(config *SlideConfig)` - 直接设置完整配置
 
+**点击文字验证码选项：**
+- `WithClickMasterSize(width, height int)` - 设置主图尺寸
+- `WithClickThumbSize(width, height int)` - 设置缩略图尺寸
+- `WithClickCaptchaCount(count int)` - 设置主图字符数量
+- `WithClickVerifyCount(count int)` - 设置验证字符数量
+- `WithClickChars(chars string)` - 设置字符集
+- `WithClickLanguage(language string)` - 设置语言 (zh/en)
+- `WithClickShadow(display bool, color string, offsetX, offsetY int)` - 设置阴影效果
+- `WithClickConfig(config *ClickConfig)` - 直接设置完整配置
+
 ### 配置对象结构
 
 #### 通用配置 (Config)
@@ -363,6 +471,7 @@ function onSlideComplete(userX) {
 | MathConfig | *MathConfig | 算术验证码配置 |
 | ChineseConfig | *ChineseConfig | 中文验证码配置 |
 | SlideConfig | *SlideConfig | 滑动拼图验证码配置 |
+| ClickConfig | *ClickConfig | 点击文字验证码配置 |
 
 #### 各驱动配置项
 
@@ -398,6 +507,23 @@ function onSlideComplete(userX) {
 | ShadowOffsetY | int | 阴影 Y 偏移 | 5 |
 | ShadowBlur | int | 阴影模糊度 | 10 |
 
+点击文字验证码配置项：
+
+| 字段 | 类型 | 说明 | 默认值 |
+|------|------|------|--------|
+| MasterWidth | int | 主图宽度 | 300 |
+| MasterHeight | int | 主图高度 | 220 |
+| ThumbWidth | int | 缩略图宽度 | 150 |
+| ThumbHeight | int | 缩略图高度 | 40 |
+| CaptchaCount | int | 主图字符数量 | 6 |
+| VerifyCount | int | 验证字符数量 | 3 |
+| DisplayShadow | bool | 是否显示阴影 | true |
+| ShadowColor | string | 阴影颜色 | #000000 |
+| ShadowOffsetX | int | 阴影 X 偏移 | 2 |
+| ShadowOffsetY | int | 阴影 Y 偏移 | 2 |
+| Chars | string | 字符集 | 这的是随了机文我你他字在有不么中 |
+| Language | string | 语言类型 | zh |
+
 ## API 参考
 
 ### 构造函数
@@ -421,7 +547,9 @@ function onSlideComplete(userX) {
 - `Generate() (string, string, string, error)`
   - 生成验证码
   - 返回: (id, base64图片/JSON数据, 答案, 错误)
-  - **注意**: 对于滑动验证码，第二个返回值是 JSON 格式的 `SlideCaptchaData`
+  - **注意**: 
+    - 对于滑动验证码，第二个返回值是 JSON 格式的 `SlideCaptchaData`
+    - 对于点击验证码，第二个返回值是 JSON 格式的 `ClickCaptchaData`
 
 - `Save(ctx context.Context, captchaID, answer string) error`
   - 将验证码答案存入 Redis
@@ -429,7 +557,9 @@ function onSlideComplete(userX) {
 - `Verify(ctx context.Context, captchaID, userInput string) (bool, error)`
   - 验证用户输入，验证成功后自动删除验证码
   - 返回: (是否匹配, 错误)
-  - **注意**: 滑动验证码允许 ±5 像素的误差
+  - **注意**: 
+    - 滑动验证码允许 ±5 像素的误差
+    - 点击验证码允许 ±10 像素的误差，userInput 应为 JSON 格式的坐标数组
 
 ### 扩展方法
 
@@ -512,6 +642,12 @@ cap.SetConfig(config)
    - 验证时允许 ±5 像素的误差范围
    - 需要前端配合实现滑块交互组件
    - 建议从 `go-captcha-assets` 加载真实的背景图片资源
+7. **点击验证码**:
+   - 返回的 JSON 数据包含主图、缩略图的 base64 编码和正确答案坐标
+   - 验证时允许 ±10 像素的误差范围
+   - 需要前端配合实现点击交互组件，按顺序点击指定字符
+   - 用户点击坐标应以 JSON 数组格式提交：`[{"x":100,"y":50},{"x":150,"y":80}]`
+   - 建议从 `go-captcha-assets` 加载真实的背景图片和字体资源
 
 ## 许可证
 

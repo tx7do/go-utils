@@ -12,6 +12,7 @@ import (
 	"github.com/mojocn/base64Captcha"
 	"github.com/redis/go-redis/v9"
 	"github.com/wenlng/go-captcha/v2/base/option"
+	"github.com/wenlng/go-captcha/v2/click"
 	"github.com/wenlng/go-captcha/v2/slide"
 )
 
@@ -19,6 +20,7 @@ type Captcha struct {
 	rdb          *redis.Client
 	config       *Config
 	slideCaptcha slide.Captcha // 滑动验证码实例（懒加载）
+	clickCaptcha click.Captcha // 点击验证码实例（懒加载）
 }
 
 // NewCaptcha 创建验证码实例（使用 Options 模式）
@@ -108,12 +110,36 @@ type SlideCaptchaData struct {
 	XPosition   int    `json:"x_position"`   // 正确位置的 X 坐标
 }
 
+// ClickCaptchaData 点击验证码数据结构
+type ClickCaptchaData struct {
+	ID          string       `json:"id"`           // 验证码ID
+	MasterImage string       `json:"master_image"` // 主图 base64
+	ThumbImage  string       `json:"thumb_image"`  // 缩略图 base64
+	Dots        map[int]*Dot `json:"dots"`         // 点击点数据
+}
+
+// Dot 点击点数据
+type Dot struct {
+	X      int    `json:"x"`      // X 坐标
+	Y      int    `json:"y"`      // Y 坐标
+	Char   string `json:"char"`   // 字符
+	Width  int    `json:"width"`  // 宽度
+	Height int    `json:"height"` // 高度
+	Angle  int    `json:"angle"`  // 角度
+}
+
 // Generate 生成验证码:返回 id, base64图片, 答案, err
 // 对于滑动验证码，b64s 包含 JSON 格式的 SlideCaptchaData
+// 对于点击验证码，b64s 包含 JSON 格式的 ClickCaptchaData
 func (c *Captcha) Generate() (id string, b64s string, answer string, err error) {
 	// 如果是滑动验证码，使用特殊处理
 	if c.config.DriverType == DriverSlide {
 		return c.generateSlide()
+	}
+
+	// 如果是点击验证码，使用特殊处理
+	if c.config.DriverType == DriverClick {
+		return c.generateClick()
 	}
 
 	var driver base64Captcha.Driver
@@ -253,6 +279,107 @@ func (c *Captcha) generateSlide() (id string, b64s string, answer string, err er
 	return id, b64s, answer, nil
 }
 
+// initClickCaptcha 初始化点击验证码实例（懒加载）
+func (c *Captcha) initClickCaptcha() error {
+	if c.clickCaptcha != nil {
+		return nil
+	}
+
+	clickCfg := c.config.ClickConfig
+	if clickCfg == nil {
+		clickCfg = DefaultClickConfig()
+	}
+
+	// 创建 builder
+	builder := click.NewBuilder(
+		click.WithImageSize(option.Size{Width: clickCfg.MasterWidth, Height: clickCfg.MasterHeight}),
+		click.WithRangeLen(option.RangeVal{Min: clickCfg.CaptchaCount, Max: clickCfg.CaptchaCount}),
+		click.WithRangeVerifyLen(option.RangeVal{Min: clickCfg.VerifyCount, Max: clickCfg.VerifyCount}),
+		click.WithDisplayShadow(clickCfg.DisplayShadow),
+		click.WithShadowColor(clickCfg.ShadowColor),
+		click.WithShadowPoint(option.Point{X: clickCfg.ShadowOffsetX, Y: clickCfg.ShadowOffsetY}),
+	)
+
+	// 设置字符集
+	chars := clickCfg.Chars
+	if chars == "" {
+		chars = "这的是随了机文我你他字在有不么中"
+	}
+
+	// 将字符串转换为字符数组
+	charArr := make([]string, 0, len([]rune(chars)))
+	for _, ch := range chars {
+		charArr = append(charArr, string(ch))
+	}
+
+	builder.SetResources(
+		click.WithChars(charArr),
+	)
+
+	c.clickCaptcha = builder.Make()
+	return nil
+}
+
+// generateClick 生成点击文字验证码
+func (c *Captcha) generateClick() (id string, b64s string, answer string, err error) {
+	// 初始化点击验证码
+	if err := c.initClickCaptcha(); err != nil {
+		return "", "", "", fmt.Errorf("failed to init click captcha: %w", err)
+	}
+
+	// 生成验证码数据
+	captData, err := c.clickCaptcha.Generate()
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to generate click captcha: %w", err)
+	}
+
+	// 获取验证数据（包含点击点位置）
+	dotData := captData.GetData()
+	if dotData == nil {
+		return "", "", "", fmt.Errorf("click captcha data is nil")
+	}
+
+	// 获取主图和缩略图的 base64
+	masterBase64 := captData.GetMasterImage().ToBase64()
+	thumbBase64 := captData.GetThumbImage().ToBase64()
+
+	// 构造返回数据
+	dots := make(map[int]*Dot)
+	for idx, dot := range dotData {
+		dots[idx] = &Dot{
+			X:      dot.X,
+			Y:      dot.Y,
+			Char:   "",
+			Width:  dot.Width,
+			Height: dot.Height,
+			Angle:  dot.Angle,
+		}
+	}
+
+	clickData := &ClickCaptchaData{
+		ID:          fmt.Sprintf("click_%d", time.Now().UnixNano()),
+		MasterImage: masterBase64,
+		ThumbImage:  thumbBase64,
+		Dots:        dots,
+	}
+
+	// 将点击验证码数据序列化为 JSON
+	jsonData, err := json.Marshal(clickData)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to marshal click data: %w", err)
+	}
+
+	// ID 用于 Redis 存储
+	id = clickData.ID
+	// b64s 包含完整的 JSON 数据
+	b64s = string(jsonData)
+	// answer 是点击点的坐标信息（JSON 格式）
+	answerBytes, _ := json.Marshal(dotData)
+	answer = string(answerBytes)
+
+	return id, b64s, answer, nil
+}
+
 // Save 将验证码答案存入 Redis
 func (c *Captcha) Save(ctx context.Context, captchaID, answer string) error {
 	key := fmt.Sprintf("%s:%s", c.config.KeyPrefix, captchaID)
@@ -278,6 +405,9 @@ func (c *Captcha) Verify(ctx context.Context, captchaID, userInput string) (bool
 	if c.config.DriverType == DriverSlide {
 		// 滑动验证码需要特殊处理，允许一定误差
 		match = c.verifySlide(ans, userInput)
+	} else if c.config.DriverType == DriverClick {
+		// 点击验证码需要特殊处理，比较坐标
+		match = c.verifyClick(ans, userInput)
 	} else {
 		match = ans == userInput
 	}
@@ -305,6 +435,55 @@ func (c *Captcha) verifySlide(expected, actual string) bool {
 		diff = -diff
 	}
 	return diff <= 5
+}
+
+// verifyClick 验证点击验证码（比较坐标）
+func (c *Captcha) verifyClick(expected, actual string) bool {
+	// 解析期望的点击数据
+	var expectedDots []*click.Dot
+	if err := json.Unmarshal([]byte(expected), &expectedDots); err != nil {
+		return false
+	}
+
+	// 解析用户点击的数据
+	var actualDots []map[string]interface{}
+	if err := json.Unmarshal([]byte(actual), &actualDots); err != nil {
+		return false
+	}
+
+	// 检查数量是否一致
+	if len(expectedDots) != len(actualDots) {
+		return false
+	}
+
+	// 验证每个点击点（允许 ±10 像素误差）
+	for i, expectedDot := range expectedDots {
+		if i >= len(actualDots) {
+			return false
+		}
+
+		actualX, ok1 := actualDots[i]["x"].(float64)
+		actualY, ok2 := actualDots[i]["y"].(float64)
+		if !ok1 || !ok2 {
+			return false
+		}
+
+		diffX := float64(expectedDot.X) - actualX
+		diffY := float64(expectedDot.Y) - actualY
+		if diffX < 0 {
+			diffX = -diffX
+		}
+		if diffY < 0 {
+			diffY = -diffY
+		}
+
+		// 允许 ±10 像素误差
+		if diffX > 10 || diffY > 10 {
+			return false
+		}
+	}
+
+	return true
 }
 
 // GetConfig 获取当前配置
@@ -340,6 +519,8 @@ func (c *Captcha) VerifyWithoutDelete(ctx context.Context, captchaID, userInput 
 	// 只校验，不删除
 	if c.config.DriverType == DriverSlide {
 		return c.verifySlide(ans, userInput), nil
+	} else if c.config.DriverType == DriverClick {
+		return c.verifyClick(ans, userInput), nil
 	}
 	return ans == userInput, nil
 }

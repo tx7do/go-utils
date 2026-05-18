@@ -13,6 +13,7 @@ const (
 	DriverMath    DriverType = "math"    // 算术验证码
 	DriverChinese DriverType = "chinese" // 中文验证码
 	DriverSlide   DriverType = "slide"   // 滑动拼图验证码
+	DriverClick   DriverType = "click"   // 点击文字验证码
 )
 
 // DigitConfig 数字验证码配置
@@ -94,6 +95,22 @@ type SlideConfig struct {
 	ShadowBlur    int `json:"shadow_blur"`     // 阴影模糊度
 }
 
+// ClickConfig 点击文字验证码配置
+type ClickConfig struct {
+	MasterWidth   int    `json:"master_width"`    // 主图宽度
+	MasterHeight  int    `json:"master_height"`   // 主图高度
+	ThumbWidth    int    `json:"thumb_width"`     // 缩略图宽度
+	ThumbHeight   int    `json:"thumb_height"`    // 缩略图高度
+	CaptchaCount  int    `json:"captcha_count"`   // 主图字符数量
+	VerifyCount   int    `json:"verify_count"`    // 验证字符数量
+	DisplayShadow bool   `json:"display_shadow"`  // 是否显示阴影
+	ShadowColor   string `json:"shadow_color"`    // 阴影颜色
+	ShadowOffsetX int    `json:"shadow_offset_x"` // 阴影X偏移
+	ShadowOffsetY int    `json:"shadow_offset_y"` // 阴影Y偏移
+	Chars         string `json:"chars"`           // 字符集
+	Language      string `json:"language"`        // 语言类型 zh, en
+}
+
 // Config 验证码总配置
 type Config struct {
 	DriverType    DriverType     `json:"driver_type"`    // 驱动类型
@@ -104,6 +121,7 @@ type Config struct {
 	MathConfig    *MathConfig    `json:"math_config"`    // 算术配置
 	ChineseConfig *ChineseConfig `json:"chinese_config"` // 中文配置
 	SlideConfig   *SlideConfig   `json:"slide_config"`   // 滑动拼图配置
+	ClickConfig   *ClickConfig   `json:"click_config"`   // 点击文字配置
 }
 
 // DefaultDigitConfig 默认数字配置
@@ -195,6 +213,24 @@ func DefaultSlideConfig() *SlideConfig {
 	}
 }
 
+// DefaultClickConfig 默认点击文字配置
+func DefaultClickConfig() *ClickConfig {
+	return &ClickConfig{
+		MasterWidth:   300,
+		MasterHeight:  220,
+		ThumbWidth:    150,
+		ThumbHeight:   40,
+		CaptchaCount:  6,
+		VerifyCount:   3,
+		DisplayShadow: true,
+		ShadowColor:   "#000000",
+		ShadowOffsetX: 2,
+		ShadowOffsetY: 2,
+		Chars:         "这的是随了机文我你他字在有不么中",
+		Language:      "zh",
+	}
+}
+
 // DefaultConfig 默认总配置
 func DefaultConfig() *Config {
 	return &Config{
@@ -206,6 +242,7 @@ func DefaultConfig() *Config {
 		MathConfig:    DefaultMathConfig(),
 		ChineseConfig: DefaultChineseConfig(),
 		SlideConfig:   DefaultSlideConfig(),
+		ClickConfig:   DefaultClickConfig(),
 	}
 }
 
@@ -499,5 +536,87 @@ func WithSlideShadow(offsetX, offsetY, blur int) Option {
 		c.SlideConfig.ShadowOffsetX = offsetX
 		c.SlideConfig.ShadowOffsetY = offsetY
 		c.SlideConfig.ShadowBlur = blur
+	}
+}
+
+// WithClickConfig 设置点击文字验证码配置
+func WithClickConfig(config *ClickConfig) Option {
+	return func(c *Config) {
+		c.ClickConfig = config
+	}
+}
+
+// WithClickMasterSize 设置点击验证码主图尺寸
+func WithClickMasterSize(width, height int) Option {
+	return func(c *Config) {
+		if c.ClickConfig == nil {
+			c.ClickConfig = DefaultClickConfig()
+		}
+		c.ClickConfig.MasterWidth = width
+		c.ClickConfig.MasterHeight = height
+	}
+}
+
+// WithClickThumbSize 设置点击验证码缩略图尺寸
+func WithClickThumbSize(width, height int) Option {
+	return func(c *Config) {
+		if c.ClickConfig == nil {
+			c.ClickConfig = DefaultClickConfig()
+		}
+		c.ClickConfig.ThumbWidth = width
+		c.ClickConfig.ThumbHeight = height
+	}
+}
+
+// WithClickCaptchaCount 设置点击验证码主图字符数量
+func WithClickCaptchaCount(count int) Option {
+	return func(c *Config) {
+		if c.ClickConfig == nil {
+			c.ClickConfig = DefaultClickConfig()
+		}
+		c.ClickConfig.CaptchaCount = count
+	}
+}
+
+// WithClickVerifyCount 设置点击验证码验证字符数量
+func WithClickVerifyCount(count int) Option {
+	return func(c *Config) {
+		if c.ClickConfig == nil {
+			c.ClickConfig = DefaultClickConfig()
+		}
+		c.ClickConfig.VerifyCount = count
+	}
+}
+
+// WithClickChars 设置点击验证码字符集
+func WithClickChars(chars string) Option {
+	return func(c *Config) {
+		if c.ClickConfig == nil {
+			c.ClickConfig = DefaultClickConfig()
+		}
+		c.ClickConfig.Chars = chars
+	}
+}
+
+// WithClickLanguage 设置点击验证码语言
+func WithClickLanguage(language string) Option {
+	return func(c *Config) {
+		if c.ClickConfig == nil {
+			c.ClickConfig = DefaultClickConfig()
+		}
+		c.ClickConfig.Language = language
+	}
+}
+
+// WithClickShadow 设置点击验证码阴影效果
+func WithClickShadow(display bool, color string, offsetX, offsetY int) Option {
+	return func(c *Config) {
+		if c.ClickConfig == nil {
+			c.ClickConfig = DefaultClickConfig()
+		}
+		c.ClickConfig.DisplayShadow = display
+		c.ClickConfig.ShadowColor = color
+		c.ClickConfig.ShadowOffsetX = offsetX
+		c.ClickConfig.ShadowOffsetY = offsetY
 	}
 }

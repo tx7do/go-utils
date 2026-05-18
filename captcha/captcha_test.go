@@ -289,6 +289,123 @@ func TestVerify_SlideCaptcha_WithTolerance(t *testing.T) {
 	assert.True(t, valid, "应该接受在误差范围内的值")
 }
 
+func TestGenerate_ClickCaptcha(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverClick),
+		WithClickMasterSize(300, 220),
+		WithClickCaptchaCount(6),
+		WithClickVerifyCount(3),
+	)
+
+	id, jsonData, answer, err := captchaInstance.Generate()
+	require.NoError(t, err)
+	assert.NotEmpty(t, id)
+	assert.NotEmpty(t, jsonData)
+	assert.NotEmpty(t, answer)
+
+	// 解析 JSON 数据
+	var clickData ClickCaptchaData
+	err = json.Unmarshal([]byte(jsonData), &clickData)
+	require.NoError(t, err)
+
+	assert.Equal(t, id, clickData.ID)
+	assert.NotEmpty(t, clickData.MasterImage)
+	assert.NotEmpty(t, clickData.ThumbImage)
+	assert.NotEmpty(t, clickData.Dots)
+	assert.Greater(t, len(clickData.Dots), 0)
+}
+
+func TestSaveAndVerify_ClickCaptcha(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverClick),
+		WithExpire(5*time.Minute),
+		WithKeyPrefix("test:click"),
+	)
+
+	ctx := context.Background()
+
+	// 生成点击验证码
+	id, jsonData, answer, err := captchaInstance.Generate()
+	require.NoError(t, err)
+
+	// 解析获取点击点数据
+	var clickData ClickCaptchaData
+	err = json.Unmarshal([]byte(jsonData), &clickData)
+	require.NoError(t, err)
+
+	// 保存验证码
+	err = captchaInstance.Save(ctx, id, answer)
+	require.NoError(t, err)
+
+	// 构造用户点击数据（模拟正确的点击）
+	// 注意：这里简化处理，实际应该从前端获取用户点击的坐标
+	userClicks := make([]map[string]interface{}, 0)
+	for _, dot := range clickData.Dots {
+		userClicks = append(userClicks, map[string]interface{}{
+			"x": float64(dot.X),
+			"y": float64(dot.Y),
+		})
+	}
+	userClicksJSON, _ := json.Marshal(userClicks)
+
+	// 验证正确答案
+	valid, err := captchaInstance.Verify(ctx, id, string(userClicksJSON))
+	require.NoError(t, err)
+	assert.True(t, valid)
+
+	// 验证后应该被删除，再次验证应该失败
+	valid, err = captchaInstance.Verify(ctx, id, string(userClicksJSON))
+	require.NoError(t, err)
+	assert.False(t, valid)
+}
+
+func TestVerify_ClickCaptcha_WithTolerance(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverClick),
+		WithExpire(5*time.Minute),
+		WithKeyPrefix("test:click"),
+	)
+
+	ctx := context.Background()
+
+	// 生成点击验证码
+	id, jsonData, answer, err := captchaInstance.Generate()
+	require.NoError(t, err)
+
+	// 解析获取点击点数据
+	var clickData ClickCaptchaData
+	err = json.Unmarshal([]byte(jsonData), &clickData)
+	require.NoError(t, err)
+
+	// 保存验证码
+	err = captchaInstance.Save(ctx, id, answer)
+	require.NoError(t, err)
+
+	// 构造用户点击数据（带 ±8 像素误差，在允许范围内）
+	userClicks := make([]map[string]interface{}, 0)
+	for _, dot := range clickData.Dots {
+		userClicks = append(userClicks, map[string]interface{}{
+			"x": float64(dot.X + 8), // +8 像素误差
+			"y": float64(dot.Y + 8),
+		})
+	}
+	userClicksJSON, _ := json.Marshal(userClicks)
+
+	// 验证应该成功（在 ±10 像素误差范围内）
+	valid, err := captchaInstance.Verify(ctx, id, string(userClicksJSON))
+	require.NoError(t, err)
+	assert.True(t, valid, "应该接受在误差范围内的点击")
+}
+
 func TestVerify_WrongAnswer(t *testing.T) {
 	rdb := setupTestRedis(t)
 	defer teardownTestRedis(rdb)
@@ -616,6 +733,36 @@ func TestOptions_SlideConfig(t *testing.T) {
 	assert.Equal(t, 12, cfg.SlideConfig.ShadowBlur)
 }
 
+func TestOptions_ClickConfig(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverClick),
+		WithClickMasterSize(350, 250),
+		WithClickThumbSize(180, 50),
+		WithClickCaptchaCount(8),
+		WithClickVerifyCount(4),
+		WithClickChars("ABCDEFGHIJK"),
+		WithClickLanguage("en"),
+		WithClickShadow(true, "#FF0000", 3, 3),
+	)
+
+	cfg := captchaInstance.GetConfig()
+	assert.Equal(t, 350, cfg.ClickConfig.MasterWidth)
+	assert.Equal(t, 250, cfg.ClickConfig.MasterHeight)
+	assert.Equal(t, 180, cfg.ClickConfig.ThumbWidth)
+	assert.Equal(t, 50, cfg.ClickConfig.ThumbHeight)
+	assert.Equal(t, 8, cfg.ClickConfig.CaptchaCount)
+	assert.Equal(t, 4, cfg.ClickConfig.VerifyCount)
+	assert.Equal(t, "ABCDEFGHIJK", cfg.ClickConfig.Chars)
+	assert.Equal(t, "en", cfg.ClickConfig.Language)
+	assert.True(t, cfg.ClickConfig.DisplayShadow)
+	assert.Equal(t, "#FF0000", cfg.ClickConfig.ShadowColor)
+	assert.Equal(t, 3, cfg.ClickConfig.ShadowOffsetX)
+	assert.Equal(t, 3, cfg.ClickConfig.ShadowOffsetY)
+}
+
 func TestDefaultConfigs(t *testing.T) {
 	t.Run("DefaultDigitConfig", func(t *testing.T) {
 		cfg := DefaultDigitConfig()
@@ -652,6 +799,17 @@ func TestDefaultConfigs(t *testing.T) {
 		assert.Equal(t, 60, cfg.TileHeight)
 	})
 
+	t.Run("DefaultClickConfig", func(t *testing.T) {
+		cfg := DefaultClickConfig()
+		assert.Equal(t, 300, cfg.MasterWidth)
+		assert.Equal(t, 220, cfg.MasterHeight)
+		assert.Equal(t, 150, cfg.ThumbWidth)
+		assert.Equal(t, 40, cfg.ThumbHeight)
+		assert.Equal(t, 6, cfg.CaptchaCount)
+		assert.Equal(t, 3, cfg.VerifyCount)
+		assert.NotEmpty(t, cfg.Chars)
+	})
+
 	t.Run("DefaultConfig", func(t *testing.T) {
 		cfg := DefaultConfig()
 		assert.Equal(t, DriverDigit, cfg.DriverType)
@@ -662,6 +820,7 @@ func TestDefaultConfigs(t *testing.T) {
 		assert.NotNil(t, cfg.MathConfig)
 		assert.NotNil(t, cfg.ChineseConfig)
 		assert.NotNil(t, cfg.SlideConfig)
+		assert.NotNil(t, cfg.ClickConfig)
 	})
 }
 
