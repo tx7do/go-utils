@@ -24,52 +24,52 @@ go get github.com/tx7do/go-utils/captcha
 package main
 
 import (
-    "context"
-    "time"
-    
-    "github.com/redis/go-redis/v9"
-    "github.com/tx7do/go-utils/captcha"
+	"context"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/tx7do/go-utils/captcha"
 )
 
 func main() {
-    // 创建 Redis 客户端
-    rdb := redis.NewClient(&redis.Options{
-        Addr: "localhost:6379",
-    })
-    
-    // 使用 Options 模式创建验证码实例
-    captchaInstance := captcha.NewCaptcha(rdb,
-        captcha.WithDriverType(captcha.DriverString),
-        captcha.WithExpire(10*time.Minute),
-        captcha.WithKeyPrefix("myapp:captcha"),
-        captcha.WithStringCount(6),
-        captcha.WithStringSource("ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
-    )
-    
-    // 生成验证码
-    id, b64Image, answer, err := captchaInstance.Generate()
-    if err != nil {
-        panic(err)
-    }
-    
-    // 保存验证码到 Redis
-    ctx := context.Background()
-    err = captchaInstance.Save(ctx, id, answer)
-    if err != nil {
-        panic(err)
-    }
-    
-    // 验证用户输入
-    isValid, err := captchaInstance.Verify(ctx, id, userInput)
-    if err != nil {
-        panic(err)
-    }
-    
-    if isValid {
-        println("验证成功")
-    } else {
-        println("验证失败")
-    }
+	// 创建 Redis 客户端
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
+	// 使用 Options 模式创建验证码实例
+	captchaInstance := captcha.NewCaptcha(rdb,
+		captcha.WithDriverType(captcha.DriverString),
+		captcha.WithExpire(10*time.Minute),
+		captcha.WithKeyPrefix("myapp:captcha"),
+		captcha.WithStringCount(6),
+		captcha.WithStringSource("ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
+	)
+
+	// 生成验证码
+	id, b64Image, answer, err := captchaInstance.Generate()
+	if err != nil {
+		panic(err)
+	}
+
+	// 保存验证码到 Redis
+	ctx := context.Background()
+	err = captchaInstance.Save(ctx, id, answer)
+	if err != nil {
+		panic(err)
+	}
+
+	// 验证用户输入
+	isValid, err := captchaInstance.Verify(ctx, id, userInput)
+	if err != nil {
+		panic(err)
+	}
+
+	if isValid {
+		println("验证成功")
+	} else {
+		println("验证失败")
+	}
 }
 ```
 
@@ -79,38 +79,38 @@ func main() {
 package main
 
 import (
-    "context"
-    "time"
-    
-    "github.com/redis/go-redis/v9"
-    "github.com/tx7do/go-utils/captcha"
+	"context"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/tx7do/go-utils/captcha"
 )
 
 func main() {
-    // 创建 Redis 客户端
-    rdb := redis.NewClient(&redis.Options{
-        Addr: "localhost:6379",
-    })
-    
-    // 创建自定义配置
-    config := captcha.DefaultConfig()
-    config.DriverType = captcha.DriverString
-    config.Expire = 10 * time.Minute
-    config.KeyPrefix = "myapp:captcha"
-    
-    // 自定义字符串验证码配置
-    config.StringConfig = &captcha.StringConfig{
-        Height:       100,
-        Width:        300,
-        CaptchaCount: 6,
-        DotCount:     100,
-        Source:       "ABCDEFGHJKLMNPQRSTUVWXYZ23456789",
-    }
-    
-    // 创建验证码实例
-    captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
-    
-    // ... 其他操作同上
+	// 创建 Redis 客户端
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
+	// 创建自定义配置
+	config := captcha.DefaultConfig()
+	config.DriverType = captcha.DriverString
+	config.Expire = 10 * time.Minute
+	config.KeyPrefix = "myapp:captcha"
+
+	// 自定义字符串验证码配置
+	config.StringConfig = &captcha.StringConfig{
+		Height:       100,
+		Width:        300,
+		CaptchaCount: 6,
+		DotCount:     100,
+		Source:       "ABCDEFGHJKLMNPQRSTUVWXYZ23456789",
+	}
+
+	// 创建验证码实例
+	captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
+
+	// ... 其他操作同上
 }
 ```
 
@@ -121,10 +121,10 @@ func main() {
 **使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
-    captcha.WithDriverType(captcha.DriverDigit),
-    captcha.WithDigitCount(4),
-    captcha.WithDigitHeight(80),
-    captcha.WithDigitWidth(240),
+	captcha.WithDriverType(captcha.DriverDigit),
+	captcha.WithDigitCount(4),
+	captcha.WithDigitHeight(80),
+	captcha.WithDigitWidth(240),
 )
 ```
 
@@ -133,11 +133,11 @@ captchaInstance := captcha.NewCaptcha(rdb,
 config := captcha.DefaultConfig()
 config.DriverType = captcha.DriverDigit
 config.DigitConfig = &captcha.DigitConfig{
-    Height:       80,
-    Width:        240,
-    CaptchaCount: 4,      // 4位数字
-    MaxSkew:      0.7,
-    DotCount:     80,
+	Height:       80,
+	Width:        240,
+	CaptchaCount: 4,      // 4位数字
+	MaxSkew:      0.7,
+	DotCount:     80,
 }
 captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 ```
@@ -147,25 +147,27 @@ captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 **使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
-    captcha.WithDriverType(captcha.DriverString),
-    captcha.WithStringCount(6),
-    captcha.WithStringSource("ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
-    captcha.WithStringHeight(100),
-    captcha.WithStringWidth(300),
+	captcha.WithDriverType(captcha.DriverString),
+	captcha.WithStringCount(6),
+	captcha.WithStringSource("ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
+	captcha.WithStringHeight(100),
+	captcha.WithStringWidth(300),
 )
 ```
 
 **使用配置对象：**
+```go
 config := captcha.DefaultConfig()
 config.DriverType = captcha.DriverString
 config.StringConfig = &captcha.StringConfig{
-    Height:       80,
-    Width:        240,
-    CaptchaCount: 6,      // 6个字符
-    MaxSkew:      0.7,
-    DotCount:     80,
-    Source:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+	Height:       80,
+	Width:        240,
+	CaptchaCount: 6,      // 6个字符
+	MaxSkew:      0.7,
+	DotCount:     80,
+	Source:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
 }
+captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 ```
 
 ### 3. 算术验证码 (DriverMath)
@@ -173,23 +175,25 @@ config.StringConfig = &captcha.StringConfig{
 **使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
-    captcha.WithDriverType(captcha.DriverMath),
-    captcha.WithMathHeight(80),
-    captcha.WithMathWidth(240),
+	captcha.WithDriverType(captcha.DriverMath),
+	captcha.WithMathHeight(80),
+	captcha.WithMathWidth(240),
 )
 // 生成的验证码类似: "3 + 5 = ?"，答案是 "8"
 ```
 
 **使用配置对象：**
+```go
 config := captcha.DefaultConfig()
 config.DriverType = captcha.DriverMath
 config.MathConfig = &captcha.MathConfig{
-    Height:       80,
-    Width:        240,
-    CaptchaCount: 4,
-    MaxSkew:      0.7,
-    DotCount:     80,
+	Height:       80,
+	Width:        240,
+	CaptchaCount: 4,
+	MaxSkew:      0.7,
+	DotCount:     80,
 }
+captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 // 生成的验证码类似: "3 + 5 = ?"，答案是 "8"
 ```
 
@@ -198,23 +202,25 @@ config.MathConfig = &captcha.MathConfig{
 **使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
-    captcha.WithDriverType(captcha.DriverChinese),
-    captcha.WithChineseCount(4),
-    captcha.WithChineseLanguage("zh"),
+	captcha.WithDriverType(captcha.DriverChinese),
+	captcha.WithChineseCount(4),
+	captcha.WithChineseLanguage("zh"),
 )
 ```
 
 **使用配置对象：**
+```go
 config := captcha.DefaultConfig()
 config.DriverType = captcha.DriverChinese
 config.ChineseConfig = &captcha.ChineseConfig{
-    Height:       80,
-    Width:        240,
-    CaptchaCount: 4,      // 4个汉字
-    MaxSkew:      0.7,
-    DotCount:     80,
-    Language:     "zh",   // 中文
+	Height:       80,
+	Width:        240,
+	CaptchaCount: 4,      // 4个汉字
+	MaxSkew:      0.7,
+	DotCount:     80,
+	Language:     "zh",   // 中文
 }
+captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 ```
 
 ## 配置选项详解
@@ -258,7 +264,7 @@ config.ChineseConfig = &captcha.ChineseConfig{
 
 ### 配置对象结构
 
-### 通用配置 (Config)
+#### 通用配置 (Config)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -270,7 +276,7 @@ config.ChineseConfig = &captcha.ChineseConfig{
 | MathConfig | *MathConfig | 算术验证码配置 |
 | ChineseConfig | *ChineseConfig | 中文验证码配置 |
 
-### 各驱动配置项
+#### 各驱动配置项
 
 所有驱动配置都包含以下字段：
 
@@ -294,11 +300,19 @@ config.ChineseConfig = &captcha.ChineseConfig{
 
 ### 构造函数
 
-- `NewCaptcha(rdb *redis.Client, expire time.Duration, keyPrefix string) *Captcha`
-  - 创建验证码实例（兼容旧接口）
+- `NewCaptcha(rdb *redis.Client, opts ...Option) *Captcha`
+  - 创建验证码实例（推荐使用 Options 模式）
+  - 示例：
+    ```go
+    cap := captcha.NewCaptcha(rdb,
+        captcha.WithDriverType(captcha.DriverString),
+        captcha.WithExpire(10*time.Minute),
+        captcha.WithStringCount(6),
+    )
+    ```
   
 - `NewCaptchaWithConfig(rdb *redis.Client, config *Config) *Captcha`
-  - 使用自定义配置创建验证码实例
+  - 使用自定义配置对象创建验证码实例
 
 ### 核心方法
 
