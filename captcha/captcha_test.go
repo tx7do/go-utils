@@ -406,6 +406,109 @@ func TestVerify_ClickCaptcha_WithTolerance(t *testing.T) {
 	assert.True(t, valid, "应该接受在误差范围内的点击")
 }
 
+func TestGenerate_RotateCaptcha(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverRotate),
+		WithRotateMasterSize(300, 300),
+		WithRotateThumbSize(150, 150),
+	)
+
+	id, jsonData, answer, err := captchaInstance.Generate()
+	require.NoError(t, err)
+	assert.NotEmpty(t, id)
+	assert.NotEmpty(t, jsonData)
+	assert.NotEmpty(t, answer)
+
+	// 解析 JSON 数据
+	var rotateData RotateCaptchaData
+	err = json.Unmarshal([]byte(jsonData), &rotateData)
+	require.NoError(t, err)
+
+	assert.Equal(t, id, rotateData.ID)
+	assert.NotEmpty(t, rotateData.MasterImage)
+	assert.NotEmpty(t, rotateData.ThumbImage)
+	assert.GreaterOrEqual(t, rotateData.Angle, 0)
+	assert.LessOrEqual(t, rotateData.Angle, 360)
+
+	// answer 应该是角度的字符串形式
+	assert.Equal(t, answer, fmt.Sprintf("%d", rotateData.Angle))
+}
+
+func TestSaveAndVerify_RotateCaptcha(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverRotate),
+		WithExpire(5*time.Minute),
+		WithKeyPrefix("test:rotate"),
+	)
+
+	ctx := context.Background()
+
+	// 生成旋转验证码
+	id, jsonData, answer, err := captchaInstance.Generate()
+	require.NoError(t, err)
+
+	// 解析获取角度
+	var rotateData RotateCaptchaData
+	err = json.Unmarshal([]byte(jsonData), &rotateData)
+	require.NoError(t, err)
+
+	// 保存验证码
+	err = captchaInstance.Save(ctx, id, answer)
+	require.NoError(t, err)
+
+	// 验证正确答案（精确匹配）
+	valid, err := captchaInstance.Verify(ctx, id, answer)
+	require.NoError(t, err)
+	assert.True(t, valid)
+
+	// 验证后应该被删除，再次验证应该失败
+	valid, err = captchaInstance.Verify(ctx, id, answer)
+	require.NoError(t, err)
+	assert.False(t, valid)
+}
+
+func TestVerify_RotateCaptcha_WithTolerance(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverRotate),
+		WithExpire(5*time.Minute),
+		WithKeyPrefix("test:rotate"),
+	)
+
+	ctx := context.Background()
+
+	// 生成旋转验证码
+	id, jsonData, answer, err := captchaInstance.Generate()
+	require.NoError(t, err)
+
+	// 解析获取角度
+	var rotateData RotateCaptchaData
+	err = json.Unmarshal([]byte(jsonData), &rotateData)
+	require.NoError(t, err)
+
+	// 保存验证码
+	err = captchaInstance.Save(ctx, id, answer)
+	require.NoError(t, err)
+
+	// 模拟用户旋转，允许 ±5 度误差
+	var expectedAngle int
+	fmt.Sscanf(answer, "%d", &expectedAngle)
+
+	// 测试在误差范围内的值
+	closeValue := fmt.Sprintf("%d", expectedAngle+3) // +3 度
+	valid, err := captchaInstance.Verify(ctx, id, closeValue)
+	require.NoError(t, err)
+	assert.True(t, valid, "应该接受在误差范围内的值")
+}
+
 func TestVerify_WrongAnswer(t *testing.T) {
 	rdb := setupTestRedis(t)
 	defer teardownTestRedis(rdb)
@@ -763,6 +866,23 @@ func TestOptions_ClickConfig(t *testing.T) {
 	assert.Equal(t, 3, cfg.ClickConfig.ShadowOffsetY)
 }
 
+func TestOptions_RotateConfig(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverRotate),
+		WithRotateMasterSize(350, 350),
+		WithRotateThumbSize(180, 180),
+	)
+
+	cfg := captchaInstance.GetConfig()
+	assert.Equal(t, 350, cfg.RotateConfig.MasterWidth)
+	assert.Equal(t, 350, cfg.RotateConfig.MasterHeight)
+	assert.Equal(t, 180, cfg.RotateConfig.ThumbWidth)
+	assert.Equal(t, 180, cfg.RotateConfig.ThumbHeight)
+}
+
 func TestDefaultConfigs(t *testing.T) {
 	t.Run("DefaultDigitConfig", func(t *testing.T) {
 		cfg := DefaultDigitConfig()
@@ -810,6 +930,14 @@ func TestDefaultConfigs(t *testing.T) {
 		assert.NotEmpty(t, cfg.Chars)
 	})
 
+	t.Run("DefaultRotateConfig", func(t *testing.T) {
+		cfg := DefaultRotateConfig()
+		assert.Equal(t, 300, cfg.MasterWidth)
+		assert.Equal(t, 300, cfg.MasterHeight)
+		assert.Equal(t, 150, cfg.ThumbWidth)
+		assert.Equal(t, 150, cfg.ThumbHeight)
+	})
+
 	t.Run("DefaultConfig", func(t *testing.T) {
 		cfg := DefaultConfig()
 		assert.Equal(t, DriverDigit, cfg.DriverType)
@@ -821,6 +949,7 @@ func TestDefaultConfigs(t *testing.T) {
 		assert.NotNil(t, cfg.ChineseConfig)
 		assert.NotNil(t, cfg.SlideConfig)
 		assert.NotNil(t, cfg.ClickConfig)
+		assert.NotNil(t, cfg.RotateConfig)
 	})
 }
 

@@ -4,7 +4,7 @@
 
 ## 特性
 
-- ✅ 支持多种验证码类型：数字、字符串、算术、中文、**滑动拼图**、**点击文字**
+- ✅ 支持多种验证码类型：数字、字符串、算术、中文、**滑动拼图**、**点击文字**、**旋转图片**
 - ✅ 完全可定制的外观和行为
 - ✅ 基于 Redis 的存储和验证
 - ✅ 自动过期管理
@@ -400,6 +400,93 @@ document.getElementById('master').addEventListener('click', function(e) {
 });
 ```
 
+### 7. 旋转图片验证码 (DriverRotate)
+
+旋转图片验证码是一种行为式验证码，用户需要旋转图片到正确的角度。
+
+**使用 Options：**
+```go
+captchaInstance := captcha.NewCaptcha(rdb,
+	captcha.WithDriverType(captcha.DriverRotate),
+	captcha.WithRotateMasterSize(300, 300),   // 主图尺寸
+	captcha.WithRotateThumbSize(150, 150),    // 缩略图尺寸
+)
+
+// 生成验证码
+id, jsonData, answer, err := captchaInstance.Generate()
+if err != nil {
+	panic(err)
+}
+
+// 解析返回的 JSON 数据
+var rotateData captcha.RotateCaptchaData
+json.Unmarshal([]byte(jsonData), &rotateData)
+
+// rotateData.MasterImage - 主图 base64（需要旋转的图片）
+// rotateData.ThumbImage  - 缩略图 base64（提示目标方向）
+// rotateData.Angle       - 正确的旋转角度
+
+// 保存验证码
+ctx := context.Background()
+err = captchaInstance.Save(ctx, id, answer)
+
+// 验证用户旋转的角度（允许 ±5 度误差）
+// 前端传来用户旋转的角度值（字符串形式）
+userAngle := "90"  // 用户旋转了90度
+isValid, err := captchaInstance.Verify(ctx, id, userAngle)
+```
+
+**使用配置对象：**
+```go
+config := captcha.DefaultConfig()
+config.DriverType = captcha.DriverRotate
+config.RotateConfig = &captcha.RotateConfig{
+	MasterWidth:  300,
+	MasterHeight: 300,
+	ThumbWidth:   150,
+	ThumbHeight:  150,
+}
+captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
+```
+
+**前端集成示例：**
+```javascript
+// 1. 从后端获取验证码数据
+fetch('/api/captcha/generate')
+  .then(res => res.json())
+  .then(data => {
+    const rotateData = JSON.parse(data.json_data);
+    
+    // 显示主图和缩略图
+    document.getElementById('master').src = rotateData.master_image;
+    document.getElementById('thumb').src = rotateData.thumb_image;
+    
+    // 记录验证码 ID
+    window.captchaId = data.id;
+    
+    // 存储正确角度
+    window.correctAngle = rotateData.angle;
+  });
+
+// 2. 用户旋转后提交
+let currentAngle = 0;
+document.getElementById('slider').addEventListener('input', function(e) {
+  currentAngle = e.target.value;
+  // 旋转图片
+  document.getElementById('master').style.transform = `rotate(${currentAngle}deg)`;
+});
+
+document.getElementById('submit').addEventListener('click', function() {
+  fetch('/api/captcha/verify', {
+    method: 'POST',
+    body: JSON.stringify({
+      id: window.captchaId,
+      angle: currentAngle
+    })
+  });
+});
+```
+
 ## 配置选项详解
 
 ### Options 函数列表（推荐）
@@ -457,6 +544,11 @@ document.getElementById('master').addEventListener('click', function(e) {
 - `WithClickShadow(display bool, color string, offsetX, offsetY int)` - 设置阴影效果
 - `WithClickConfig(config *ClickConfig)` - 直接设置完整配置
 
+**旋转图片验证码选项：**
+- `WithRotateMasterSize(width, height int)` - 设置主图尺寸
+- `WithRotateThumbSize(width, height int)` - 设置缩略图尺寸
+- `WithRotateConfig(config *RotateConfig)` - 直接设置完整配置
+
 ### 配置对象结构
 
 #### 通用配置 (Config)
@@ -472,6 +564,7 @@ document.getElementById('master').addEventListener('click', function(e) {
 | ChineseConfig | *ChineseConfig | 中文验证码配置 |
 | SlideConfig | *SlideConfig | 滑动拼图验证码配置 |
 | ClickConfig | *ClickConfig | 点击文字验证码配置 |
+| RotateConfig | *RotateConfig | 旋转图片验证码配置 |
 
 #### 各驱动配置项
 
@@ -524,6 +617,15 @@ document.getElementById('master').addEventListener('click', function(e) {
 | Chars | string | 字符集 | 这的是随了机文我你他字在有不么中 |
 | Language | string | 语言类型 | zh |
 
+旋转图片验证码配置项：
+
+| 字段 | 类型 | 说明 | 默认值 |
+|------|------|------|--------|
+| MasterWidth | int | 主图宽度 | 300 |
+| MasterHeight | int | 主图高度 | 300 |
+| ThumbWidth | int | 缩略图宽度 | 150 |
+| ThumbHeight | int | 缩略图高度 | 150 |
+
 ## API 参考
 
 ### 构造函数
@@ -550,6 +652,7 @@ document.getElementById('master').addEventListener('click', function(e) {
   - **注意**: 
     - 对于滑动验证码，第二个返回值是 JSON 格式的 `SlideCaptchaData`
     - 对于点击验证码，第二个返回值是 JSON 格式的 `ClickCaptchaData`
+    - 对于旋转验证码，第二个返回值是 JSON 格式的 `RotateCaptchaData`
 
 - `Save(ctx context.Context, captchaID, answer string) error`
   - 将验证码答案存入 Redis
@@ -560,6 +663,7 @@ document.getElementById('master').addEventListener('click', function(e) {
   - **注意**: 
     - 滑动验证码允许 ±5 像素的误差
     - 点击验证码允许 ±10 像素的误差，userInput 应为 JSON 格式的坐标数组
+    - 旋转验证码允许 ±5 度的误差，userInput 应为角度值的字符串形式
 
 ### 扩展方法
 
@@ -648,6 +752,12 @@ cap.SetConfig(config)
    - 需要前端配合实现点击交互组件，按顺序点击指定字符
    - 用户点击坐标应以 JSON 数组格式提交：`[{"x":100,"y":50},{"x":150,"y":80}]`
    - 建议从 `go-captcha-assets` 加载真实的背景图片和字体资源
+8. **旋转验证码**:
+   - 返回的 JSON 数据包含主图、缩略图的 base64 编码和正确角度
+   - 验证时允许 ±5 度的误差范围
+   - 需要前端配合实现旋转交互组件（如滑块或旋钮）
+   - 用户旋转角度应以字符串形式提交：`"90"`
+   - 建议从 `go-captcha-assets` 加载真实的背景图片资源
 
 ## 许可证
 

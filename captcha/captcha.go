@@ -13,14 +13,16 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/wenlng/go-captcha/v2/base/option"
 	"github.com/wenlng/go-captcha/v2/click"
+	"github.com/wenlng/go-captcha/v2/rotate"
 	"github.com/wenlng/go-captcha/v2/slide"
 )
 
 type Captcha struct {
-	rdb          *redis.Client
-	config       *Config
-	slideCaptcha slide.Captcha // 滑动验证码实例（懒加载）
-	clickCaptcha click.Captcha // 点击验证码实例（懒加载）
+	rdb           *redis.Client
+	config        *Config
+	slideCaptcha  slide.Captcha  // 滑动验证码实例（懒加载）
+	clickCaptcha  click.Captcha  // 点击验证码实例（懒加载）
+	rotateCaptcha rotate.Captcha // 旋转验证码实例（懒加载）
 }
 
 // NewCaptcha 创建验证码实例（使用 Options 模式）
@@ -128,9 +130,18 @@ type Dot struct {
 	Angle  int    `json:"angle"`  // 角度
 }
 
+// RotateCaptchaData 旋转验证码数据结构
+type RotateCaptchaData struct {
+	ID          string `json:"id"`           // 验证码ID
+	MasterImage string `json:"master_image"` // 主图 base64（需要旋转的图片）
+	ThumbImage  string `json:"thumb_image"`  // 缩略图 base64（提示目标方向）
+	Angle       int    `json:"angle"`        // 正确角度
+}
+
 // Generate 生成验证码:返回 id, base64图片, 答案, err
 // 对于滑动验证码，b64s 包含 JSON 格式的 SlideCaptchaData
 // 对于点击验证码，b64s 包含 JSON 格式的 ClickCaptchaData
+// 对于旋转验证码，b64s 包含 JSON 格式的 RotateCaptchaData
 func (c *Captcha) Generate() (id string, b64s string, answer string, err error) {
 	// 如果是滑动验证码，使用特殊处理
 	if c.config.DriverType == DriverSlide {
@@ -140,6 +151,11 @@ func (c *Captcha) Generate() (id string, b64s string, answer string, err error) 
 	// 如果是点击验证码，使用特殊处理
 	if c.config.DriverType == DriverClick {
 		return c.generateClick()
+	}
+
+	// 如果是旋转验证码，使用特殊处理
+	if c.config.DriverType == DriverRotate {
+		return c.generateRotate()
 	}
 
 	var driver base64Captcha.Driver
@@ -380,6 +396,83 @@ func (c *Captcha) generateClick() (id string, b64s string, answer string, err er
 	return id, b64s, answer, nil
 }
 
+// initRotateCaptcha 初始化旋转验证码实例（懒加载）
+func (c *Captcha) initRotateCaptcha() error {
+	if c.rotateCaptcha != nil {
+		return nil
+	}
+
+	rotateCfg := c.config.RotateConfig
+	if rotateCfg == nil {
+		rotateCfg = DefaultRotateConfig()
+	}
+
+	// 创建 builder
+	builder := rotate.NewBuilder(
+		slide.WithImageSize(option.Size{Width: rotateCfg.MasterWidth, Height: rotateCfg.MasterHeight}),
+	)
+
+	// 设置资源配置
+	bgImage, err := loadDefaultBackground()
+	if err != nil {
+		return fmt.Errorf("failed to load background: %w", err)
+	}
+
+	builder.SetResources(
+		slide.WithBackgrounds([]image.Image{bgImage}),
+	)
+
+	c.rotateCaptcha = builder.Make()
+	return nil
+}
+
+// generateRotate 生成旋转验证码
+func (c *Captcha) generateRotate() (id string, b64s string, answer string, err error) {
+	// 初始化旋转验证码
+	if err := c.initRotateCaptcha(); err != nil {
+		return "", "", "", fmt.Errorf("failed to init rotate captcha: %w", err)
+	}
+
+	// 生成验证码数据
+	captData, err := c.rotateCaptcha.Generate()
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to generate rotate captcha: %w", err)
+	}
+
+	// 获取验证数据（包含正确角度）
+	angleData := captData.GetData()
+	if angleData == nil {
+		return "", "", "", fmt.Errorf("rotate captcha data is nil")
+	}
+
+	// 获取主图和缩略图的 base64
+	masterBase64 := captData.GetMasterImage().ToBase64()
+	thumbBase64 := captData.GetThumbImage().ToBase64()
+
+	// 构造返回数据
+	rotateData := &RotateCaptchaData{
+		ID:          fmt.Sprintf("rotate_%d", time.Now().UnixNano()),
+		MasterImage: masterBase64,
+		ThumbImage:  thumbBase64,
+		Angle:       angleData.Angle,
+	}
+
+	// 将旋转验证码数据序列化为 JSON
+	jsonData, err := json.Marshal(rotateData)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to marshal rotate data: %w", err)
+	}
+
+	// ID 用于 Redis 存储
+	id = rotateData.ID
+	// b64s 包含完整的 JSON 数据
+	b64s = string(jsonData)
+	// answer 是正确的角度值
+	answer = fmt.Sprintf("%d", angleData.Angle)
+
+	return id, b64s, answer, nil
+}
+
 // Save 将验证码答案存入 Redis
 func (c *Captcha) Save(ctx context.Context, captchaID, answer string) error {
 	key := fmt.Sprintf("%s:%s", c.config.KeyPrefix, captchaID)
@@ -408,6 +501,9 @@ func (c *Captcha) Verify(ctx context.Context, captchaID, userInput string) (bool
 	} else if c.config.DriverType == DriverClick {
 		// 点击验证码需要特殊处理，比较坐标
 		match = c.verifyClick(ans, userInput)
+	} else if c.config.DriverType == DriverRotate {
+		// 旋转验证码需要特殊处理，比较角度
+		match = c.verifyRotate(ans, userInput)
 	} else {
 		match = ans == userInput
 	}
@@ -486,6 +582,26 @@ func (c *Captcha) verifyClick(expected, actual string) bool {
 	return true
 }
 
+// verifyRotate 验证旋转验证码（比较角度）
+func (c *Captcha) verifyRotate(expected, actual string) bool {
+	var expectedAngle, actualAngle int
+	if _, err := fmt.Sscanf(expected, "%d", &expectedAngle); err != nil {
+		return false
+	}
+	if _, err := fmt.Sscanf(actual, "%d", &actualAngle); err != nil {
+		return false
+	}
+
+	// 计算角度差（考虑360度循环）
+	diff := expectedAngle - actualAngle
+	if diff < 0 {
+		diff = -diff
+	}
+
+	// 允许 ±5 度的误差
+	return diff <= 5
+}
+
 // GetConfig 获取当前配置
 func (c *Captcha) GetConfig() *Config {
 	return c.config
@@ -521,6 +637,8 @@ func (c *Captcha) VerifyWithoutDelete(ctx context.Context, captchaID, userInput 
 		return c.verifySlide(ans, userInput), nil
 	} else if c.config.DriverType == DriverClick {
 		return c.verifyClick(ans, userInput), nil
+	} else if c.config.DriverType == DriverRotate {
+		return c.verifyRotate(ans, userInput), nil
 	}
 	return ans == userInput, nil
 }

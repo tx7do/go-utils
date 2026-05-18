@@ -14,6 +14,7 @@ const (
 	DriverChinese DriverType = "chinese" // 中文验证码
 	DriverSlide   DriverType = "slide"   // 滑动拼图验证码
 	DriverClick   DriverType = "click"   // 点击文字验证码
+	DriverRotate  DriverType = "rotate"  // 旋转验证码
 )
 
 // DigitConfig 数字验证码配置
@@ -111,6 +112,14 @@ type ClickConfig struct {
 	Language      string `json:"language"`        // 语言类型 zh, en
 }
 
+// RotateConfig 旋转验证码配置
+type RotateConfig struct {
+	MasterWidth  int `json:"master_width"`  // 主图宽度
+	MasterHeight int `json:"master_height"` // 主图高度
+	ThumbWidth   int `json:"thumb_width"`   // 缩略图宽度
+	ThumbHeight  int `json:"thumb_height"`  // 缩略图高度
+}
+
 // Config 验证码总配置
 type Config struct {
 	DriverType    DriverType     `json:"driver_type"`    // 驱动类型
@@ -122,6 +131,7 @@ type Config struct {
 	ChineseConfig *ChineseConfig `json:"chinese_config"` // 中文配置
 	SlideConfig   *SlideConfig   `json:"slide_config"`   // 滑动拼图配置
 	ClickConfig   *ClickConfig   `json:"click_config"`   // 点击文字配置
+	RotateConfig  *RotateConfig  `json:"rotate_config"`  // 旋转配置
 }
 
 // DefaultDigitConfig 默认数字配置
@@ -231,6 +241,16 @@ func DefaultClickConfig() *ClickConfig {
 	}
 }
 
+// DefaultRotateConfig 默认旋转验证码配置
+func DefaultRotateConfig() *RotateConfig {
+	return &RotateConfig{
+		MasterWidth:  300,
+		MasterHeight: 300,
+		ThumbWidth:   150,
+		ThumbHeight:  150,
+	}
+}
+
 // DefaultConfig 默认总配置
 func DefaultConfig() *Config {
 	return &Config{
@@ -243,6 +263,7 @@ func DefaultConfig() *Config {
 		ChineseConfig: DefaultChineseConfig(),
 		SlideConfig:   DefaultSlideConfig(),
 		ClickConfig:   DefaultClickConfig(),
+		RotateConfig:  DefaultRotateConfig(),
 	}
 }
 
@@ -618,5 +639,34 @@ func WithClickShadow(display bool, color string, offsetX, offsetY int) Option {
 		c.ClickConfig.ShadowColor = color
 		c.ClickConfig.ShadowOffsetX = offsetX
 		c.ClickConfig.ShadowOffsetY = offsetY
+	}
+}
+
+// WithRotateConfig 设置旋转验证码配置
+func WithRotateConfig(config *RotateConfig) Option {
+	return func(c *Config) {
+		c.RotateConfig = config
+	}
+}
+
+// WithRotateMasterSize 设置旋转验证码主图尺寸
+func WithRotateMasterSize(width, height int) Option {
+	return func(c *Config) {
+		if c.RotateConfig == nil {
+			c.RotateConfig = DefaultRotateConfig()
+		}
+		c.RotateConfig.MasterWidth = width
+		c.RotateConfig.MasterHeight = height
+	}
+}
+
+// WithRotateThumbSize 设置旋转验证码缩略图尺寸
+func WithRotateThumbSize(width, height int) Option {
+	return func(c *Config) {
+		if c.RotateConfig == nil {
+			c.RotateConfig = DefaultRotateConfig()
+		}
+		c.RotateConfig.ThumbWidth = width
+		c.RotateConfig.ThumbHeight = height
 	}
 }
