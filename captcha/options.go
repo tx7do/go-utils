@@ -12,6 +12,7 @@ const (
 	DriverString  DriverType = "string"  // 字符串验证码
 	DriverMath    DriverType = "math"    // 算术验证码
 	DriverChinese DriverType = "chinese" // 中文验证码
+	DriverSlide   DriverType = "slide"   // 滑动拼图验证码
 )
 
 // DigitConfig 数字验证码配置
@@ -80,6 +81,19 @@ type ChineseConfig struct {
 	CaptchaLen   int     `json:"captcha_len"`   // 验证码长度（兼容字段）
 }
 
+// SlideConfig 滑动拼图验证码配置
+type SlideConfig struct {
+	MasterWidth   int `json:"master_width"`    // 主图宽度
+	MasterHeight  int `json:"master_height"`   // 主图高度
+	TileWidth     int `json:"tile_width"`      // 滑块宽度
+	TileHeight    int `json:"tile_height"`     // 滑块高度
+	TileRadius    int `json:"tile_radius"`     // 滑块圆角半径
+	JigsawRadius  int `json:"jigsaw_radius"`   // 拼图缺口圆角半径
+	ShadowOffsetX int `json:"shadow_offset_x"` // 阴影X偏移
+	ShadowOffsetY int `json:"shadow_offset_y"` // 阴影Y偏移
+	ShadowBlur    int `json:"shadow_blur"`     // 阴影模糊度
+}
+
 // Config 验证码总配置
 type Config struct {
 	DriverType    DriverType     `json:"driver_type"`    // 驱动类型
@@ -89,6 +103,7 @@ type Config struct {
 	StringConfig  *StringConfig  `json:"string_config"`  // 字符串配置
 	MathConfig    *MathConfig    `json:"math_config"`    // 算术配置
 	ChineseConfig *ChineseConfig `json:"chinese_config"` // 中文配置
+	SlideConfig   *SlideConfig   `json:"slide_config"`   // 滑动拼图配置
 }
 
 // DefaultDigitConfig 默认数字配置
@@ -165,6 +180,21 @@ func DefaultChineseConfig() *ChineseConfig {
 	}
 }
 
+// DefaultSlideConfig 默认滑动拼图配置
+func DefaultSlideConfig() *SlideConfig {
+	return &SlideConfig{
+		MasterWidth:   300,
+		MasterHeight:  220,
+		TileWidth:     60,
+		TileHeight:    60,
+		TileRadius:    5,
+		JigsawRadius:  10,
+		ShadowOffsetX: 5,
+		ShadowOffsetY: 5,
+		ShadowBlur:    10,
+	}
+}
+
 // DefaultConfig 默认总配置
 func DefaultConfig() *Config {
 	return &Config{
@@ -175,6 +205,7 @@ func DefaultConfig() *Config {
 		StringConfig:  DefaultStringConfig(),
 		MathConfig:    DefaultMathConfig(),
 		ChineseConfig: DefaultChineseConfig(),
+		SlideConfig:   DefaultSlideConfig(),
 	}
 }
 
@@ -407,5 +438,66 @@ func WithChineseDotCount(count int) Option {
 			c.ChineseConfig = DefaultChineseConfig()
 		}
 		c.ChineseConfig.DotCount = count
+	}
+}
+
+// WithSlideConfig 设置滑动拼图验证码配置
+func WithSlideConfig(config *SlideConfig) Option {
+	return func(c *Config) {
+		c.SlideConfig = config
+	}
+}
+
+// WithSlideMasterSize 设置滑动拼图主图尺寸
+func WithSlideMasterSize(width, height int) Option {
+	return func(c *Config) {
+		if c.SlideConfig == nil {
+			c.SlideConfig = DefaultSlideConfig()
+		}
+		c.SlideConfig.MasterWidth = width
+		c.SlideConfig.MasterHeight = height
+	}
+}
+
+// WithSlideTileSize 设置滑动拼图滑块尺寸
+func WithSlideTileSize(width, height int) Option {
+	return func(c *Config) {
+		if c.SlideConfig == nil {
+			c.SlideConfig = DefaultSlideConfig()
+		}
+		c.SlideConfig.TileWidth = width
+		c.SlideConfig.TileHeight = height
+	}
+}
+
+// WithSlideTileRadius 设置滑动拼图滑块圆角半径
+func WithSlideTileRadius(radius int) Option {
+	return func(c *Config) {
+		if c.SlideConfig == nil {
+			c.SlideConfig = DefaultSlideConfig()
+		}
+		c.SlideConfig.TileRadius = radius
+	}
+}
+
+// WithSlideJigsawRadius 设置滑动拼图缺口圆角半径
+func WithSlideJigsawRadius(radius int) Option {
+	return func(c *Config) {
+		if c.SlideConfig == nil {
+			c.SlideConfig = DefaultSlideConfig()
+		}
+		c.SlideConfig.JigsawRadius = radius
+	}
+}
+
+// WithSlideShadow 设置滑动拼图阴影效果
+func WithSlideShadow(offsetX, offsetY, blur int) Option {
+	return func(c *Config) {
+		if c.SlideConfig == nil {
+			c.SlideConfig = DefaultSlideConfig()
+		}
+		c.SlideConfig.ShadowOffsetX = offsetX
+		c.SlideConfig.ShadowOffsetY = offsetY
+		c.SlideConfig.ShadowBlur = blur
 	}
 }

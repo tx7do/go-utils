@@ -4,7 +4,7 @@
 
 ## 特性
 
-- ✅ 支持多种验证码类型：数字、字符串、算术、中文
+- ✅ 支持多种验证码类型：数字、字符串、算术、中文、**滑动拼图**
 - ✅ 完全可定制的外观和行为
 - ✅ 基于 Redis 的存储和验证
 - ✅ 自动过期管理
@@ -223,6 +223,85 @@ config.ChineseConfig = &captcha.ChineseConfig{
 captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 ```
 
+### 5. 滑动拼图验证码 (DriverSlide) 
+
+滑动拼图验证码是一种行为式验证码，用户需要将滑块拖动到正确位置。
+
+**使用 Options：**
+```go
+captchaInstance := captcha.NewCaptcha(rdb,
+	captcha.WithDriverType(captcha.DriverSlide),
+	captcha.WithSlideMasterSize(300, 220),  // 主图尺寸
+	captcha.WithSlideTileSize(60, 60),      // 滑块尺寸
+)
+
+// 生成验证码
+id, jsonData, answer, err := captchaInstance.Generate()
+if err != nil {
+	panic(err)
+}
+
+// 解析返回的 JSON 数据
+var slideData captcha.SlideCaptchaData
+json.Unmarshal([]byte(jsonData), &slideData)
+
+// slideData.MasterImage - 主图 base64（带缺口）
+// slideData.TileImage   - 滑块图 base64
+// slideData.XPosition   - 缺口的 X 坐标（正确答案）
+
+// 保存验证码
+ctx := context.Background()
+err = captchaInstance.Save(ctx, id, answer)
+
+// 验证用户滑动的位置（允许 ±5 像素误差）
+userX := getUserInput() // 前端传来的 X 坐标
+isValid, err := captchaInstance.Verify(ctx, id, fmt.Sprintf("%d", userX))
+```
+
+**使用配置对象：**
+```go
+config := captcha.DefaultConfig()
+config.DriverType = captcha.DriverSlide
+config.SlideConfig = &captcha.SlideConfig{
+	MasterWidth:  300,  // 主图宽度
+	MasterHeight: 220,  // 主图高度
+	TileWidth:    60,   // 滑块宽度
+	TileHeight:   60,   // 滑块高度
+	TileRadius:   5,    // 滑块圆角半径
+	JigsawRadius: 10,   // 拼图缺口圆角半径
+}
+captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
+```
+
+**前端集成示例：**
+```javascript
+// 1. 从后端获取验证码数据
+fetch('/api/captcha/generate')
+  .then(res => res.json())
+  .then(data => {
+    // data.json_data 是 JSON 字符串
+    const slideData = JSON.parse(data.json_data);
+    
+    // 显示主图和滑块
+    document.getElementById('master').src = slideData.master_image;
+    document.getElementById('tile').src = slideData.tile_image;
+    
+    // 记录验证码 ID
+    window.captchaId = data.id;
+  });
+
+// 2. 用户滑动后提交
+function onSlideComplete(userX) {
+  fetch('/api/captcha/verify', {
+    method: 'POST',
+    body: JSON.stringify({
+      id: window.captchaId,
+      x: userX  // 用户滑动的 X 坐标
+    })
+  });
+}
+```
+
 ## 配置选项详解
 
 ### Options 函数列表（推荐）
@@ -262,6 +341,14 @@ captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 - `WithChineseDotCount(count int)` - 设置干扰点数量
 - `WithChineseConfig(config *ChineseConfig)` - 直接设置完整配置
 
+**滑动拼图验证码选项：**
+- `WithSlideMasterSize(width, height int)` - 设置主图尺寸
+- `WithSlideTileSize(width, height int)` - 设置滑块尺寸
+- `WithSlideTileRadius(radius int)` - 设置滑块圆角半径
+- `WithSlideJigsawRadius(radius int)` - 设置拼图缺口圆角半径
+- `WithSlideShadow(offsetX, offsetY, blur int)` - 设置阴影效果
+- `WithSlideConfig(config *SlideConfig)` - 直接设置完整配置
+
 ### 配置对象结构
 
 #### 通用配置 (Config)
@@ -275,6 +362,7 @@ captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 | StringConfig | *StringConfig | 字符串验证码配置 |
 | MathConfig | *MathConfig | 算术验证码配置 |
 | ChineseConfig | *ChineseConfig | 中文验证码配置 |
+| SlideConfig | *SlideConfig | 滑动拼图验证码配置 |
 
 #### 各驱动配置项
 
@@ -295,6 +383,20 @@ captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 
 中文验证码额外字段：
 - `Language`: 语言类型 ("zh" 或 "en")
+
+滑动拼图验证码配置项：
+
+| 字段 | 类型 | 说明 | 默认值 |
+|------|------|------|--------|
+| MasterWidth | int | 主图宽度 | 300 |
+| MasterHeight | int | 主图高度 | 220 |
+| TileWidth | int | 滑块宽度 | 60 |
+| TileHeight | int | 滑块高度 | 60 |
+| TileRadius | int | 滑块圆角半径 | 5 |
+| JigsawRadius | int | 拼图缺口圆角半径 | 10 |
+| ShadowOffsetX | int | 阴影 X 偏移 | 5 |
+| ShadowOffsetY | int | 阴影 Y 偏移 | 5 |
+| ShadowBlur | int | 阴影模糊度 | 10 |
 
 ## API 参考
 
@@ -318,7 +420,8 @@ captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 
 - `Generate() (string, string, string, error)`
   - 生成验证码
-  - 返回: (id, base64图片, 答案, 错误)
+  - 返回: (id, base64图片/JSON数据, 答案, 错误)
+  - **注意**: 对于滑动验证码，第二个返回值是 JSON 格式的 `SlideCaptchaData`
 
 - `Save(ctx context.Context, captchaID, answer string) error`
   - 将验证码答案存入 Redis
@@ -326,6 +429,7 @@ captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 - `Verify(ctx context.Context, captchaID, userInput string) (bool, error)`
   - 验证用户输入，验证成功后自动删除验证码
   - 返回: (是否匹配, 错误)
+  - **注意**: 滑动验证码允许 ±5 像素的误差
 
 ### 扩展方法
 
@@ -403,6 +507,11 @@ cap.SetConfig(config)
 3. **一次性使用**: 默认验证后会自动删除，防止重放攻击
 4. **字符源**: 字符串验证码建议使用排除易混淆字符的字符集
 5. **性能考虑**: 高并发场景下注意 Redis 连接池配置
+6. **滑动验证码**:
+   - 返回的 JSON 数据包含主图和滑块图的 base64 编码
+   - 验证时允许 ±5 像素的误差范围
+   - 需要前端配合实现滑块交互组件
+   - 建议从 `go-captcha-assets` 加载真实的背景图片资源
 
 ## 许可证
 

@@ -2,6 +2,8 @@ package captcha
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -155,6 +157,36 @@ func TestGenerate_ChineseCaptcha(t *testing.T) {
 	assert.Equal(t, 4, len([]rune(answer)))
 }
 
+func TestGenerate_SlideCaptcha(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverSlide),
+		WithSlideMasterSize(300, 220),
+		WithSlideTileSize(60, 60),
+	)
+
+	id, jsonData, answer, err := captchaInstance.Generate()
+	require.NoError(t, err)
+	assert.NotEmpty(t, id)
+	assert.NotEmpty(t, jsonData)
+	assert.NotEmpty(t, answer)
+
+	// 解析 JSON 数据
+	var slideData SlideCaptchaData
+	err = json.Unmarshal([]byte(jsonData), &slideData)
+	require.NoError(t, err)
+
+	assert.Equal(t, id, slideData.ID)
+	assert.NotEmpty(t, slideData.MasterImage)
+	assert.NotEmpty(t, slideData.TileImage)
+	assert.Greater(t, slideData.XPosition, 0)
+
+	// answer 应该是 X 坐标的字符串形式
+	assert.Equal(t, answer, fmt.Sprintf("%d", slideData.XPosition))
+}
+
 func TestSaveAndVerify(t *testing.T) {
 	rdb := setupTestRedis(t)
 	defer teardownTestRedis(rdb)
@@ -183,6 +215,78 @@ func TestSaveAndVerify(t *testing.T) {
 	valid, err = captchaInstance.Verify(ctx, id, answer)
 	require.NoError(t, err)
 	assert.False(t, valid)
+}
+
+func TestSaveAndVerify_SlideCaptcha(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverSlide),
+		WithExpire(5*time.Minute),
+		WithKeyPrefix("test:slide"),
+	)
+
+	ctx := context.Background()
+
+	// 生成滑动验证码
+	id, jsonData, answer, err := captchaInstance.Generate()
+	require.NoError(t, err)
+
+	// 解析获取 X 位置
+	var slideData SlideCaptchaData
+	err = json.Unmarshal([]byte(jsonData), &slideData)
+	require.NoError(t, err)
+
+	// 保存验证码
+	err = captchaInstance.Save(ctx, id, answer)
+	require.NoError(t, err)
+
+	// 验证正确答案（精确匹配）
+	valid, err := captchaInstance.Verify(ctx, id, answer)
+	require.NoError(t, err)
+	assert.True(t, valid)
+
+	// 验证后应该被删除，再次验证应该失败
+	valid, err = captchaInstance.Verify(ctx, id, answer)
+	require.NoError(t, err)
+	assert.False(t, valid)
+}
+
+func TestVerify_SlideCaptcha_WithTolerance(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverSlide),
+		WithExpire(5*time.Minute),
+		WithKeyPrefix("test:slide"),
+	)
+
+	ctx := context.Background()
+
+	// 生成滑动验证码
+	id, jsonData, answer, err := captchaInstance.Generate()
+	require.NoError(t, err)
+
+	// 解析获取 X 位置
+	var slideData SlideCaptchaData
+	err = json.Unmarshal([]byte(jsonData), &slideData)
+	require.NoError(t, err)
+
+	// 保存验证码
+	err = captchaInstance.Save(ctx, id, answer)
+	require.NoError(t, err)
+
+	// 模拟用户滑动，允许 ±5 像素误差
+	var expectedX int
+	fmt.Sscanf(answer, "%d", &expectedX)
+
+	// 测试在误差范围内的值
+	closeValue := fmt.Sprintf("%d", expectedX+3) // +3 像素
+	valid, err := captchaInstance.Verify(ctx, id, closeValue)
+	require.NoError(t, err)
+	assert.True(t, valid, "应该接受在误差范围内的值")
 }
 
 func TestVerify_WrongAnswer(t *testing.T) {
@@ -487,6 +591,31 @@ func TestOptions_ChineseConfig(t *testing.T) {
 	assert.Equal(t, 110, cfg.ChineseConfig.DotCount)
 }
 
+func TestOptions_SlideConfig(t *testing.T) {
+	rdb := setupTestRedis(t)
+	defer teardownTestRedis(rdb)
+
+	captchaInstance := NewCaptcha(rdb,
+		WithDriverType(DriverSlide),
+		WithSlideMasterSize(350, 250),
+		WithSlideTileSize(70, 70),
+		WithSlideTileRadius(8),
+		WithSlideJigsawRadius(12),
+		WithSlideShadow(6, 6, 12),
+	)
+
+	cfg := captchaInstance.GetConfig()
+	assert.Equal(t, 350, cfg.SlideConfig.MasterWidth)
+	assert.Equal(t, 250, cfg.SlideConfig.MasterHeight)
+	assert.Equal(t, 70, cfg.SlideConfig.TileWidth)
+	assert.Equal(t, 70, cfg.SlideConfig.TileHeight)
+	assert.Equal(t, 8, cfg.SlideConfig.TileRadius)
+	assert.Equal(t, 12, cfg.SlideConfig.JigsawRadius)
+	assert.Equal(t, 6, cfg.SlideConfig.ShadowOffsetX)
+	assert.Equal(t, 6, cfg.SlideConfig.ShadowOffsetY)
+	assert.Equal(t, 12, cfg.SlideConfig.ShadowBlur)
+}
+
 func TestDefaultConfigs(t *testing.T) {
 	t.Run("DefaultDigitConfig", func(t *testing.T) {
 		cfg := DefaultDigitConfig()
@@ -515,6 +644,14 @@ func TestDefaultConfigs(t *testing.T) {
 		assert.Equal(t, "zh", cfg.Language)
 	})
 
+	t.Run("DefaultSlideConfig", func(t *testing.T) {
+		cfg := DefaultSlideConfig()
+		assert.Equal(t, 300, cfg.MasterWidth)
+		assert.Equal(t, 220, cfg.MasterHeight)
+		assert.Equal(t, 60, cfg.TileWidth)
+		assert.Equal(t, 60, cfg.TileHeight)
+	})
+
 	t.Run("DefaultConfig", func(t *testing.T) {
 		cfg := DefaultConfig()
 		assert.Equal(t, DriverDigit, cfg.DriverType)
@@ -524,6 +661,7 @@ func TestDefaultConfigs(t *testing.T) {
 		assert.NotNil(t, cfg.StringConfig)
 		assert.NotNil(t, cfg.MathConfig)
 		assert.NotNil(t, cfg.ChineseConfig)
+		assert.NotNil(t, cfg.SlideConfig)
 	})
 }
 
