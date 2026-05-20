@@ -268,8 +268,14 @@ func (c *Captcha) generateSlide() (id string, b64s string, answer string, err er
 	}
 
 	// 获取主图和滑块图的 base64
-	masterBase64 := captData.GetMasterImage().ToBase64()
-	tileBase64 := captData.GetTileImage().ToBase64()
+	masterBase64, err := captData.GetMasterImage().ToBase64()
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to convert master image to base64: %w", err)
+	}
+	tileBase64, err := captData.GetTileImage().ToBase64()
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to convert tile image to base64: %w", err)
+	}
 
 	// 构造返回数据
 	slideData := &SlideCaptchaData{
@@ -356,8 +362,14 @@ func (c *Captcha) generateClick() (id string, b64s string, answer string, err er
 	}
 
 	// 获取主图和缩略图的 base64
-	masterBase64 := captData.GetMasterImage().ToBase64()
-	thumbBase64 := captData.GetThumbImage().ToBase64()
+	masterBase64, err := captData.GetMasterImage().ToBase64()
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to get master image: %w", err)
+	}
+	thumbBase64, err := captData.GetThumbImage().ToBase64()
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to get thumb image: %w", err)
+	}
 
 	// 构造返回数据
 	dots := make(map[int]*Dot)
@@ -430,8 +442,14 @@ func (c *Captcha) generateRotate() (id string, b64s string, answer string, err e
 	}
 
 	// 获取主图和缩略图的 base64
-	masterBase64 := captData.GetMasterImage().ToBase64()
-	thumbBase64 := captData.GetThumbImage().ToBase64()
+	masterBase64, err := captData.GetMasterImage().ToBase64()
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to convert master image to base64: %w", err)
+	}
+	thumbBase64, err := captData.GetThumbImage().ToBase64()
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to convert thumb image to base64: %w", err)
+	}
 
 	// 构造返回数据
 	rotateData := &RotateCaptchaData{
