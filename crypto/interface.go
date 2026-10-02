@@ -50,3 +50,20 @@ type Verifier interface {
 	// Name 返回算法名称
 	Name() string
 }
+
+// 编译期断言：具体实现满足对应接口
+var (
+	_ Cipher       = (*AESCipher)(nil)
+	_ Cipher       = (*AESGCMCipher)(nil)
+	_ Cipher       = (*SM2Cipher)(nil)
+	_ Cipher       = (*SM4Cipher)(nil)
+	_ Cipher       = (*RSACipher)(nil)
+	_ Hasher       = (*SHA256Hasher)(nil)
+	_ Hasher       = (*SHA512Hasher)(nil)
+	_ Hasher       = (*SM3Hasher)(nil)
+	_ KeyExchanger = (*ECDHCipher)(nil)
+	_ Signer       = (*ECDSACipher)(nil)
+	_ Signer       = (*SM2Cipher)(nil)
+	_ Verifier     = (*ECDSACipher)(nil)
+	_ Verifier     = (*SM2Cipher)(nil)
+)

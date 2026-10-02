@@ -6,7 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/asn1"
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -32,6 +32,11 @@ func NewECDSACipher() (*ECDSACipher, error) {
 		privateKey: priv,
 		publicKey:  &priv.PublicKey,
 	}, nil
+}
+
+// NewECDSACipherFromKey 用已有密钥初始化
+func NewECDSACipherFromKey(priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) *ECDSACipher {
+	return &ECDSACipher{privateKey: priv, publicKey: pub}
 }
 
 // Sign 签名
@@ -67,12 +72,34 @@ func (e *ECDSACipher) Verify(data []byte, signature string) (bool, error) {
 	return ecdsa.Verify(e.publicKey, hash[:], r, s), nil
 }
 
-// PublicKeyBytes 公钥/私钥导出
+// PublicKeyBytes 导出公钥字节（X.509 PKIX/DER编码）
+// 可用 ParseECDSAPublicKey 或 x509.ParsePKIXPublicKey 解析
 func (e *ECDSACipher) PublicKeyBytes() []byte {
-	// 使用ASN.1编码公钥
-	pubBytes, _ := asn1.Marshal(*e.publicKey)
+	if e.publicKey == nil {
+		return nil
+	}
+	// 使用X.509 PKIX编码公钥（与 RSACipher.ExportPublicKey 格式一致）
+	pubBytes, err := x509.MarshalPKIXPublicKey(e.publicKey)
+	if err != nil {
+		return nil
+	}
 	return pubBytes
 }
+
+// ParseECDSAPublicKey 从 X.509 PKIX/DER 编码字节解析ECDSA公钥
+// 是 ECDSACipher.PublicKeyBytes 的逆操作
+func ParseECDSAPublicKey(data []byte) (*ecdsa.PublicKey, error) {
+	pub, err := x509.ParsePKIXPublicKey(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse pkix public key: %w", err)
+	}
+	ecdsaPub, ok := pub.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("not an ECDSA public key, got %T", pub)
+	}
+	return ecdsaPub, nil
+}
+
 func (e *ECDSACipher) PrivateKey() *ecdsa.PrivateKey { return e.privateKey }
 
 // Name 返回算法名称

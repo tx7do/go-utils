@@ -15,13 +15,16 @@ func NewSM3Hasher() *SM3Hasher {
 }
 
 // Sum 计算数据的SM3哈希值
-func (h *SM3Hasher) Sum(data []byte) []byte {
+func (h *SM3Hasher) Sum(data []byte) ([]byte, error) {
 	hasher := sm3.New()
 	hasher.Write(data)
-	return hasher.Sum(nil)
+	return hasher.Sum(nil), nil
 }
 
 // Name 返回哈希算法的名称
 func (h *SM3Hasher) Name() string {
 	return "SM3"
 }
+
+// 编译期断言：SM3Hasher 实现 Hasher 接口
+var _ Hasher = (*SM3Hasher)(nil)
