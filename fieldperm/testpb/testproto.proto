@@ -1,0 +1,14 @@
+// testproto 仅为 fieldperm 的黑盒测试提供最小 proto 消息：
+// Plan.created_by 的 json_name（createdBy）与 proto 字段名拼写不同，
+// 覆盖隐藏集双拼写命中路径；description / remark 两种拼写一致，作保留对照。
+syntax = "proto3";
+
+package fieldperm.testproto;
+
+option go_package = "github.com/tx7do/go-utils/fieldperm/testpb";
+
+message Plan {
+  optional string description = 8; // 两种拼写一致
+  optional string remark = 9;      // 两种拼写一致
+  optional uint32 created_by = 20; // json_name = createdBy
+}
