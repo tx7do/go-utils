@@ -1,6 +1,10 @@
 package sqlutil
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestMaskSQL(t *testing.T) {
 	cases := []struct {
@@ -115,5 +119,81 @@ func TestMaskSQLFingerprint(t *testing.T) {
 	b := MaskSQL("SELECT * FROM users WHERE email = 'bob@y.org' AND age > 35")
 	if a != b {
 		t.Errorf("同构 SQL 脱敏后不一致: %q vs %q", a, b)
+	}
+}
+
+// TestMaskSQLLexerEdges 脱敏词法的边角分支：
+// 未闭合字符串脱敏到末尾、引号标识符内的 "" 转义与未闭合标识符原样保留、
+// 嵌套与未闭合块注释原样保留、行注释原样保留、$1 处于串末尾仍按占位符保留、
+// 孤立 $ 原样单字节、美元引用整体脱敏、十六进制数值按数值脱敏。
+func TestMaskSQLLexerEdges(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "未闭合字符串脱敏到末尾",
+			in:   "WHERE a = 'abc",
+			want: "WHERE a = ***",
+		},
+		{
+			name: "引号标识符内双引号转义原样保留",
+			in:   `SELECT "a""b" FROM t`,
+			want: `SELECT "a""b" FROM t`,
+		},
+		{
+			name: "未闭合引号标识符原样保留到末尾",
+			in:   `SELECT "unterminated`,
+			want: `SELECT "unterminated`,
+		},
+		{
+			name: "嵌套块注释原样保留（其中数字仍脱敏）",
+			in:   "SELECT /* a /* b */ c */ 1",
+			want: "SELECT /* a /* b */ c */ ***",
+		},
+		{
+			name: "未闭合块注释原样保留到末尾（前导数字仍脱敏）",
+			in:   "SELECT 1 /* xx",
+			want: "SELECT *** /* xx",
+		},
+		{
+			name: "行注释原样保留（前导数字仍脱敏）",
+			in:   "SELECT 1 -- trailing comment",
+			want: "SELECT *** -- trailing comment",
+		},
+		{
+			name: "占位符处于串末尾",
+			in:   "WHERE id = $1",
+			want: "WHERE id = $1",
+		},
+		{
+			name: "孤立美元符号原样保留",
+			in:   "a $ b",
+			want: "a $ b",
+		},
+		{
+			name: "美元引用整体脱敏",
+			in:   "SELECT $tag$secret body$tag$ FROM t",
+			want: "SELECT *** FROM t",
+		},
+		{
+			name: "空标签美元引用整体脱敏",
+			in:   "SELECT $$secret$$ FROM t",
+			want: "SELECT *** FROM t",
+		},
+		{
+			name: "十六进制数值脱敏",
+			in:   "WHERE a = 0xFF",
+			want: "WHERE a = ***",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, MaskSQL(tc.in))
+		})
 	}
 }

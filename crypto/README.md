@@ -91,6 +91,33 @@ h2 := NewSM3Hasher()
 hash := h2.Sum([]byte("hello"))
 ```
 
+
+---
+
+## 全局加密器与载荷封装（encryptor.go / sign.go / payload.go）
+
+面向"配置类敏感字段落库加密"场景的更上层封装（与上表的原语接口相互独立）：
+
+- **`Encryptor`**：AES-256-GCM 认证加密，密文带 `enc:` 前缀、base64 编码，
+  密钥由任意长度口令经 SHA-256 派生；`IsEncrypted` 判定前缀；
+- **全局单例**：`InitGlobalEncryptor(key, enabled)` / `GetGlobalEncryptor` /
+  `EncryptIfNeeded` / `DecryptIfNeeded`——未配置密钥时透传明文
+  （`DecryptIfNeeded` 对无前缀串原样返回，兼容历史明文行）；
+- **`SignData` / `VerifyData`**：绑定全局密钥的 HMAC-SHA256 签名门面
+  （用于签名 URL 等场景；未初始化时显式报错而非产出空签名）；
+- **载荷封装**：`EncryptPayload(payload, reservedKeys...)` 把整份配置
+  map 序列化加密为 `{_encrypted_config, _is_encrypted}` 封装，
+  `reservedKeys`（如任务系统的 `task_id`/`task_type`）以明文保留供
+  无需解密的路由/调度层读取；`DecryptPayload` /
+  `HasEncryptedPayload` 处理封装的解出与识别，
+  `Must*` 系列为测试便捷变体。
+
+```go
+_ = InitGlobalEncryptor(os.Getenv("APP_CRYPTO_KEY"), true)
+cipherText, _ := EncryptIfNeeded("smtp-password")
+plain, _ := DecryptIfNeeded(row.Config)
+```
+
 ---
 
 ## 其它说明

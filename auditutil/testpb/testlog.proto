@@ -1,0 +1,18 @@
+// testlog 仅为 auditutil 的哈希/签名测试提供最小 proto 消息，
+// 字段与审计日志的防篡改约定保持同名（log_hash/signature）。
+syntax = "proto3";
+
+package auditutil.testpb;
+
+option go_package = "github.com/tx7do/go-utils/auditutil/testpb";
+
+import "google/protobuf/timestamp.proto";
+
+message TestLog {
+  uint32 tenant_id = 1;
+  uint32 user_id = 2;
+  string action = 3;
+  google.protobuf.Timestamp created_at = 4;
+  optional string log_hash = 15;
+  optional bytes signature = 16;
+}
