@@ -15,6 +15,7 @@ import (
 	"bufio"
 	"context"
 	"net"
+	"net/mail"
 	"strings"
 	"sync"
 	"testing"
@@ -611,4 +612,17 @@ func TestSendMail_SessionCommandFailures(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSendMail_FromNameHeader 发件人显示名：FromName 非空时 From 头为 `名称 <地址>`，
+// 非 ASCII 名称按 RFC 2047 编码——收件客户端直接显示这个名，而不是裸地址。
+// FromName 为空时 From 头保持裸地址，与既有对端的解析习惯逐字节兼容。
+func TestSendMail_FromNameHeader(t *testing.T) {
+	fromHeader := (&mail.Address{Name: "GoWind Shop", Address: "noreply@example.test"}).String()
+	got := buildMessage(fromHeader, []string{"to@example.test"}, "s", "b")
+	// 带空格的显示名按 RFC 5322 加引号——收件客户端照样显示为 GoWind Shop。
+	require.Contains(t, string(got), `From: "GoWind Shop" <noreply@example.test>`+"\r\n")
+
+	cjk := (&mail.Address{Name: "风行商店", Address: "noreply@example.test"}).String()
+	require.Contains(t, cjk, "=?utf-8?", "非 ASCII 名称必须走 RFC 2047 编码，裸中文会毁掉整个头")
 }

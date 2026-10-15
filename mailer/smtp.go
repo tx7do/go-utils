@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"strconv"
 	"strings"
@@ -20,6 +21,9 @@ type SmtpConfig struct {
 	Username string // 用户名
 	Password string // 密码/授权码
 	From     string // 发件人地址
+	// FromName 发件人显示名（可选）。非空时 From 头为 `名称 <地址>`，
+	// 非 ASCII 名称按 RFC 2047 编码——收件客户端直接显示这个名，而不是裸地址。
+	FromName string
 	TlsMode  string // NONE / START_TLS / SSL
 }
 
@@ -71,7 +75,14 @@ func SendMail(ctx context.Context, cfg SmtpConfig, to []string, subject, body st
 	addr := cfg.Host + ":" + strconv.Itoa(int(cfg.Port))
 	from := strings.TrimSpace(cfg.From)
 
-	msg := buildMessage(from, to, subject, body)
+	fromHeader := from
+	if cfg.FromName != "" {
+		// mail.Address.String() 会对非 ASCII 名称做 RFC 2047 Q 编码，
+		// 且地址含特殊字符时自动加尖括号——手拼引号会在这两处踩坑。
+		fromHeader = (&mail.Address{Name: cfg.FromName, Address: from}).String()
+	}
+
+	msg := buildMessage(fromHeader, to, subject, body)
 
 	var client *smtp.Client
 	var err error
