@@ -10,7 +10,9 @@ notify/
 ├── ssrf.go        SSRF 防线：内网 CIDR 拦网表 + 解析后直连的 guarded http.Client
 ├── email/         SMTP 邮件（薄封装同库 mailer 子模块）
 ├── webhook/       HTTP 回调：钉钉/飞书/企微签名风格 + HMAC 自有方案 + 载荷模板
-└── sms/           阿里云 Dysmsapi / 腾讯云 SMS（裸 HTTP，零 SDK）+ 手机号归一
+├── sms/           阿里云 Dysmsapi / 腾讯云 SMS（裸 HTTP，零 SDK）+ 手机号归一
+├── telegram/      Telegram Bot API sendMessage（裸 HTTP；body ok=false 判失败）
+└── wechat/        微信公众号模板消息（access_token 缓存 + 40001/42001 强刷重试一次）
 ```
 
 ## 用法
@@ -50,6 +52,10 @@ webhook 的 `ErrBlockedTarget` 可用 `errors.Is` 沿链判别（拦网与拨号
 **webhook** — 签名风格由 `Config.SignStyle` 决定：`CUSTOM`（HMAC-SHA256 盖 "时间戳.正文"，签名进 `X-Gw-Signature` 头）、`NONE`、`DINGTALK`（毫秒签名进 URL query）、`FEISHU`（签名进 body 顶层）、`WECOM`（凭据在 URL key 上）。钉钉/飞书/企微都会在 HTTP 200 里报业务失败，判据落在 body 的 errcode/code 上，只看状态码会把"对方没收"记成成功。正文形状：三家内置 text 模板；CUSTOM/NONE 用 `Config.DefaultPayload` 钩子（业务字段类型归调用方）或库内置三字段默认。模板占位符 `{{name}}` 单趟替换（不递归），基础变量之外 `Message.Params` 每键皆可用。
 
 **sms** — 模板参数：阿里云按参数名整表传 JSON（模板 `${name}`），腾讯云按参数名排序取值传位置参数（模板 `{1}{2}`，单参数无感）。服务商名拼错在 `New` 当场报错；必填项缺失走 `Precheck`（点名缺哪个字段）。
+
+**telegram** — `Message.Target` 为 chat_id，`Title` 与 `Content` 以空行相连为消息文本；`Config.ParseMode` 可选 MarkdownV2/HTML（配了之后转义归调用方）。回执带 Telegram 的 message_id。
+
+**wechat** — `Message.Target` 为 openid；`Params` 每键渲染成模板 `{KEY}` 占位值，无参数时整段 `Content` 落 `content` 键；`Config.TemplateID` 必配。access_token 按实例缓存（提前 60s 刷新），对端报 40001/42001 时强刷重试一次；回执带 msgid。
 
 **ssrf** — `NewGuardedClient(allowPrivate)` 造"拨号前按解析后的 IP 拦内网"的客户端：校验的地址与连接的地址是同一个，TOCTOU 只剩 DNS 重绑定一种形式；不跟随重定向。放行开关 `NOTIFY_ALLOW_PRIVATE_TARGET=1` 仅限本机联调。
 
