@@ -40,6 +40,17 @@
 | `opsgenie/` | Opsgenie Alerts v2（告警） | alias（可选） | requestId |
 | `sendgrid/` | SendGrid Mail v3 | 收件邮箱 | X-Message-Id |
 | `mailgun/` | Mailgun Messages API | 收件邮箱 | 消息 id |
+| `postmark/` | Postmark 邮件 API | 收件邮箱 | MessageID |
+| `vonage/` | Vonage（原 Nexmo）国际短信 | 收件号（无 + 的 E.164） | message-id |
+| `serverchan/` | Server酱（微信个人推送） | （SendKey 即收件绑定） | — |
+| `wxpusher/` | WxPusher（微信个人推送） | UID | messageId |
+| `pushdeer/` | PushDeer（自建微信推送） | （PushKey 即收件绑定） | — |
+| `pushbullet/` | Pushbullet | 设备 device_iden（可选） | iden |
+| `join/` | Join by joaoapps | 设备 ID（逗号相连，可选） | — |
+| `webex/` | Cisco Webex 消息 | roomId 或人员邮箱 | 消息 id |
+| `homeassistant/` | Home Assistant notify 服务 | （Service 决定通知面） | — |
+| `ifttt/` | IFTTT Maker Webhooks | event 事件名 | — |
+| `datadog/` | Datadog Events | host（可选） | 事件 ID |
 
 ## 结构
 
@@ -96,6 +107,10 @@ webhook 的 `ErrBlockedTarget` 可用 `errors.Is` 沿链判别（拦网与拨号
 **push** — 七家设备厂商（APNs/FCM/华为/荣耀/小米/OPPO/vivo），`Message.Target` 为设备令牌，`Params` 进数据面（OPPO/vivo 通知栏形态无数据面）。APNs 标准库 HTTP/2 + ES256 Token 鉴权，provider token 缓存 50 分钟；多设备遍历、失效令牌清理与聚合是调用方编排层的事。
 
 **工作通知/应用消息（dingtalk/feishu）** — 与群机器人分工：机器人推群，这两个凭应用凭据推成员个人。dingtalk 是异步受理（task_id 进回执，送达结果靠回调）；feishu 的 content 字段是"JSON 字符串套 JSON"（内层对象先序列化成串再嵌入），tenant_access_token 缓存 + 失效强刷重试一次（99991661/99991663）。
+
+**个人推送（serverchan/wxpusher/pushdeer/pushbullet/join）** — 微信个人推送三件套靠 SendKey/AppToken/PushKey 绑定收件人；WxPusher 成功码是 1000 不是 0；Pushbullet 鉴权头是 `Access-Token` 不是 Bearer；Join 的 Target 是逗号相连的 deviceIds。
+
+**监控/家居自动化（datadog/homeassistant/ifttt）** — Datadog 的 Target 落 host 字段（事件归属主机）；HA 的 Target 落 data.target 由 notify 平台解释、Params 原样进 data；IFTTT 按 value1/2/3 值槽映射。
 
 **告警渠道（pagerduty/opsgenie）** — Target 是去重键（dedup key / alias）：同键事件被平台关联为同一告警的重现而非新告警，这是告警渠道与通知渠道最大的语义差异。PagerDuty 的 Title 落 payload.custom_details；Opsgenie 的 message 由 Title 顶上、Content 兜底，全文进 description。
 
