@@ -26,6 +26,20 @@
 | `gchat/` | Google Chat 入站 Webhook | （URL 即收件身份） | 消息资源名 |
 | `pushover/` | Pushover | 用户 key | request ID |
 | `teams/` | MS Teams 工作流 Webhook（Adaptive Card） | （URL 即收件身份） | — |
+| `dingtalk/` | 钉钉工作通知（推成员个人） | userid_list（`\|` 相连） | task_id |
+| `feishu/` | 飞书应用消息（im/v1） | open_id/user_id/email/chat_id | message_id |
+| `getui/` | 个推 v2 | cid | — |
+| `huaweisms/` | 华为云短信 MSGSMS（模板） | 手机号 | smsMsgId |
+| `line/` | LINE Messaging API | userId/groupId/roomId | — |
+| `whatsapp/` | WhatsApp Business Cloud API | 收件号（无 + 的 E.164） | wamid |
+| `mattermost/` | Mattermost 入站 Webhook | （URL 即收件身份） | — |
+| `rocketchat/` | Rocket.Chat chat.postMessage | 频道 / @user | 消息 _id |
+| `zulip/` | Zulip（stream） | stream 频道名 | 消息 ID |
+| `matrix/` | Matrix 客户端 API | 房间 ID | event_id |
+| `pagerduty/` | PagerDuty Events v2（告警） | dedup key（可选） | dedup key |
+| `opsgenie/` | Opsgenie Alerts v2（告警） | alias（可选） | requestId |
+| `sendgrid/` | SendGrid Mail v3 | 收件邮箱 | X-Message-Id |
+| `mailgun/` | Mailgun Messages API | 收件邮箱 | 消息 id |
 
 ## 结构
 
@@ -81,8 +95,14 @@ webhook 的 `ErrBlockedTarget` 可用 `errors.Is` 沿链判别（拦网与拨号
 
 **push** — 七家设备厂商（APNs/FCM/华为/荣耀/小米/OPPO/vivo），`Message.Target` 为设备令牌，`Params` 进数据面（OPPO/vivo 通知栏形态无数据面）。APNs 标准库 HTTP/2 + ES256 Token 鉴权，provider token 缓存 50 分钟；多设备遍历、失效令牌清理与聚合是调用方编排层的事。
 
-**webhook 型渠道（slack/discord/gchat/teams/gotify/bark/ntfy/pushover）** — Target 语义见总览表；带 Title 的组合各按平台惯例排版（Slack/Google Chat 用 mrkdwn 粗体行，Discord 走 embed 卡片，Teams 走 Adaptive Card）。Params 在 bark（原生字段直传 JSON）、pushover（原生字段直传表单）、ntfy/gotify（priority 覆盖）有各自约定，见各包文档。
+**工作通知/应用消息（dingtalk/feishu）** — 与群机器人分工：机器人推群，这两个凭应用凭据推成员个人。dingtalk 是异步受理（task_id 进回执，送达结果靠回调）；feishu 的 content 字段是"JSON 字符串套 JSON"（内层对象先序列化成串再嵌入），tenant_access_token 缓存 + 失效强刷重试一次（99991661/99991663）。
+
+**告警渠道（pagerduty/opsgenie）** — Target 是去重键（dedup key / alias）：同键事件被平台关联为同一告警的重现而非新告警，这是告警渠道与通知渠道最大的语义差异。PagerDuty 的 Title 落 payload.custom_details；Opsgenie 的 message 由 Title 顶上、Content 兜底，全文进 description。
+
+**国际 IM/短信（line/whatsapp/matrix/rocketchat/zulip/mattermost/twilio）** — LINE/WhatsApp 凭频道令牌直推（WhatsApp 收件号无 + 前缀，走 24h 会话窗口或模板）；Matrix 用 PUT + 事务 ID（房间 ID 的 ! 和 : 要显式转义成 %21/%3A，url.PathEscape 不动它们）；Rocket.Chat 走 X-User-Id/X-Auth-Token 双头；Zulip stream 消息必须有 topic（Config 默认 + Params 覆盖）。
+
+**webhook 型渠道（slack/discord/gchat/teams/gotify/bark/ntfy/pushover/mattermost）** — Target 语义见总览表；带 Title 的组合各按平台惯例排版（Slack/Google Chat 用 mrkdwn 粗体行，Discord 走 embed 卡片，Teams 走 Adaptive Card）。Params 在 bark（原生字段直传 JSON）、pushover（原生字段直传表单）、ntfy/gotify（priority 覆盖）有各自约定，见各包文档。
 
 ## Credits
 
-发送层的原始实现在 go-wind-admin / go-wind-im 的通知渠道模块中打磨成形（SSRF 防线、签名风格、verdict 判据、access_token 缓存与台账错误语义），本包是其通用化抽取。
+发送层的原始实现在 go-wind-admin / go-wind-im 的通知渠道模块中打磨成形（SSRF 防线、签名风格、verdict 判据、access_token 缓存与台账错误语义），本包是其通用化抽取；其余渠道按官方文档以同一接口形态补齐。
