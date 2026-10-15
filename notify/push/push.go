@@ -12,7 +12,6 @@
 package push
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -21,9 +20,9 @@ import (
 
 // ErrInvalidToken 厂商侧明确判定的设备令牌失效。
 //
-// 为什么要单独一个哨兵：失效令牌躺在设备表里只会让后续每次投递都白打一趟，
-// 调用方要能一眼把它从"投递失败"里分出来、删行自清理。
-var ErrInvalidToken = errors.New("push token is invalid or unregistered")
+// v0.0.3 时是本包定义的哨兵；随跨渠道通用化上移到 notify 根包，
+// 这里保留别名，既有 `errors.Is(push.ErrInvalidToken, ...)` 用法不受影响。
+var ErrInvalidToken = notify.ErrInvalidToken
 
 // pushTimeout 单台设备出站请求的总超时。
 const pushTimeout = 10 * time.Second

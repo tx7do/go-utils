@@ -24,6 +24,13 @@ import (
 // 实现准则：凡是发生在联系对端**之前**的拒绝，一律包 ErrNotConfigured。
 var ErrNotConfigured = errors.New("notification channel is not configured")
 
+// ErrInvalidToken 厂商侧明确判定的收件令牌失效（设备令牌/regId/别名等）。
+//
+// 与投递失败分开的原因：失效令牌躺在调用方的设备表里只会让后续每次投递
+// 都白打一趟——errors.Is 命中它就该删行自清理，重试没有意义。
+// 各渠道把自家错误码（APNs 410、FCM 404/410、JPush 1011 等）都归到这里。
+var ErrInvalidToken = errors.New("notification target token is invalid or unregistered")
+
 // Message 一次投递意图。
 //
 // 不含模板与路由：正文由调用方备好；发给谁、怎么记账也是调用方的事。
