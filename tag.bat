@@ -23,3 +23,4 @@ git tag captcha/v0.0.4
 
 git push origin --tags
 git tag notify/v0.0.1
+git tag notify/v0.0.2
