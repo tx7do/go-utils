@@ -28,3 +28,4 @@ git tag mailer/v0.1.1
 git tag notify/v0.0.3
 git tag notify/v0.0.4
 git tag notify/v0.0.5
+git tag notify/v0.0.6
