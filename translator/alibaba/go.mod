@@ -1,4 +1,4 @@
-module github.com/chenmingyong/go-utils/translator/alibaba
+module github.com/tx7do/go-utils/translator/alibaba
 
 go 1.21
 

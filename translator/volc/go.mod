@@ -1,4 +1,4 @@
-module github.com/chenmingyong/go-utils/translator/volc
+module github.com/tx7do/go-utils/translator/volc
 
 go 1.21
 
