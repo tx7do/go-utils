@@ -64,3 +64,7 @@ git tag translator/alibaba/v0.0.1
 git tag translator/baidu/v0.0.1
 git tag translator/google/v0.0.1
 git tag translator/volc/v0.0.1
+git tag v1.1.44
+git tag code_generator/v0.0.2
+git tag copierutil/v0.0.9
+git tag jwtutil/v0.0.4
