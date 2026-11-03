@@ -39,7 +39,7 @@ func LoadServerTlsConfigFile(keyFile, certFile, caFile string, insecureSkipVerif
 		cfg.ClientAuth = tls.RequireAndVerifyClientCert
 		cp, err := newCertPoolWithCaFile(caFile)
 		if err != nil {
-			log.Fatalln("read cert file error:", err)
+			log.Println("read cert file error:", err)
 			return nil, err
 		}
 
@@ -74,7 +74,7 @@ func LoadServerTlsConfigString(keyPEMBlock, certPEMBlock, caPEMBlock []byte, ins
 		cfg.ClientAuth = tls.RequireAndVerifyClientCert
 		cp, err := newCertPool(caPEMBlock)
 		if err != nil {
-			log.Fatalln("read cert PEM error:", err)
+			log.Println("read cert PEM error:", err)
 			return nil, err
 		}
 
@@ -103,7 +103,7 @@ func LoadClientTlsConfigFile(keyFile, certFile, caFile string) (*tls.Config, err
 
 	tlsCert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
-		log.Fatalln("read pair file error:", err)
+		log.Println("read pair file error:", err)
 		return nil, err
 	}
 
@@ -112,7 +112,7 @@ func LoadClientTlsConfigFile(keyFile, certFile, caFile string) (*tls.Config, err
 	if caFile != "" {
 		cp, err := newCertPoolWithCaFile(caFile)
 		if err != nil {
-			log.Fatalln("read cert file error:", err)
+			log.Println("read cert file error:", err)
 			return nil, err
 		}
 
@@ -134,7 +134,7 @@ func LoadClientTlsConfigString(keyPEMBlock, certPEMBlock, caPEMBlock []byte) (*t
 
 	tlsCert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
 	if err != nil {
-		log.Fatalln("read pair PEM error:", err)
+		log.Println("read pair PEM error:", err)
 		return nil, err
 	}
 
@@ -143,7 +143,7 @@ func LoadClientTlsConfigString(keyPEMBlock, certPEMBlock, caPEMBlock []byte) (*t
 	if len(caPEMBlock) != 0 {
 		cp, err := newCertPool(caPEMBlock)
 		if err != nil {
-			log.Fatalln("read cert PEM error:", err)
+			log.Println("read cert PEM error:", err)
 			return nil, err
 		}
 
