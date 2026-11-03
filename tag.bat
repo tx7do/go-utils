@@ -68,3 +68,4 @@ git tag v1.1.44
 git tag code_generator/v0.0.2
 git tag copierutil/v0.0.9
 git tag jwtutil/v0.0.4
+git tag code_generator/v0.0.3
