@@ -1,10 +1,43 @@
-# 百度翻译 (Baidu Translator)
+# baidu
 
-百度翻译是百度提供的在线翻译服务。
+Go translator wrapper for the Baidu Translate Open Platform general translation API.
 
-## 使用
+English | [简体中文](README.zh-CN.md)
 
-### 基础使用
+## Introduction
+
+This module (`github.com/tx7do/go-utils/translator/baidu`) is the Baidu Translate implementation of the translator components in [go-utils](https://github.com/tx7do/go-utils). It is an **independent Go module** (with its own `go.mod`) and has no third-party dependencies.
+
+Its method signature matches the `Translator` interface of go-utils:
+
+```go
+// Translate translates text.
+func (t *Translator) Translate(source, sourceLang, targetLang string) (string, error)
+```
+
+Internally it calls the Baidu general translation API (`https://fanyi-api.baidu.com/api/trans/vip/translate`), generating a random `salt` and computing the MD5 signature automatically.
+
+## Features
+
+- Built on the Baidu Translate Open Platform general translation API
+- AppID + SecretKey authentication with the signature computed automatically (MD5)
+- Built-in 30-second HTTP timeout
+- `auto` source language for automatic detection
+- No custom error type; errors are plain `error` values
+
+## Installation
+
+This module is an independent Go module:
+
+```bash
+go get github.com/tx7do/go-utils/translator/baidu
+```
+
+```go
+import "github.com/tx7do/go-utils/translator/baidu"
+```
+
+## Quick Start
 
 ```go
 package main
@@ -13,14 +46,15 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/chenmingyong/go-utils/translator/baidu"
+	"github.com/tx7do/go-utils/translator/baidu"
 )
 
 func main() {
-	// 创建翻译器，需要提供 AppID 和 SecretKey
+	// Create the translator; an AppID and SecretKey are required.
+	// Note: NewTranslator does not return an error.
 	translator := baidu.NewTranslator("your_app_id", "your_secret_key")
 
-	// 翻译文本
+	// Translate text
 	result, err := translator.Translate("Hello, world!", "en", "zh")
 	if err != nil {
 		log.Fatal(err)
@@ -30,146 +64,174 @@ func main() {
 }
 ```
 
-## 获取 AppID 和 SecretKey
-
-1. 访问[百度翻译开放平台](https://fanyi-api.baidu.com/)
-2. 登录或注册账号
-3. 在"我的应用"中创建新应用
-4. 获取 AppID 和 SecretKey
-
-## 支持的语言
-
-| 语言 | 代码 |
-|------|------|
-| 自动检测 | auto |
-| 中文 | zh |
-| 英文 | en |
-| 日语 | ja |
-| 韩语 | ko |
-| 俄语 | ru |
-| 德语 | de |
-| 法语 | fr |
-| 西班牙语 | es |
-| 葡萄牙语 | pt |
-| 意大利语 | it |
-| 泰语 | th |
-| 越南语 | vi |
-| 印尼语 | id |
-| 缅甸语 | my |
-| 柬埔寨语 | km |
-| 老挝语 | lo |
-| 阿拉伯语 | ar |
-| 土耳其语 | tr |
-| 波兰语 | pl |
-| 乌克兰语 | uk |
-| 希腊语 | el |
-| 瑞典语 | sv |
-| 丹麦语 | da |
-| 芬兰语 | fi |
-| 荷兰语 | nl |
-| 挪威语 | no |
-| 捷克语 | cs |
-| 罗马尼亚语 | ro |
-| 匈牙利语 | hu |
-| 保加利亚语 | bg |
-| 斯洛文尼亚语 | sl |
-| 斯洛伐克语 | sk |
-| 克罗地亚语 | hr |
-| 塞尔维亚语 | sr |
-| 爱沙尼亚语 | et |
-| 立陶宛语 | lt |
-| 拉脱维亚语 | lv |
-| 阿尔巴尼亚语 | sq |
-| 马其顿语 | mk |
-| 亚美尼亚语 | hy |
-| 格鲁吉亚语 | ka |
-| 白俄罗斯语 | be |
-| 冰岛语 | is |
-| 库尔德语 | ku |
-| 吉尔吉斯语 | ky |
-| 拉丁语 | la |
-| 卢森堡语 | lb |
-| 高棉语 | km |
-| 梵语 | sa |
-| 威尔士语 | cy |
-| 尼泊尔语 | ne |
-| 孟加拉语 | bn |
-| 旁遮普语 | pa |
-| 梵语 | sa |
-| 乌尔都语 | ur |
-| 马来语 | ms |
-| 缅甸语 | my |
-| 泰卢固语 | te |
-| 泰米尔语 | ta |
-| 卡纳达语 | kn |
-| 马拉雅拉姆语 | ml |
-| 古吉拉特语 | gu |
-| 马拉地语 | mr |
-| 奥利亚语 | or |
-| 旁遮普语 | pa |
-| 信德语 | sd |
-| 僧伽罗语 | si |
-
-更多语言支持请参考[官方文档](https://fanyi-api.baidu.com/api/trans/product/apidoc)。
-
-## 接口
+## Configuration / Options
 
 ### NewTranslator
-
-创建一个新的百度翻译器。
 
 ```go
 func NewTranslator(appID, secretKey string) *Translator
 ```
 
-**参数：**
-- `appID`: 百度翻译的 AppID
-- `secretKey`: 百度翻译的 SecretKey
+**Parameters:**
 
-**返回值：**
-- `*Translator`: 翻译器实例
+- `appID`: the Baidu Translate AppID
+- `secretKey`: the Baidu Translate SecretKey
+
+**Returns:** a `*Translator` instance. It does **not** return an error — construction performs no network requests.
+
+This module has no configuration options: the HTTP client uses a fixed 30-second timeout that cannot be changed.
 
 ### Translate
-
-翻译文本。
 
 ```go
 func (t *Translator) Translate(source, sourceLang, targetLang string) (string, error)
 ```
 
-**参数：**
-- `source`: 要翻译的文本
-- `sourceLang`: 源语言代码
-- `targetLang`: 目标语言代码
+**Parameters:**
 
-**返回值：**
-- `string`: 翻译结果
-- `error`: 错误信息
+- `source`: the text to translate
+- `sourceLang`: source language code; pass `auto` for automatic detection
+- `targetLang`: target language code
 
-## 错误处理
+**Returns:** the translated text and an error.
 
-百度翻译 API 可能返回以下错误码：
+## Obtaining the AppID and SecretKey
 
-| 错误码 | 含义 |
-|--------|------|
-| 52000 | 成功 |
-| 52001 | 请求超时 |
-| 52002 | 系统错误 |
-| 52003 | 未授权用户 |
-| 54000 | 必需参数为空 |
-| 54001 | 签名错误 |
-| 54002 | 访问频率受限 |
-| 54003 | 无效的请求 |
-| 54004 | 无此字段 |
-| 54005 | 无此翻译类型 |
-| 58000 | 客户端IP非法 |
-| 58001 | 译文语言方向不支持 |
-| 90107 | 认证未通过 |
+1. Visit the [Baidu Translate Open Platform](https://fanyi-api.baidu.com/)
+2. Sign in or register an account
+3. Create a new application in the management console
+4. Obtain the AppID and SecretKey
 
-## 注意事项
+## Supported Languages
 
-1. 需要配置正确的 AppID 和 SecretKey
-2. 请确保账户有足够的翻译配额
-3. 请遵守百度翻译的使用协议和限速要求
-4. 签名使用 MD5 算法，格式为：`appID + query + salt + secretKey` 的 MD5 值
+| Language | Code | Language | Code |
+|----------|------|----------|------|
+| Auto-detect | `auto` | Slovak | `sk` |
+| Chinese | `zh` | Croatian | `hr` |
+| English | `en` | Serbian | `sr` |
+| Japanese | `ja` | Estonian | `et` |
+| Korean | `ko` | Lithuanian | `lt` |
+| Russian | `ru` | Latvian | `lv` |
+| German | `de` | Albanian | `sq` |
+| French | `fr` | Macedonian | `mk` |
+| Spanish | `es` | Armenian | `hy` |
+| Portuguese | `pt` | Georgian | `ka` |
+| Italian | `it` | Belarusian | `be` |
+| Thai | `th` | Icelandic | `is` |
+| Vietnamese | `vi` | Kurdish | `ku` |
+| Indonesian | `id` | Kyrgyz | `ky` |
+| Burmese | `my` | Latin | `la` |
+| Khmer | `km` | Luxembourgish | `lb` |
+| Lao | `lo` | Sanskrit | `sa` |
+| Arabic | `ar` | Welsh | `cy` |
+| Turkish | `tr` | Nepali | `ne` |
+| Polish | `pl` | Bengali | `bn` |
+| Ukrainian | `uk` | Punjabi | `pa` |
+| Greek | `el` | Urdu | `ur` |
+| Swedish | `sv` | Malay | `ms` |
+| Danish | `da` | Telugu | `te` |
+| Finnish | `fi` | Tamil | `ta` |
+| Dutch | `nl` | Kannada | `kn` |
+| Norwegian | `no` | Malayalam | `ml` |
+| Czech | `cs` | Gujarati | `gu` |
+| Romanian | `ro` | Marathi | `mr` |
+| Hungarian | `hu` | Odia | `or` |
+| Bulgarian | `bg` | Sindhi | `sd` |
+| Slovenian | `sl` | Sinhala | `si` |
 
+See the [official documentation](https://fanyi-api.baidu.com/api/trans/product/apidoc) for more supported languages.
+
+## Advanced Usage
+
+### Error Handling
+
+This module has no dedicated error type; every error is a plain `error` created with `fmt.Errorf`. Simply check `err`:
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/tx7do/go-utils/translator/baidu"
+)
+
+func main() {
+	translator := baidu.NewTranslator("your_app_id", "your_secret_key")
+
+	result, err := translator.Translate("Hello", "en", "zh")
+	if err != nil {
+		// err.Error() looks like "baidu translate error: 54001 - Invalid sign";
+		// parse the numeric code before the "-" if needed
+		log.Printf("translate failed: %v", err)
+		return
+	}
+
+	fmt.Println(result)
+}
+```
+
+Error message formats (matching the source code):
+
+| Scenario | Error message format |
+|----------|----------------------|
+| API returned an error code | `baidu translate error: <error_code> - <error_msg>` |
+| HTTP status is not 200 | `baidu translate error: status <status code>, body: <response body>` |
+| No translation result in the response | `baidu translate: invalid response format` |
+| Network request failed | the underlying error (e.g. `*url.Error`) is returned as-is |
+
+### Common Error Codes
+
+The following are common error codes; the full list is in the [official documentation](https://fanyi-api.baidu.com/api/trans/product/apidoc):
+
+| Code | Meaning |
+|------|---------|
+| 52000 | Success |
+| 52001 | Request timed out |
+| 52002 | System error |
+| 52003 | Unauthorized user |
+| 54000 | A required parameter is empty |
+| 54001 | Invalid signature |
+| 54002 | Rate limit exceeded |
+| 54003 | Invalid request |
+| 54004 | Unknown field |
+| 54005 | Unknown translation type |
+| 58000 | Invalid client IP |
+| 58001 | Unsupported target language direction |
+| 90107 | Authentication failed |
+
+### Using the Unified Interface
+
+This module does not import `go-utils/translator`, but its method signature matches the `Translator` interface, so it can be assigned directly:
+
+```go
+package main
+
+import (
+	"github.com/tx7do/go-utils/translator"
+	"github.com/tx7do/go-utils/translator/baidu"
+)
+
+func main() {
+	tr := baidu.NewTranslator("your_app_id", "your_secret_key")
+	var iface translator.Translator = tr
+	_, _ = iface.Translate("Hello", "en", "zh")
+}
+```
+
+## Notes
+
+1. **Long texts return only the first segment**: the Baidu API splits long text by line and returns multiple segments in the `trans_result` array; this module returns only the first segment's translation (`trans_result[0].dst`). Split long texts yourself before calling.
+2. **HTTP timeout is fixed at 30 seconds and is not configurable**: the module uses `&http.Client{Timeout: 30 * time.Second}` internally and offers no customization option.
+3. **Signature algorithm**: `sign = MD5(appID + query + salt + secretKey)`, where `salt` is a randomly generated `int64` per request. The signature is computed automatically; no manual work is needed.
+4. Per-request text length and rate limits are documented in the [official documentation](https://fanyi-api.baidu.com/api/trans/product/apidoc); split long texts and mind the QPS limits.
+5. Every call hits the Baidu API; watch your account quota and billing. The `Translator` instance is reusable.
+
+## Acknowledgements
+
+- [Baidu Translate Open Platform](https://fanyi-api.baidu.com/)
+
+## License
+
+Released under the project [MIT License](https://github.com/tx7do/go-utils/blob/main/LICENSE).

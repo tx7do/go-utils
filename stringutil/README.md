@@ -1,15 +1,39 @@
 # stringutil
 
-`stringutil` 包提供字符串相关的实用工具函数，包括：
+String utility package: type conversion, pseudo-random / cryptographically secure
+random string generation, and JSON field value replacement.
 
-- **类型转换**：Go 基本类型与字符串之间的互转（含指针版本和默认值版本）
-- **随机字符串**：基于伪随机数生成器（`math/rand/v2`）的随机字符串生成
-- **加密随机字符串**：基于 `crypto/rand` 的密码学安全随机字符串生成
-- **JSON 字段替换**：使用正则替换 JSON 字符串中指定字段的值
+English | [简体中文](README.zh-CN.md)
 
----
+## Features
 
-## 快速开始
+- **Type conversion**: between Go basic types and strings (pointer variants and
+  default-value variants included)
+- **Pseudo-random strings**: based on the PCG generator of `math/rand/v2`, suitable
+  for general business scenarios
+- **Crypto-random strings**: based on `crypto/rand`, suitable for passwords, tokens, keys
+- **JSON field replacement**: replaces the values of given fields in a JSON string via regex
+- **Reproducible randomness**: `RandomSeed` accepts an external `*rand.Rand`, so a
+  fixed seed reproduces the output
+
+## Installation
+
+stringutil is a subpackage of the root module `github.com/tx7do/go-utils`
+(no go.mod of its own); installing the root module is enough:
+
+```bash
+go get github.com/tx7do/go-utils
+```
+
+```go
+import "github.com/tx7do/go-utils/stringutil"
+```
+
+> Version requirement: the code uses `math/rand/v2` (introduced in Go 1.22), so
+> Go 1.22+ is required in practice; the root module's `go.mod` currently declares
+> `go 1.25.0`.
+
+## Quick Start
 
 ```go
 package main
@@ -21,152 +45,167 @@ import (
 )
 
 func main() {
-	// 类型转换
+	// Type conversion.
 	s := stringutil.IntToString(42)
 	n, _ := stringutil.StringToInt("42")
 	fmt.Println(s, n)
 
-	// 随机字符串
+	// Pseudo-random strings.
 	alpha, _ := stringutil.RandomAlphabetic(10)
 	num, _ := stringutil.RandomNumeric(6)
 	alphanum, _ := stringutil.RandomAlphaNumeric(16)
 	fmt.Println(alpha, num, alphanum)
 
-	// 加密安全随机字符串
+	// Cryptographically secure random string.
 	safe, _ := stringutil.CryptoRandomAlphaNumeric(32)
 	fmt.Println(safe)
 
-	// JSON 字段替换
+	// JSON field replacement.
 	jsonStr := `{"tenantId": "old_value", "name": "test"}`
 	result := stringutil.ReplaceJSONField("tenantId|tenant_id", "new_value", jsonStr)
 	fmt.Println(result)
 }
 ```
 
----
+## API Reference
 
-## 类型转换（`convert.go`）
+### Type conversion (convert.go)
 
-### 基本类型 → 字符串
+#### Basic types → string
 
-| 函数 | 说明 |
-|------|------|
+| Function | Description |
+|----------|-------------|
 | `BoolToString(v bool)` | `true` → `"true"` |
-| `IntToString(v int)` | 整数转十进制字符串 |
-| `Int8ToString` / `Int16ToString` / `Int32ToString` / `Int64ToString` | 各尺寸有符号整数 |
-| `UintToString` / `Uint8ToString` / `Uint16ToString` / `Uint32ToString` / `Uint64ToString` | 各尺寸无符号整数 |
-| `Float32ToString` / `Float64ToString` | 浮点数转字符串（`DoubleToString` 是 `Float64ToString` 的别名） |
+| `IntToString(v int)` | Integer to decimal string |
+| `Int8ToString` / `Int16ToString` / `Int32ToString` / `Int64ToString` | Signed integers of each size |
+| `UintToString` / `Uint8ToString` / `Uint16ToString` / `Uint32ToString` / `Uint64ToString` | Unsigned integers of each size |
+| `Float32ToString` / `Float64ToString` | Floats to string (`DoubleToString` is an alias of `Float64ToString`) |
 
-### 字符串 → 基本类型
+#### String → basic types
 
-所有函数会自动 `TrimSpace`，解析失败时返回 `error`。
+All functions `TrimSpace` automatically and return an `error` on parse failure.
 
-| 函数 | 说明 |
-|------|------|
-| `StringToBool(s)` | 支持 `1/0/t/f/true/false/TRUE/FALSE` |
-| `StringToInt(s)` / `StringToIntBase(s, base)` | 十进制或指定进制 |
-| `StringToInt8` ~ `StringToInt64` | 各尺寸有符号整数（均有 `*Base` 变体） |
-| `StringToUint` ~ `StringToUint64` | 各尺寸无符号整数（均有 `*Base` 变体） |
-| `StringToFloat32` / `StringToFloat64` | 浮点数解析 |
+| Function | Description |
+|----------|-------------|
+| `StringToBool(s)` | Based on `strconv.ParseBool`; accepted values: `1`, `t`, `T`, `TRUE`, `true`, `True` → `true`; `0`, `f`, `F`, `FALSE`, `false`, `False` → `false` (anything else errors) |
+| `StringToInt(s)` / `StringToIntBase(s, base)` | Decimal or a given base (base 2-36, 0 infers from prefix) |
+| `StringToInt8` ~ `StringToInt64` | Signed integers of each size (`*Base` variants included) |
+| `StringToUint` ~ `StringToUint64` | Unsigned integers of each size (`*Base` variants included) |
+| `StringToFloat32` / `StringToFloat64` | Float parsing (`StringToDouble` is an alias of `StringToFloat64`) |
 
-### 带默认值版本
+#### Default-value variants
 
-解析失败时返回 `defaultValue` 而非 `error`：
+Return `defaultValue` instead of `error` on parse failure:
 
 ```go
-v := stringutil.StringToIntOrDefault("abc", 0) // v == 0
-v2 := stringutil.StringToIntOrDefault("123", 0) // v2 == 123
+v := stringutil.StringToIntOrDefault("abc", 0)   // v == 0
+v2 := stringutil.StringToIntOrDefault("123", 0)  // v2 == 123
 ```
 
-可用的函数：`StringToBoolOrDefault`、`StringToIntOrDefault`、`StringToUintOrDefault` 等，以及对应的 `*BaseOrDefault` 变体。
+Available functions: `StringToBoolOrDefault`, `StringToIntOrDefault`,
+`StringToUintOrDefault`, `StringToDoubleOrDefault` (semantically the same as
+`StringToFloat64OrDefault`), and so on, plus the corresponding `*BaseOrDefault` variants.
 
-### 指针类型转换
+#### Pointer conversions
 
-`*T` ↔ `*string` 的转换，输入为 `nil` 时返回 `nil`：
+Conversions between `*T` and `*string`; a `nil` input yields `nil`:
 
 ```go
 n := 42
 sp := stringutil.IntPtrToStringPtr(&n) // *string
 
 s := "100"
-np := stringutil.StringPtrToIntPtr(&s) // *int，解析失败返回 nil
+np := stringutil.StringPtrToIntPtr(&s) // *int, nil on parse failure
 ```
 
-| 函数系列 | 说明 |
-|---------|------|
+| Function family | Description |
+|-----------------|-------------|
 | `BoolPtrToStringPtr` ~ `DoublePtrToStringPtr` | `*T` → `*string` |
-| `StringPtrToBoolPtr` ~ `StringPtrToDoublePtr` | `*string` → `*T`（均有 `*Base` 变体） |
+| `StringPtrToBoolPtr` ~ `StringPtrToDoublePtr` | `*string` → `*T` (`*Base` variants included) |
 
----
+### Pseudo-random strings (randomstringutils.go)
 
-## 伪随机字符串（`randomstringutils.go`）
+Based on the PCG pseudo-random generator of `math/rand/v2`, suitable for general
+business scenarios.
 
-基于 `math/rand/v2` 的 PCG 伪随机数生成器，适合一般业务场景。
+The package-level random source (seeded with the current Unix-nano timestamp; all
+`Random*` functions use it):
 
-### 便捷函数
+```go
+var RANDOM = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
+```
 
-| 函数 | 字符集 | 示例输出 |
-|------|--------|---------|
+#### Convenience functions
+
+| Function | Charset | Example output |
+|----------|---------|----------------|
 | `RandomAlphabetic(count)` | a-z, A-Z | `KxTmBqRp` |
 | `RandomNumeric(count)` | 0-9 | `83472615` |
 | `RandomAlphaNumeric(count)` | a-z, A-Z, 0-9 | `aB3kR9xM` |
 | `RandomAscii(count)` | ASCII 32-126 | `H_I;E` |
-| `RandomNonAlphaNumeric(count)` | 无过滤 | 可包含任意 Unicode 字符 |
-| `RandomAlphaNumericCustom(count, letters, numbers)` | 自定义过滤 | — |
+| `RandomNonAlphaNumeric(count)` | no filtering | may contain arbitrary Unicode characters (incl. surrogate ranges) |
+| `RandomAlphaNumericCustom(count, letters, numbers)` | custom filtering | — |
 
-### 通用函数
+#### General functions
 
 ```go
-// 使用预定义字符集
+import "math/rand/v2"
+
+// Using a predefined charset.
 out, err := stringutil.Random(10, 0, 0, false, false, 'a', 'b', 'c', '1', '2', '3')
 
-// 可复现的随机字符串（固定种子）
+// Reproducible random string (fixed seed): import math/rand/v2 yourself.
 random := rand.New(rand.NewPCG(42, 0))
 out, err := stringutil.RandomSeed(10, 0, 0, true, true, nil, random)
 ```
 
-### 错误条件
+Parameters of `Random` / `RandomSeed`: `count` is the output length; `start` / `end`
+delimit the character range (end-exclusive, both ignored when both are 0 and `chars`
+is nil); `letters` / `numbers` filter characters; `chars` is an optional custom
+charset (when provided, `start`/`end` index into that slice). When
+`start == 0 && end == 0` and no `chars` is given, the default range is `[0, MaxInt32)`
+with no filtering, or `[' ', 'z'+1)` with any filtering enabled.
 
-`RandomSeed` 在以下情况返回 `error`：
+#### Error conditions
 
-- `count < 0`：请求长度为负数
-- `chars` 非 `nil` 但长度为 0：空字符集
-- `end <= start`（当 `start`/`end` 被显式提供时）
-- `end > len(chars)`（当 `chars` 非 `nil` 时）
+`RandomSeed` returns an `error` when:
 
----
+- `count < 0`: a negative length was requested
+- `chars` is non-`nil` but empty: empty charset
+- `end <= start` (when `start`/`end` are explicitly provided)
+- `end > len(chars)` (when `chars` is provided)
 
-## 加密安全随机字符串（`cryptorandomstringutils.go`）
+### Crypto-secure random strings (cryptorandomstringutils.go)
 
-基于 `crypto/rand` 的密码学安全随机数生成器，适合生成密码、Token、密钥等安全敏感场景。
+Based on the `crypto/rand` cryptographically secure generator, suitable for
+passwords, tokens, keys and other security-sensitive scenarios.
 
-API 与伪随机版本完全对应，函数名以 `Crypto` 为前缀：
+The API mirrors the pseudo-random version; function names carry the `Crypto` prefix:
 
-| 函数 | 字符集 |
-|------|--------|
+| Function | Charset |
+|----------|---------|
 | `CryptoRandomAlphabetic(count)` | a-z, A-Z |
 | `CryptoRandomNumeric(count)` | 0-9 |
 | `CryptoRandomAlphaNumeric(count)` | a-z, A-Z, 0-9 |
 | `CryptoRandomAscii(count)` | ASCII 32-126 |
-| `CryptoRandomNonAlphaNumeric(count)` | 无过滤 |
-| `CryptoRandomAlphaNumericCustom(count, letters, numbers)` | 自定义过滤 |
-| `CryptoRandom(count, start, end, letters, numbers, chars...)` | 通用接口 |
+| `CryptoRandomNonAlphaNumeric(count)` | no filtering |
+| `CryptoRandomAlphaNumericCustom(count, letters, numbers)` | custom filtering |
+| `CryptoRandom(count, start, end, letters, numbers, chars...)` | general interface |
 
-错误条件与伪随机版本相同。
+Error conditions are the same as the pseudo-random version (except for entropy
+failures, see Notes).
 
----
-
-## JSON 字段替换（`replace.go`）
+### JSON field replacement (replace.go)
 
 ```go
 func ReplaceJSONField(fieldNames, newValue, jsonStr string) string
 ```
 
-使用正则表达式替换 JSON 字符串中指定字段的值。
+Replaces the values of given fields in a JSON string using a regular expression.
 
-- `fieldNames`：要替换的字段名，用竖线 `|` 分隔（例如 `"tenantId|tenant_id"`）
-- `newValue`：新值（将被包裹在引号中）
-- 匹配不区分大小写
+- `fieldNames`: the field names to replace, separated by `|` (e.g. `"tenantId|tenant_id"`)
+- `newValue`: the new value (it will be wrapped in quotes)
+- Matching is case-insensitive
 
 ```go
 jsonStr := `{"tenantId": "old", "Name": "test"}`
@@ -174,11 +213,26 @@ result := stringutil.ReplaceJSONField("tenantId|tenant_id", "new", jsonStr)
 // result: `{"tenantId": "new", "Name": "test"}`
 ```
 
----
+## Recommendations
 
-## 使用建议
+- General business randomness: use the `Random*` functions (better performance)
+- Passwords, tokens, keys and other security-sensitive scenarios: use the `CryptoRandom*` functions
+- Reproducible random output: use `RandomSeed` with a fixed-seed `*rand.Rand`
+- Fault-tolerant type conversion: prefer the `*OrDefault` functions
 
-- 一般业务随机：使用 `Random*` 系列函数（性能更好）
-- 密码、Token、密钥等安全敏感场景：使用 `CryptoRandom*` 系列函数
-- 需要可复现的随机输出：使用 `RandomSeed` 并传入固定种子的 `*rand.Rand`
-- 类型转换需要容错：优先使用 `*OrDefault` 系列函数
+## Notes
+
+- **The `CryptoRandom*` family panics if the entropy source fails**: internally
+  `getCryptoRandomInt` calls `rand.Int(rand.Reader, ...)` and panics on error.
+  Failure to read system entropy via `crypto/rand` is extremely rare, but it means
+  the error is not returned as an `error` value.
+- The package-level `RANDOM` is a globally shared `*rand.Rand`; concurrent calls to
+  the `Random*` functions share the same source. `*rand.Rand` of `math/rand/v2` is
+  **not safe for concurrent use**, so concurrent calls carry a data race risk.
+  Under high concurrency, or when independent sequences are needed, use `RandomSeed`
+  with your own (locked/isolated) random source instead.
+- `RandomNonAlphaNumeric` / `CryptoRandomNonAlphaNumeric` apply no character
+  filtering, so the output may contain arbitrary Unicode characters (including some
+  surrogate ranges); verify charset safety before writing to logs or storage.
+- `ReplaceJSONField` is regex-based and only fits JSON whose field values are plain
+  strings; for nested structures or complex escapes, use a standard JSON library.

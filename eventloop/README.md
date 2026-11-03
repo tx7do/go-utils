@@ -1,158 +1,229 @@
-# 事件循环（eventloop）
+# eventloop
 
-## 简要说明
+English | [简体中文](README.zh-CN.md)
 
-- 本包实现一个单 goroutine 顺序事件循环（EventLoop），按优先级调度事件并调用用户提供的 `EventProcessor` 进行处理。
-- 设计目标：简单、可预测的顺序处理；入队并发安全；可通过 `EventProcessor` 实现并发或异步处理。
-- 支持帧驱动模式（frame-driven），按帧时间预算处理事件，适合游戏/实时渲染类场景。
-- 支持注入 `Metrics` 用于统计处理耗时与计数（默认 `NoopMetrics`）。
-- 回调投递支持 inline（同步）与 async（异步）两种模式，callback 分发器仅在异步模式下启动。
+A single-goroutine sequential event loop: three-priority scheduling, an optional frame-driven mode, request-reply callbacks, with injectable logging and metrics interfaces.
 
-## 核心类型（概念）
+## Features
 
-- `EventLoop`：事件循环主体，负责从优先级队列读取事件并处理。
-- `Event`：事件结构体，典型包含 `Priority`、`Payload`、`Callback`、`Ctx` 等字段。注意：包内字段已统一使用 `Payload`。
-- `EventProcessor`：处理器接口，定义 `Process(Event) Result`，由调用方实现实际业务逻辑。
-- `Result`：处理结果，通常含 `Err error` 字段，用于回调或上报处理状态。
-- `Metrics`：可选统计接口，记录提交/丢弃/处理计数和处理耗时快照。实现示例：`NoopMetrics` 与 `SimpleMetrics`。
+- **Three-priority scheduling**: `PriorityHigh` / `PriorityMedium` / `PriorityLow` — every cycle drains High first, then Medium, and defers Low into a local buffer (re-checking high/medium before each deferred item), so high-priority events are always handled earlier;
+- **Single-goroutine sequential processing**: every `Process` call runs serially on the event-loop goroutine, giving predictable ordering; submission is concurrency-safe;
+- **Frame-driven mode** (`frameDriven=true`): processes events against a fixed frame rate and per-frame time budget, suited to game main loops, real-time rendering and other time-sliced scenarios;
+- **Request-reply pattern**: `NewRequestEvent` hands you the event and its reply channel in one call;
+- **Two callback delivery modes**: inline (synchronously on the event-loop goroutine) and async (a dedicated dispatcher, the default);
+- **Injectable logging and metrics**: `SetLogger` / `SetMetrics`, defaulting to `NoopLogger` / `NoopMetrics`;
+- **Graceful stop**: `Stop` cancels the context and waits for the loop goroutines to exit.
 
-## 主要 API（示例签名）
+## Installation
 
-- `func NewEventLoop(bufferSize int, processor EventProcessor) *EventLoop`：创建实例。
-- `func (el *EventLoop) Start() error`：启动事件循环（在单独 goroutine 中运行）。
-- `func (el *EventLoop) Stop()`：优雅停止并等待循环结束。
-- `func (el *EventLoop) Submit(ev Event) error`：将事件入队（行为详见下文）。
-- `func (el *EventLoop) SetCallbackInline(inline bool, timeout time.Duration)`：切换回调投递模式。`inline=true` 表示在事件循环的 goroutine 内同步投递回调（可能阻塞事件循环）；`timeout` 控制同步投递的超时（`0` 表示无限等待）。注意建议在 `Start()` 之前设置以获得更确定的行为。
-- `func (el *EventLoop) SetMetrics(m Metrics)`：注入自定义 `Metrics` 实现（默认为 `NoopMetrics{}`）。
-- `func (el *EventLoop) IsRunning() bool`：检查事件循环是否正在运行。
-- `func (el *EventLoop) GetMetrics() Metrics`：获取当前使用的 `Metrics` 实例。
-- `func (el *EventLoop) SetFrameParameters(frameInterval, frameBudget, maxLowTime time.Duration)`：设置帧驱动模式下的参数，仅在 `frameDriven=true` 时生效。
+Standalone module with zero third-party dependencies:
 
-## 帧驱动模式（frame-driven）
+```bash
+go get github.com/tx7do/go-utils/eventloop@latest
+```
 
-- 打开帧驱动后，事件循环以固定帧率（`frameInterval`）触发每帧处理：
-  1. 在单帧内优先处理所有 High，然后 Medium，最后在剩余预算内处理 Low（受 `frameBudget` 与 `maxLowTime` 限制）。
-  2. 当单帧预算耗尽时，会提前返回以保证下帧继续处理。
-- 适用于需要时间片控制的场景（例如游戏主循环、实时渲染）。非实时场景请保持默认（frameDriven=false）。
+```go
+import "github.com/tx7do/go-utils/eventloop"
+```
 
-## 回调投递语义（重要）
-
-- 两种回调模式：
-  - 同步（inline）：在事件循环 goroutine 内直接将 `Result` 发送到 `Event.Callback`。可以设置超时以避免长期阻塞。该模式保证回调由事件循环逻辑线程投递，但可能对事件循环造成背压。
-  - 异步（async，默认）：事件循环把回调项封装为 `callbackItem` 放入内部 `callbackCh`，由独立的 `callbackDispatcher` 负责可靠投递（带重试直到超时或取消）。在该模式下回调不在事件循环 goroutine 中执行。
-- 实现细节：
-  - `Start()` 仅在异步模式下启动 `callbackDispatcher`。切换模式时内部通过互斥锁保护 `cbInline`/`cbTimeout` 的读写以避免数据竞争。
-  - 在异步模式且 `callbackCh` 满时，会启动后台重试 goroutine 去尝试入队直到超时或上下文取消；这可能在极端场景下产生较多短期 goroutine，生产环境可用固定 worker 池或限流替换该策略。
-  - 建议回调接收方在独立 goroutine 中消费 `Callback` channel，以避免阻塞或丢失（除非使用 inline 模式并接受阻塞语义）。
-
-## 优先级行为
-
-- 支持至少三个优先级：`PriorityHigh`、`PriorityMedium`、`PriorityLow`。
-- 事件循环在每个循环周期优先尝试读取高优先级，其次中、最后低，保证高优先级事件更早被处理。
-- 低优先级读取可采用阻塞或被取消的方式（参见实现细节）。
-
-## 并发与执行语义
-
-- 所有事件的 `Process` 调用均在同一个 goroutine（事件循环 goroutine）中串行执行，保证顺序可预测，但不绑定到特定 OS 线程。
-- `Submit`/`Dispatch` 可并发调用；它们将事件放入通道，入队是并发安全的。
-- 回调行为：
-  - 默认异步模式：事件循环不会在处理完成时阻塞于回调发送，采用内部队列并由分发器投递；当内部队列满且重试超时后，结果可能被丢弃并记录。
-  - inline 模式：回调由事件循环 goroutine 直接投递，可能阻塞事件循环；可设置超时以限制阻塞时间。
-- 若需要严格的 OS 线程绑定，请在业务中使用 `runtime.LockOSThread()` 并谨慎设计；大多数场景不需要。
-
-## Metrics
-
-- `Metrics` 接口用于统计事件循环关键指标，包含：
-  - 提交/丢弃/处理计数（按优先级）
-  - 回调丢弃与 inline 超时计数
-  - 记录处理耗时并提供快照（平均处理耗时纳秒）
-- 提供实现：
-  - `NoopMetrics`：空实现，默认使用。
-  - `SimpleMetrics`：内存中基于原子计数的实现，适合测试和轻量监控。
-- 使用示例：
-  - `el.SetMetrics(NewSimpleMetrics())` 在 `Start()` 之前注入。
-
-## 使用示例
-
-自由驱动模式下的简单用法：
+## Quick Start
 
 ```go
 package main
 
 import (
-  "context"
-  "fmt"
-  "time"
+	"context"
+	"fmt"
+	"time"
 
-  "github.com/tx7do/go-utils/eventloop"
+	"github.com/tx7do/go-utils/eventloop"
 )
 
 type myProc struct{}
 
 func (p *myProc) Process(ev eventloop.Event) eventloop.Result {
-  fmt.Println("process:", ev.Payload)
-  return eventloop.Result{}
+	fmt.Println("process:", ev.Data) // the field is named Data
+	return eventloop.Result{}
 }
 
 func main() {
-  el := eventloop.NewEventLoop(64, &myProc{}, false)
+	// NewEventLoop(bufferSize, processor, frameDriven): bufferSize<=0 falls back to the default 100
+	el := eventloop.NewEventLoop(64, &myProc{}, false)
 
-  // 可选：在 Start 之前选择回调模式；inline=true 表示在事件循环 goroutine 内投递回调
-  el.SetCallbackInline(false, time.Second) // 使用异步分发（默认）并设置超时
+	// Optional: callback mode. false = async dispatch (default), 1s timeout
+	el.SetCallbackInline(false, time.Second)
 
-  _ = el.Start()
-  defer el.Stop()
+	if err := el.Start(); err != nil {
+		panic(err)
+	}
+	defer el.Stop()
 
-  // 若传回调，可用 buffered channel 接收结果
-  cb := make(chan eventloop.Result, 1)
-  el.Submit(eventloop.Event{Priority: eventloop.PriorityHigh, Payload: "hello", Ctx: context.Background(), Callback: cb})
+	// Request-reply: one call yields the event and its reply channel
+	ev, reply := eventloop.NewRequestEvent("calc.add", "hello")
+	ev.Priority = eventloop.PriorityHigh // Event is returned by value; fields can be set before Submit
+	ev.Ctx = context.Background()
+	if err := el.Submit(ev); err != nil {
+		panic(err)
+	}
 
-  // 在独立 goroutine 中读取回调（避免阻塞事件循环）
-  go func() {
-    select {
-    case r := <-cb:
-      fmt.Println("callback result:", r)
-    case <-time.After(2 * time.Second):
-      fmt.Println("callback timeout")
-    }
-  }()
-
-  time.Sleep(100 * time.Millisecond)
+	select {
+	case r := <-reply:
+		fmt.Println("callback result:", r)
+	case <-time.After(2 * time.Second):
+		fmt.Println("callback timeout")
+	}
 }
 ```
 
-帧驱动模式下的用法：
+## Core API
+
+### Creation & Lifecycle
 
 ```go
-// 创建帧驱动模式的事件循环
-el := eventloop.NewEventLoop(64, myProcessor, true)
+// bufferSize<=0 falls back to the default 100; processor may be nil (callback-carrying events
+// then receive ErrNoEventProcessor via their callback); frameDriven=true selects the frame loop.
+func NewEventLoop(bufferSize int, processor EventProcessor, frameDriven bool) *EventLoop
 
-// 可选：设置回调为异步并设置超时
-el.SetCallbackInline(false, time.Second)
-
-// 可选：注入 metrics
-el.SetMetrics(eventloop.NewSimpleMetrics())
-
-// 在 Start 之前微调帧参数（仅在 frameDriven=true 时生效）
-el.frameInterval = 16 * time.Millisecond
-el.frameBudget = 10 * time.Millisecond
-el.maxLowTime = 2 * time.Millisecond
-
-_ = el.Start()
-defer el.Stop()
+func (el *EventLoop) Start() error          // idempotent: returns nil if already running; waits for the readiness signal (up to 50ms, still returns nil on timeout)
+func (el *EventLoop) Stop()                 // graceful stop: cancels the context and waits for all goroutines
+func (el *EventLoop) IsRunning() bool
 ```
 
-## 测试与验证
+### Submitting Events
 
-- 运行 `go test ./...` 以执行单元测试。
-- 关键测试覆盖项（示例）：
-  - 优先级调度（高/中/低 的处理顺序）。
-  - nil 处理器时通过回调返回错误的场景。
-  - 异步回调队列满时的重试/超时行为。
-  - inline 模式下回调在事件循环 goroutine 中投递且超时控制生效。
+```go
+// Non-blocking submit: a full queue returns the matching Err*QueueFull immediately; an
+// unrecognized priority returns ErrUnknownPriority; a stopped loop returns ErrEventLoopNotRunning.
+func (el *EventLoop) Submit(event Event) error
 
-## 注意事项
+// Blocking submit: waits for queue space, the caller's ctx cancellation (returns ctx.Err()),
+// or the loop stopping (returns ErrEventLoopStopped).
+func (el *EventLoop) SubmitBlocking(ctx context.Context, event Event) error
+```
 
-- 如果业务要求严格的线程亲和性（OS 线程绑定），需使用 `runtime.LockOSThread()` 并谨慎设计；大多数场景不需要。
-- 处理器内部若执行耗时或阻塞操作，应自行并行化以避免阻塞整个循环。
-- 回调策略为非阻塞写入，调用方若需保证回调可靠性，应使用有足够缓冲或外部同步机制。
+### Events & Request-Reply (`event.go`)
+
+```go
+type Event struct {
+    Priority Priority        // priority (default PriorityLow)
+    Type     string          // event type
+    Data     any             // event payload (note: the field is Data, not Payload)
+    Callback chan Result     // reply channel (may be nil)
+    Ctx      context.Context // event context (may be nil; falls back to the loop's ctx)
+    TS       time.Time       // set to time.Now() by NewEvent
+}
+
+type Result struct {
+    Data any
+    Err  error
+}
+
+// Build an event: default PriorityLow, TS set automatically, options override via chaining.
+func NewEvent(typ string, payload any, opts ...EventOption) Event
+
+// Request-reply: returns the event and a capacity-1 reply channel (WithCallback applied internally).
+func NewRequestEvent(typ string, payload any) (Event, chan Result)
+
+func WithPriority(p Priority) EventOption
+func WithContext(ctx context.Context) EventOption
+func WithCallback(cb chan Result) EventOption
+```
+
+### Configuration Injection
+
+```go
+// Inject a Logger (NoopLogger / NewStdLogger or your own); nil resets to NoopLogger.
+func (el *EventLoop) SetLogger(l Logger)
+
+// Inject a Metrics implementation (e.g. NewSimpleMetrics()); nil resets to NoopMetrics.
+func (el *EventLoop) SetMetrics(m Metrics)
+
+// Switch callback delivery mode: inline=true delivers synchronously on the event-loop
+// goroutine (may block the loop); timeout bounds that delivery, 0 meaning wait forever.
+// Prefer setting this before Start().
+func (el *EventLoop) SetCallbackInline(inline bool, timeout time.Duration)
+
+// Set frame-driven parameters. Non-positive interval/budget keep the current value;
+// a negative maxLow keeps the current value (0 is accepted). Prefer calling before Start().
+func (el *EventLoop) SetFrameParameters(interval, budget, maxLow time.Duration)
+```
+
+### Observation
+
+```go
+// Instantaneous snapshot of the internal channel lengths (non-blocking): High / Medium / Low / Callback.
+func (el *EventLoop) QueueLengths() QueueLengths
+```
+
+## Frame-Driven Mode
+
+With `NewEventLoop(…, true)`, the loop beats at `frameInterval` and processes per frame:
+
+1. Each frame drains all High events first, then all Medium, then processes Low within the remaining budget;
+2. When the frame budget (`frameBudget`) is exhausted it returns immediately, leaving the rest for the next frame; Low is additionally bounded by `maxLowTime`;
+3. Default constants (`event.go`): `FrameInterval = 50ms` (20Hz), `FrameBudget = 25ms`, `MaxLowTime = 2ms`.
+
+Tuning goes through `SetFrameParameters` (before `Start()` or at any time) — the three fields are unexported and cannot be assigned from outside the package:
+
+```go
+el := eventloop.NewEventLoop(64, myProcessor, true)
+el.SetFrameParameters(16*time.Millisecond, 10*time.Millisecond, 2*time.Millisecond)
+_ = el.Start()
+```
+
+Keep `frameDriven=false` (free-running: events are processed as they arrive, no frame cadence) for non-realtime scenarios.
+
+## Callback Delivery Semantics
+
+Two modes (switch with `SetCallbackInline`, ideally before `Start()`):
+
+- **Async (default)**: callback items enter an internal `callbackCh`; a dedicated `callbackDispatcher` goroutine delivers them reliably (retrying until delivered, the callback side cancels, or `cbTimeout` expires and the result is discarded with a log). Callbacks do not run on the event-loop goroutine; `Start()` launches the dispatcher only in this mode.
+- **Synchronous (inline)**: the event-loop goroutine sends the `Result` straight to `Event.Callback`; `cbTimeout=0` waits forever (potentially blocking the loop for a long time), otherwise it gives up and logs after the timeout. Guarantees delivery on the loop thread but applies backpressure to the loop.
+
+Queue-full fallback: when `callbackCh` is full, a background goroutine retries the enqueue until delivered, the event's ctx is cancelled, the loop stops, or the timeout gives up — under extreme pressure this can spawn many short-lived goroutines, so production deployments may swap in a fixed worker pool.
+
+Consumers should drain the `Callback` channel from their own goroutine (the `NewRequestEvent` reply channel has capacity 1 — read it promptly after `Submit`).
+
+## Metrics
+
+The `Metrics` interface counts submitted/dropped/processed per priority, callback discards and inline timeouts, and observes processing durations; `Snapshot()` returns a read-only snapshot (including per-priority average processing nanoseconds). Built-in implementations:
+
+- `NoopMetrics{}`: the default, zero overhead;
+- `NewSimpleMetrics()`: atomic-counter based, suitable for tests and lightweight monitoring.
+
+```go
+m := eventloop.NewSimpleMetrics()
+el.SetMetrics(m)
+// after running for a while:
+snap := m.Snapshot()
+```
+
+`el.QueueLengths()` additionally observes instantaneous per-queue backlog.
+
+## Error Sentinels (`errors.go`)
+
+```go
+var (
+    ErrEventLoopNotRunning           // loop not started, from Submit/SubmitBlocking
+    ErrEventLoopStopped              // the loop was Stop()ed while SubmitBlocking waited
+    ErrNoEventProcessor              // processor is nil: callback-carrying events get this via their callback
+    ErrHighQueueFull                 // high-priority queue full
+    ErrMediumQueueFull               // medium-priority queue full
+    ErrLowQueueFull                  // low-priority queue full
+    ErrUnknownPriority               // priority not one of High/Medium/Low
+)
+```
+
+## Priority & Concurrency Semantics
+
+- Every `Process` runs serially on the event-loop goroutine — predictable ordering, but not pinned to a specific OS thread; if you need strict thread affinity, use `runtime.LockOSThread()` in your business code and design carefully;
+- `Submit` / `SubmitBlocking` are safe for concurrent callers; enqueueing is concurrency-safe;
+- In free-running mode Low events are buffered locally (deferredLow), and high/medium are re-drained before each deferred item — a sustained high-priority flood can starve Low;
+- An event whose `Ctx` is already cancelled or expired never reaches the processor: callback-carrying events receive `ctx.Err()` through the callback; those without a callback are dropped silently.
+
+## Notes / Caveats
+
+- **Do not block for long inside `Process`**: the whole loop stalls behind that one call (and the frame budget is blown in frame-driven mode); parallelize slow work inside the processor itself;
+- **Frame-loop logging uses the standard log package**: the frame loop's start/stop and "frame budget exceeded" messages go through plain `log.Println`, not the Logger injected via `SetLogger` (the injected Logger covers callback discard/timeout warnings);
+- `Submit` is non-blocking — use `SubmitBlocking` or add your own buffering when you need backpressure;
+- Events still sitting in the channels when `Stop` returns were never processed; to "drain then stop", wait for `QueueLengths()` to reach zero in your own layer before calling `Stop`.

@@ -1,30 +1,36 @@
-# Captcha 验证码模块
+# captcha
 
-一个高度可定制的验证码模块，支持多种驱动类型和丰富的配置选项。
+English | [简体中文](README.zh-CN.md)
 
-## 特性
+`captcha` is a standalone Go module (`github.com/tx7do/go-utils/captcha`) providing highly customizable CAPTCHAs with multiple driver types and rich configuration, backed by Redis for storage and verification.
 
-- ✅ 支持多种验证码类型：数字、字符串、算术、中文、**滑动拼图**、**点击文字**、**旋转图片**
-- ✅ 完全可定制的外观和行为
-- ✅ 基于 Redis 的存储和验证
-- ✅ 自动过期管理
-- ✅ 灵活的配置选项
+## Features
 
-## 安装
+- Seven CAPTCHA types: digit, string, math, Chinese, slide-jigsaw, click-text, rotate-image
+- Two configuration styles: functional Options and a `Config` object
+- Redis-backed storage, expiration, and one-shot verification
+- Behavioral CAPTCHAs (slide/click/rotate) with built-in pixel/degree tolerance
+
+## Installation
+
+This package is a standalone module (it has its own `go.mod`), not a subpackage of the root module `github.com/tx7do/go-utils`:
 
 ```bash
 go get github.com/tx7do/go-utils/captcha
 ```
 
-## 快速开始
+```go
+import "github.com/tx7do/go-utils/captcha"
+```
 
-### 使用 Options 模式（推荐）
+## Quick Start
 
 ```go
 package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -32,12 +38,11 @@ import (
 )
 
 func main() {
-	// 创建 Redis 客户端
 	rdb := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379",
 	})
 
-	// 使用 Options 模式创建验证码实例
+	// Create a captcha instance with functional options
 	captchaInstance := captcha.NewCaptcha(rdb,
 		captcha.WithDriverType(captcha.DriverString),
 		captcha.WithExpire(10*time.Minute),
@@ -46,79 +51,57 @@ func main() {
 		captcha.WithStringSource("ABCDEFGHJKLMNPQRSTUVWXYZ23456789"),
 	)
 
-	// 生成验证码
+	// Generate: returns (id, base64 image, answer, err)
 	id, b64Image, answer, err := captchaInstance.Generate()
 	if err != nil {
 		panic(err)
 	}
 
-	// 保存验证码到 Redis
+	// Save the answer in Redis (key prefix + id)
 	ctx := context.Background()
-	err = captchaInstance.Save(ctx, id, answer)
-	if err != nil {
+	if err := captchaInstance.Save(ctx, id, answer); err != nil {
 		panic(err)
 	}
 
-	// 验证用户输入
+	// Verify the user input
+	userInput := "AB3dEf" // characters submitted by the user (from a front-end form)
 	isValid, err := captchaInstance.Verify(ctx, id, userInput)
 	if err != nil {
 		panic(err)
 	}
-
 	if isValid {
-		println("验证成功")
+		fmt.Println("verified")
 	} else {
-		println("验证失败")
+		fmt.Println("verification failed")
 	}
 }
 ```
 
-### 使用配置对象
+### Using a Config Object
 
 ```go
-package main
+config := captcha.DefaultConfig() // returns *Config with every field defaulted
+config.DriverType = captcha.DriverString
+config.Expire = 10 * time.Minute
+config.KeyPrefix = "myapp:captcha"
 
-import (
-	"context"
-	"time"
-
-	"github.com/redis/go-redis/v9"
-	"github.com/tx7do/go-utils/captcha"
-)
-
-func main() {
-	// 创建 Redis 客户端
-	rdb := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-
-	// 创建自定义配置
-	config := captcha.DefaultConfig()
-	config.DriverType = captcha.DriverString
-	config.Expire = 10 * time.Minute
-	config.KeyPrefix = "myapp:captcha"
-
-	// 自定义字符串验证码配置
-	config.StringConfig = &captcha.StringConfig{
-		Height:       100,
-		Width:        300,
-		CaptchaCount: 6,
-		DotCount:     100,
-		Source:       "ABCDEFGHJKLMNPQRSTUVWXYZ23456789",
-	}
-
-	// 创建验证码实例
-	captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
-
-	// ... 其他操作同上
+config.StringConfig = &captcha.StringConfig{
+	Height:       100,
+	Width:        300,
+	CaptchaCount: 6,
+	DotCount:     100,
+	Source:       "ABCDEFGHJKLMNPQRSTUVWXYZ23456789",
 }
+
+captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
 ```
 
-## 支持的验证码类型
+## CAPTCHA Types
 
-### 1. 数字验证码 (DriverDigit)
+> The per-type examples below are fragments; they reuse the imports from Quick Start (plus `encoding/json`) and the `rdb`/`captchaInstance`/`ctx` variables.
 
-**使用 Options：**
+### 1. Digit (DriverDigit)
+
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
 	captcha.WithDriverType(captcha.DriverDigit),
@@ -128,23 +111,8 @@ captchaInstance := captcha.NewCaptcha(rdb,
 )
 ```
 
-**使用配置对象：**
-```go
-config := captcha.DefaultConfig()
-config.DriverType = captcha.DriverDigit
-config.DigitConfig = &captcha.DigitConfig{
-	Height:       80,
-	Width:        240,
-	CaptchaCount: 4,      // 4位数字
-	MaxSkew:      0.7,
-	DotCount:     80,
-}
-captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
-```
+### 2. String (DriverString)
 
-### 2. 字符串验证码 (DriverString)
-
-**使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
 	captcha.WithDriverType(captcha.DriverString),
@@ -155,51 +123,19 @@ captchaInstance := captcha.NewCaptcha(rdb,
 )
 ```
 
-**使用配置对象：**
-```go
-config := captcha.DefaultConfig()
-config.DriverType = captcha.DriverString
-config.StringConfig = &captcha.StringConfig{
-	Height:       80,
-	Width:        240,
-	CaptchaCount: 6,      // 6个字符
-	MaxSkew:      0.7,
-	DotCount:     80,
-	Source:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-}
-captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
-```
+### 3. Math (DriverMath)
 
-### 3. 算术验证码 (DriverMath)
-
-**使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
 	captcha.WithDriverType(captcha.DriverMath),
 	captcha.WithMathHeight(80),
 	captcha.WithMathWidth(240),
 )
-// 生成的验证码类似: "3 + 5 = ?"，答案是 "8"
+// Generates something like "3+5=?" with answer "8"
 ```
 
-**使用配置对象：**
-```go
-config := captcha.DefaultConfig()
-config.DriverType = captcha.DriverMath
-config.MathConfig = &captcha.MathConfig{
-	Height:       80,
-	Width:        240,
-	CaptchaCount: 4,
-	MaxSkew:      0.7,
-	DotCount:     80,
-}
-captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
-// 生成的验证码类似: "3 + 5 = ?"，答案是 "8"
-```
+### 4. Chinese (DriverChinese)
 
-### 4. 中文验证码 (DriverChinese)
-
-**使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
 	captcha.WithDriverType(captcha.DriverChinese),
@@ -208,557 +144,319 @@ captchaInstance := captcha.NewCaptcha(rdb,
 )
 ```
 
-**使用配置对象：**
-```go
-config := captcha.DefaultConfig()
-config.DriverType = captcha.DriverChinese
-config.ChineseConfig = &captcha.ChineseConfig{
-	Height:       80,
-	Width:        240,
-	CaptchaCount: 4,      // 4个汉字
-	MaxSkew:      0.7,
-	DotCount:     80,
-	Language:     "zh",   // 中文
-}
-captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
-```
+### 5. Slide Jigsaw (DriverSlide)
 
-### 5. 滑动拼图验证码 (DriverSlide) 
+The user drags a tile to the gap position.
 
-滑动拼图验证码是一种行为式验证码，用户需要将滑块拖动到正确位置。
-
-**使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
 	captcha.WithDriverType(captcha.DriverSlide),
-	captcha.WithSlideMasterSize(300, 220),  // 主图尺寸
-	captcha.WithSlideTileSize(60, 60),      // 滑块尺寸
+	captcha.WithSlideMasterSize(300, 220), // master image size
+	captcha.WithSlideTileSize(60, 60),     // tile width (height is a reserved field)
 )
 
-// 生成验证码
 id, jsonData, answer, err := captchaInstance.Generate()
 if err != nil {
 	panic(err)
 }
 
-// 解析返回的 JSON 数据
+// jsonData is the JSON encoding of SlideCaptchaData
 var slideData captcha.SlideCaptchaData
-json.Unmarshal([]byte(jsonData), &slideData)
+_ = json.Unmarshal([]byte(jsonData), &slideData)
+// slideData.MasterImage - master image base64 (with the gap)
+// slideData.TileImage   - tile image base64
+// slideData.XPosition   - gap X coordinate (see the security note below)
+// slideData.ID          - built from the gap coordinates as "X_Y" (see the security note below)
 
-// slideData.MasterImage - 主图 base64（带缺口）
-// slideData.TileImage   - 滑块图 base64
-// slideData.XPosition   - 缺口的 X 坐标（正确答案）
-
-// 保存验证码
+// Save the answer (the answer is the gap X coordinate as a string)
 ctx := context.Background()
-err = captchaInstance.Save(ctx, id, answer)
+_ = captchaInstance.Save(ctx, id, answer)
 
-// 验证用户滑动的位置（允许 ±5 像素误差）
-userX := getUserInput() // 前端传来的 X 坐标
+// Verify: userInput is the user's X coordinate as a string; tolerance is ±5 px
+userX := 123 // X coordinate from the front end
 isValid, err := captchaInstance.Verify(ctx, id, fmt.Sprintf("%d", userX))
 ```
 
-**使用配置对象：**
-```go
-config := captcha.DefaultConfig()
-config.DriverType = captcha.DriverSlide
-config.SlideConfig = &captcha.SlideConfig{
-	MasterWidth:  300,  // 主图宽度
-	MasterHeight: 220,  // 主图高度
-	TileWidth:    60,   // 滑块宽度
-	TileHeight:   60,   // 滑块高度
-	TileRadius:   5,    // 滑块圆角半径
-	JigsawRadius: 10,   // 拼图缺口圆角半径
-}
-captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
-```
+### 6. Click Text (DriverClick)
 
-**前端集成示例：**
-```javascript
-// 1. 从后端获取验证码数据
-fetch('/api/captcha/generate')
-  .then(res => res.json())
-  .then(data => {
-    // data.json_data 是 JSON 字符串
-    const slideData = JSON.parse(data.json_data);
-    
-    // 显示主图和滑块
-    document.getElementById('master').src = slideData.master_image;
-    document.getElementById('tile').src = slideData.tile_image;
-    
-    // 记录验证码 ID
-    window.captchaId = data.id;
-  });
+The user clicks the specified characters in order.
 
-// 2. 用户滑动后提交
-function onSlideComplete(userX) {
-  fetch('/api/captcha/verify', {
-    method: 'POST',
-    body: JSON.stringify({
-      id: window.captchaId,
-      x: userX  // 用户滑动的 X 坐标
-    })
-  });
-}
-```
-
-### 6. 点击文字验证码 (DriverClick)
-
-点击文字验证码是一种行为式验证码，用户需要按顺序点击图中指定的文字。
-
-**使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
 	captcha.WithDriverType(captcha.DriverClick),
-	captcha.WithClickMasterSize(300, 220),   // 主图尺寸
-	captcha.WithClickThumbSize(150, 40),     // 缩略图尺寸
-	captcha.WithClickCaptchaCount(6),        // 主图显示6个字符
-	captcha.WithClickVerifyCount(3),         // 需要点击3个字符
+	captcha.WithClickMasterSize(300, 220), // master image size
+	captcha.WithClickCaptchaCount(6),      // show 6 characters on the master image
+	captcha.WithClickVerifyCount(3),       // 3 characters must be clicked in order
 	captcha.WithClickChars("这的是随了机文我你他字"),
 )
 
-// 生成验证码
 id, jsonData, answer, err := captchaInstance.Generate()
 if err != nil {
 	panic(err)
 }
 
-// 解析返回的 JSON 数据
+// jsonData is the JSON encoding of ClickCaptchaData
 var clickData captcha.ClickCaptchaData
-json.Unmarshal([]byte(jsonData), &clickData)
+_ = json.Unmarshal([]byte(jsonData), &clickData)
+// clickData.MasterImage - master image base64 (randomly placed characters)
+// clickData.ThumbImage  - thumb image base64 (shows the characters to click)
+// clickData.Dots        - correct answer coordinates (map[int]*Dot)
 
-// clickData.MasterImage - 主图 base64（随机分布的字符）
-// clickData.ThumbImage  - 缩略图 base64（提示要点击的字符）
-// clickData.Dots        - 正确答案的坐标信息
-
-// 保存验证码
+// Save the answer
 ctx := context.Background()
-err = captchaInstance.Save(ctx, id, answer)
+_ = captchaInstance.Save(ctx, id, answer)
 
-// 验证用户点击的坐标（允许 ±10 像素误差）
-// 前端传来用户点击的坐标数组：[{x: 100, y: 50}, {x: 150, y: 80}, ...]
-userClicksJSON := `[{"x":100,"y":50},{"x":150,"y":80}]`
+// Verify: userInput is a JSON array of coordinates in click order; tolerance is ±10 px
+userClicksJSON := `[{"x":100,"y":50},{"x":150,"y":80},{"x":200,"y":120}]`
 isValid, err := captchaInstance.Verify(ctx, id, userClicksJSON)
 ```
 
-**使用配置对象：**
-```go
-config := captcha.DefaultConfig()
-config.DriverType = captcha.DriverClick
-config.ClickConfig = &captcha.ClickConfig{
-	MasterWidth:   300,
-	MasterHeight:  220,
-	ThumbWidth:    150,
-	ThumbHeight:   40,
-	CaptchaCount:  6,    // 主图显示6个字符
-	VerifyCount:   3,    // 需要点击3个字符
-	DisplayShadow: true,
-	ShadowColor:   "#000000",
-	Chars:         "这的是随了机文我你他字",
-	Language:      "zh",
-}
-captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
-```
+### 7. Rotate Image (DriverRotate)
 
-**前端集成示例：**
-```javascript
-// 1. 从后端获取验证码数据
-fetch('/api/captcha/generate')
-  .then(res => res.json())
-  .then(data => {
-    const clickData = JSON.parse(data.json_data);
-    
-    // 显示主图和缩略图
-    document.getElementById('master').src = clickData.master_image;
-    document.getElementById('thumb').src = clickData.thumb_image;
-    
-    // 记录验证码 ID
-    window.captchaId = data.id;
-    
-    // 存储正确的点击点（用于验证）
-    window.correctDots = clickData.dots;
-  });
+The user rotates the image to the correct angle.
 
-// 2. 用户点击后收集坐标
-let userClicks = [];
-document.getElementById('master').addEventListener('click', function(e) {
-  const rect = this.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  userClicks.push({x: x, y: y});
-  
-  // 当点击次数达到要求时提交
-  if (userClicks.length === Object.keys(window.correctDots).length) {
-    fetch('/api/captcha/verify', {
-      method: 'POST',
-      body: JSON.stringify({
-        id: window.captchaId,
-        clicks: userClicks
-      })
-    });
-  }
-});
-```
-
-### 7. 旋转图片验证码 (DriverRotate)
-
-旋转图片验证码是一种行为式验证码，用户需要旋转图片到正确的角度。
-
-**使用 Options：**
 ```go
 captchaInstance := captcha.NewCaptcha(rdb,
 	captcha.WithDriverType(captcha.DriverRotate),
-	captcha.WithRotateMasterSize(300, 300),   // 主图尺寸
-	captcha.WithRotateThumbSize(150, 150),    // 缩略图尺寸
 )
 
-// 生成验证码
 id, jsonData, answer, err := captchaInstance.Generate()
 if err != nil {
 	panic(err)
 }
 
-// 解析返回的 JSON 数据
+// jsonData is the JSON encoding of RotateCaptchaData
 var rotateData captcha.RotateCaptchaData
-json.Unmarshal([]byte(jsonData), &rotateData)
+_ = json.Unmarshal([]byte(jsonData), &rotateData)
+// rotateData.MasterImage - master image base64 (to be rotated)
+// rotateData.ThumbImage  - thumb image base64 (target orientation)
+// rotateData.Angle       - correct angle
 
-// rotateData.MasterImage - 主图 base64（需要旋转的图片）
-// rotateData.ThumbImage  - 缩略图 base64（提示目标方向）
-// rotateData.Angle       - 正确的旋转角度
-
-// 保存验证码
+// Save the answer (the answer is the angle as a string)
 ctx := context.Background()
-err = captchaInstance.Save(ctx, id, answer)
+_ = captchaInstance.Save(ctx, id, answer)
 
-// 验证用户旋转的角度（允许 ±5 度误差）
-// 前端传来用户旋转的角度值（字符串形式）
-userAngle := "90"  // 用户旋转了90度
+// Verify: userInput is the angle as a string; tolerance is ±5 degrees (wrapped over 360)
+userAngle := "90"
 isValid, err := captchaInstance.Verify(ctx, id, userAngle)
 ```
 
-**使用配置对象：**
+> Note: the rotate image dimensions are determined by the upstream `go-captcha` default resources. `WithRotateMasterSize` / `WithRotateThumbSize` / `RotateConfig` are currently **not** read (see "Reserved fields" below).
+
+## Configuration
+
+### Functional Options
+
+**Common:**
+
+| Option | Description |
+|--------|-------------|
+| `WithDriverType(driverType DriverType)` | Driver type (digit/string/math/chinese/slide/click/rotate) |
+| `WithExpire(expire time.Duration)` | Redis storage TTL |
+| `WithKeyPrefix(prefix string)` | Redis key prefix |
+
+**Digit:** `WithDigitHeight` / `WithDigitWidth` / `WithDigitCount` / `WithDigitMaxSkew` / `WithDigitDotCount` / `WithDigitConfig(*DigitConfig)`
+
+**String:** `WithStringHeight` / `WithStringWidth` / `WithStringCount` / `WithStringSource` / `WithStringDotCount` / `WithStringConfig(*StringConfig)`
+
+**Math:** `WithMathHeight` / `WithMathWidth` / `WithMathDotCount` / `WithMathConfig(*MathConfig)`
+
+**Chinese:** `WithChineseHeight` / `WithChineseWidth` / `WithChineseCount` / `WithChineseLanguage` / `WithChineseDotCount` / `WithChineseConfig(*ChineseConfig)`
+
+**Slide:** `WithSlideMasterSize(width, height)` / `WithSlideTileSize(width, height)` / `WithSlideTileRadius` / `WithSlideJigsawRadius` / `WithSlideShadow(offsetX, offsetY, blur)` / `WithSlideConfig(*SlideConfig)`
+
+**Click:** `WithClickMasterSize(width, height)` / `WithClickThumbSize(width, height)` / `WithClickCaptchaCount` / `WithClickVerifyCount` / `WithClickChars` / `WithClickLanguage` / `WithClickShadow(display, color, offsetX, offsetY)` / `WithClickConfig(*ClickConfig)`
+
+**Rotate:** `WithRotateMasterSize(width, height)` / `WithRotateThumbSize(width, height)` / `WithRotateConfig(*RotateConfig)`
+
+### Default Config Factories
+
+`DefaultConfig()` and per-driver defaults are available as factory functions (they return pointers you can mutate and pass to `NewCaptchaWithConfig`):
+
 ```go
-config := captcha.DefaultConfig()
-config.DriverType = captcha.DriverRotate
-config.RotateConfig = &captcha.RotateConfig{
-	MasterWidth:  300,
-	MasterHeight: 300,
-	ThumbWidth:   150,
-	ThumbHeight:  150,
+func DefaultConfig() *Config           // DriverDigit, Expire=5m, KeyPrefix="captcha", all sub-configs
+func DefaultDigitConfig() *DigitConfig
+func DefaultStringConfig() *StringConfig
+func DefaultMathConfig() *MathConfig
+func DefaultChineseConfig() *ChineseConfig
+func DefaultSlideConfig() *SlideConfig
+func DefaultClickConfig() *ClickConfig
+func DefaultRotateConfig() *RotateConfig
+```
+
+### Config Structures
+
+#### Common (Config)
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| DriverType | DriverType | Driver type | `DriverDigit` |
+| Expire | time.Duration | Storage TTL | 5 minutes |
+| KeyPrefix | string | Redis key prefix | `captcha` |
+| DigitConfig / StringConfig / MathConfig / ChineseConfig / SlideConfig / ClickConfig / RotateConfig | *XxxConfig | Per-driver configs | their own defaults |
+
+#### Flat CAPTCHAs (Digit/String/Math/Chinese) Common Fields
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| Height | int | Image height | 80 |
+| Width | int | Image width | 240 |
+| CaptchaCount | int | Character count | 4 |
+| MaxSkew | float64 | Maximum skew | 0.7 |
+| DotCount | int | Noise dot count | 80 |
+| BgColorR/G/B | uint8 | Background RGB | 255, 255, 255 |
+| FontColorR/G/B | uint8 | Font RGB | 0, 0, 0 |
+
+Extra fields:
+
+- `StringConfig.Source`: character source (default `abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`)
+- `ChineseConfig.Language`: language (default `zh`)
+
+> Fields actually consumed per driver (determined by the upstream `base64Captcha` driver constructors):
+>
+> - Digit: `Height/Width/CaptchaCount/MaxSkew/DotCount`
+> - String: `Height/Width/CaptchaCount/DotCount/Source`
+> - Math: `Height/Width/DotCount` (`CaptchaCount/MaxSkew` do not affect the generated arithmetic question)
+> - Chinese: `Height/Width/CaptchaCount/DotCount/Language`
+>
+> `BgColor*/FontColor*` for all flat drivers, and `MaxSkew` for String/Math/Chinese, are not passed to the driver constructors, so setting them has no effect.
+
+#### Slide (SlideConfig)
+
+| Field | Type | Description | Default | Currently effective |
+|-------|------|-------------|---------|---------------------|
+| MasterWidth | int | Master image width | 300 | Yes |
+| MasterHeight | int | Master image height | 220 | Yes |
+| TileWidth | int | Tile width | 60 | Yes |
+| TileHeight | int | Tile height | 60 | **Reserved, not effective yet** |
+| TileRadius | int | Tile corner radius | 5 | **Reserved, not effective yet** |
+| JigsawRadius | int | Jigsaw gap radius | 10 | **Reserved, not effective yet** |
+| ShadowOffsetX | int | Shadow X offset | 5 | **Reserved, not effective yet** |
+| ShadowOffsetY | int | Shadow Y offset | 5 | **Reserved, not effective yet** |
+| ShadowBlur | int | Shadow blur | 10 | **Reserved, not effective yet** |
+
+#### Click (ClickConfig)
+
+| Field | Type | Description | Default | Currently effective |
+|-------|------|-------------|---------|---------------------|
+| MasterWidth | int | Master image width | 300 | Yes |
+| MasterHeight | int | Master image height | 220 | Yes |
+| ThumbWidth | int | Thumb image width | 150 | **Reserved, not effective yet** |
+| ThumbHeight | int | Thumb image height | 40 | **Reserved, not effective yet** |
+| CaptchaCount | int | Characters on the master image | 6 | Yes |
+| VerifyCount | int | Characters to click in order | 3 | Yes |
+| DisplayShadow | bool | Show shadow | true | Yes |
+| ShadowColor | string | Shadow color | `#000000` | Yes |
+| ShadowOffsetX | int | Shadow X offset | 2 | Yes |
+| ShadowOffsetY | int | Shadow Y offset | 2 | Yes |
+| Chars | string | Character set | 这的是随了机文我你他字在有不么中 | Yes |
+| Language | string | Language | zh | **Reserved, not effective yet** |
+
+#### Rotate (RotateConfig)
+
+| Field | Type | Description | Default | Currently effective |
+|-------|------|-------------|---------|---------------------|
+| MasterWidth | int | Master image width | 300 | **Reserved, not effective yet** |
+| MasterHeight | int | Master image height | 300 | **Reserved, not effective yet** |
+| ThumbWidth | int | Thumb image width | 150 | **Reserved, not effective yet** |
+| ThumbHeight | int | Thumb image height | 150 | **Reserved, not effective yet** |
+
+> **About reserved fields**: the slide builder reads only `MasterWidth/MasterHeight/TileWidth`; the click builder reads only `master size/CaptchaCount/VerifyCount/the three shadow fields/Chars`; the rotate CAPTCHA is always built with a plain `rotate.NewBuilder()` and reads no `RotateConfig` fields. These option functions can be called without error, but they do not affect generation.
+
+## API Reference
+
+### Constructors
+
+```go
+func NewCaptcha(rdb *redis.Client, opts ...Option) *Captcha
+func NewCaptchaWithConfig(rdb *redis.Client, config *Config) *Captcha  // nil config falls back to DefaultConfig()
+```
+
+### Data Structures
+
+```go
+type SlideCaptchaData struct {
+	ID          string `json:"id"`           // built from the gap coordinates: "X_Y"
+	MasterImage string `json:"master_image"` // master image base64
+	TileImage   string `json:"tile_image"`   // tile image base64
+	XPosition   int    `json:"x_position"`   // gap X coordinate (the correct answer)
 }
-captchaInstance := captcha.NewCaptchaWithConfig(rdb, config)
-```
 
-**前端集成示例：**
-```javascript
-// 1. 从后端获取验证码数据
-fetch('/api/captcha/generate')
-  .then(res => res.json())
-  .then(data => {
-    const rotateData = JSON.parse(data.json_data);
-    
-    // 显示主图和缩略图
-    document.getElementById('master').src = rotateData.master_image;
-    document.getElementById('thumb').src = rotateData.thumb_image;
-    
-    // 记录验证码 ID
-    window.captchaId = data.id;
-    
-    // 存储正确角度
-    window.correctAngle = rotateData.angle;
-  });
-
-// 2. 用户旋转后提交
-let currentAngle = 0;
-document.getElementById('slider').addEventListener('input', function(e) {
-  currentAngle = e.target.value;
-  // 旋转图片
-  document.getElementById('master').style.transform = `rotate(${currentAngle}deg)`;
-});
-
-document.getElementById('submit').addEventListener('click', function() {
-  fetch('/api/captcha/verify', {
-    method: 'POST',
-    body: JSON.stringify({
-      id: window.captchaId,
-      angle: currentAngle
-    })
-  });
-});
-```
-
-## 配置选项详解
-
-### Options 函数列表（推荐）
-
-**通用选项：**
-- `WithDriverType(driverType DriverType)` - 设置驱动类型
-- `WithExpire(expire time.Duration)` - 设置过期时间
-- `WithKeyPrefix(prefix string)` - 设置 Redis key 前缀
-
-**数字验证码选项：**
-- `WithDigitHeight(height int)` - 设置高度
-- `WithDigitWidth(width int)` - 设置宽度
-- `WithDigitCount(count int)` - 设置字符数量
-- `WithDigitMaxSkew(skew float64)` - 设置最大倾斜度
-- `WithDigitDotCount(count int)` - 设置干扰点数量
-- `WithDigitConfig(config *DigitConfig)` - 直接设置完整配置
-
-**字符串验证码选项：**
-- `WithStringHeight(height int)` - 设置高度
-- `WithStringWidth(width int)` - 设置宽度
-- `WithStringCount(count int)` - 设置字符数量
-- `WithStringSource(source string)` - 设置字符源
-- `WithStringDotCount(count int)` - 设置干扰点数量
-- `WithStringConfig(config *StringConfig)` - 直接设置完整配置
-
-**算术验证码选项：**
-- `WithMathHeight(height int)` - 设置高度
-- `WithMathWidth(width int)` - 设置宽度
-- `WithMathDotCount(count int)` - 设置干扰点数量
-- `WithMathConfig(config *MathConfig)` - 直接设置完整配置
-
-**中文验证码选项：**
-- `WithChineseHeight(height int)` - 设置高度
-- `WithChineseWidth(width int)` - 设置宽度
-- `WithChineseCount(count int)` - 设置字符数量
-- `WithChineseLanguage(language string)` - 设置语言 (zh/en)
-- `WithChineseDotCount(count int)` - 设置干扰点数量
-- `WithChineseConfig(config *ChineseConfig)` - 直接设置完整配置
-
-**滑动拼图验证码选项：**
-- `WithSlideMasterSize(width, height int)` - 设置主图尺寸
-- `WithSlideTileSize(width, height int)` - 设置滑块尺寸
-- `WithSlideTileRadius(radius int)` - 设置滑块圆角半径
-- `WithSlideJigsawRadius(radius int)` - 设置拼图缺口圆角半径
-- `WithSlideShadow(offsetX, offsetY, blur int)` - 设置阴影效果
-- `WithSlideConfig(config *SlideConfig)` - 直接设置完整配置
-
-**点击文字验证码选项：**
-- `WithClickMasterSize(width, height int)` - 设置主图尺寸
-- `WithClickThumbSize(width, height int)` - 设置缩略图尺寸
-- `WithClickCaptchaCount(count int)` - 设置主图字符数量
-- `WithClickVerifyCount(count int)` - 设置验证字符数量
-- `WithClickChars(chars string)` - 设置字符集
-- `WithClickLanguage(language string)` - 设置语言 (zh/en)
-- `WithClickShadow(display bool, color string, offsetX, offsetY int)` - 设置阴影效果
-- `WithClickConfig(config *ClickConfig)` - 直接设置完整配置
-
-**旋转图片验证码选项：**
-- `WithRotateMasterSize(width, height int)` - 设置主图尺寸
-- `WithRotateThumbSize(width, height int)` - 设置缩略图尺寸
-- `WithRotateConfig(config *RotateConfig)` - 直接设置完整配置
-
-### 配置对象结构
-
-#### 通用配置 (Config)
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| DriverType | DriverType | 验证码驱动类型 |
-| Expire | time.Duration | 验证码过期时间 |
-| KeyPrefix | string | Redis key 前缀 |
-| DigitConfig | *DigitConfig | 数字验证码配置 |
-| StringConfig | *StringConfig | 字符串验证码配置 |
-| MathConfig | *MathConfig | 算术验证码配置 |
-| ChineseConfig | *ChineseConfig | 中文验证码配置 |
-| SlideConfig | *SlideConfig | 滑动拼图验证码配置 |
-| ClickConfig | *ClickConfig | 点击文字验证码配置 |
-| RotateConfig | *RotateConfig | 旋转图片验证码配置 |
-
-#### 各驱动配置项
-
-所有驱动配置都包含以下字段：
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| Height | int | 图片高度 | 80 |
-| Width | int | 图片宽度 | 240 |
-| CaptchaCount | int | 验证码字符数量 | 4 |
-| MaxSkew | float64 | 最大倾斜度 | 0.7 |
-| DotCount | int | 干扰点数量 | 80 |
-| BgColorR/G/B | uint8 | 背景色 RGB | 255, 255, 255 (白色) |
-| FontColorR/G/B | uint8 | 字体色 RGB | 0, 0, 0 (黑色) |
-
-字符串验证码额外字段：
-- `Source`: 字符源字符串
-
-中文验证码额外字段：
-- `Language`: 语言类型 ("zh" 或 "en")
-
-滑动拼图验证码配置项：
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| MasterWidth | int | 主图宽度 | 300 |
-| MasterHeight | int | 主图高度 | 220 |
-| TileWidth | int | 滑块宽度 | 60 |
-| TileHeight | int | 滑块高度 | 60 |
-| TileRadius | int | 滑块圆角半径 | 5 |
-| JigsawRadius | int | 拼图缺口圆角半径 | 10 |
-| ShadowOffsetX | int | 阴影 X 偏移 | 5 |
-| ShadowOffsetY | int | 阴影 Y 偏移 | 5 |
-| ShadowBlur | int | 阴影模糊度 | 10 |
-
-点击文字验证码配置项：
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| MasterWidth | int | 主图宽度 | 300 |
-| MasterHeight | int | 主图高度 | 220 |
-| ThumbWidth | int | 缩略图宽度 | 150 |
-| ThumbHeight | int | 缩略图高度 | 40 |
-| CaptchaCount | int | 主图字符数量 | 6 |
-| VerifyCount | int | 验证字符数量 | 3 |
-| DisplayShadow | bool | 是否显示阴影 | true |
-| ShadowColor | string | 阴影颜色 | #000000 |
-| ShadowOffsetX | int | 阴影 X 偏移 | 2 |
-| ShadowOffsetY | int | 阴影 Y 偏移 | 2 |
-| Chars | string | 字符集 | 这的是随了机文我你他字在有不么中 |
-| Language | string | 语言类型 | zh |
-
-旋转图片验证码配置项：
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| MasterWidth | int | 主图宽度 | 300 |
-| MasterHeight | int | 主图高度 | 300 |
-| ThumbWidth | int | 缩略图宽度 | 150 |
-| ThumbHeight | int | 缩略图高度 | 150 |
-
-## API 参考
-
-### 构造函数
-
-- `NewCaptcha(rdb *redis.Client, opts ...Option) *Captcha`
-  - 创建验证码实例（推荐使用 Options 模式）
-  - 示例：
-    ```go
-    cap := captcha.NewCaptcha(rdb,
-        captcha.WithDriverType(captcha.DriverString),
-        captcha.WithExpire(10*time.Minute),
-        captcha.WithStringCount(6),
-    )
-    ```
-  
-- `NewCaptchaWithConfig(rdb *redis.Client, config *Config) *Captcha`
-  - 使用自定义配置对象创建验证码实例
-
-### 核心方法
-
-- `Generate() (string, string, string, error)`
-  - 生成验证码
-  - 返回: (id, base64图片/JSON数据, 答案, 错误)
-  - **注意**: 
-    - 对于滑动验证码，第二个返回值是 JSON 格式的 `SlideCaptchaData`
-    - 对于点击验证码，第二个返回值是 JSON 格式的 `ClickCaptchaData`
-    - 对于旋转验证码，第二个返回值是 JSON 格式的 `RotateCaptchaData`
-
-- `Save(ctx context.Context, captchaID, answer string) error`
-  - 将验证码答案存入 Redis
-
-- `Verify(ctx context.Context, captchaID, userInput string) (bool, error)`
-  - 验证用户输入，验证成功后自动删除验证码
-  - 返回: (是否匹配, 错误)
-  - **注意**: 
-    - 滑动验证码允许 ±5 像素的误差
-    - 点击验证码允许 ±10 像素的误差，userInput 应为 JSON 格式的坐标数组
-    - 旋转验证码允许 ±5 度的误差，userInput 应为角度值的字符串形式
-
-### 扩展方法
-
-- `VerifyAndDelete(ctx context.Context, captchaID, userInput string) (bool, error)`
-  - 验证并删除验证码（与 Verify 相同）
-
-- `VerifyWithoutDelete(ctx context.Context, captchaID, userInput string) (bool, error)`
-  - 验证但不删除验证码（用于多次验证场景）
-
-- `Delete(ctx context.Context, captchaID string) error`
-  - 手动删除验证码
-
-- `Exists(ctx context.Context, captchaID string) (bool, error)`
-  - 检查验证码是否存在
-
-- `GetRemainingTime(ctx context.Context, captchaID string) (time.Duration, error)`
-  - 获取验证码剩余时间
-
-- `GetConfig() *Config`
-  - 获取当前配置
-
-- `SetConfig(config *Config)`
-  - 设置配置
-
-## 最佳实践
-
-### 1. 排除易混淆字符
-
-```go
-config.StringConfig.Source = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // 排除 I, l, 1, O, 0 等
-```
-
-### 2. 调整难度
-
-```go
-// 更难的验证码
-config.DigitConfig.MaxSkew = 1.0    // 更大的倾斜
-config.DigitConfig.DotCount = 150   // 更多干扰点
-config.DigitConfig.CaptchaCount = 6 // 更多位数
-
-// 更简单的验证码
-config.DigitConfig.MaxSkew = 0.3    // 更小的倾斜
-config.DigitConfig.DotCount = 30    // 更少干扰点
-config.DigitConfig.CaptchaCount = 3 // 更少位数
-```
-
-### 3. 自定义颜色
-
-```go
-// 深色主题
-config.DigitConfig.BgColorR = 33
-config.DigitConfig.BgColorG = 33
-config.DigitConfig.BgColorB = 33
-config.DigitConfig.FontColorR = 255
-config.DigitConfig.FontColorG = 255
-config.DigitConfig.FontColorB = 255
-```
-
-### 4. 动态切换验证码类型
-
-```go
-// 根据安全等级动态切换
-if securityLevel == "high" {
-    config.DriverType = captcha.DriverChinese
-} else {
-    config.DriverType = captcha.DriverDigit
+type ClickCaptchaData struct {
+	ID          string       `json:"id"`           // "click_<UnixNano>"
+	MasterImage string       `json:"master_image"` // master image base64
+	ThumbImage  string       `json:"thumb_image"`  // thumb image base64
+	Dots        map[int]*Dot `json:"dots"`         // click dots (coordinates/size/angle)
 }
-cap.SetConfig(config)
+
+type RotateCaptchaData struct {
+	ID          string `json:"id"`           // "rotate_<UnixNano>"
+	MasterImage string `json:"master_image"` // master image base64
+	ThumbImage  string `json:"thumb_image"`  // thumb image base64
+	Angle       int    `json:"angle"`        // correct angle
+}
 ```
 
-## 注意事项
+### Core Methods
 
-1. **Redis 依赖**: 确保 Redis 服务正常运行
-2. **过期时间**: 合理设置过期时间，避免验证码长期有效
-3. **一次性使用**: 默认验证后会自动删除，防止重放攻击
-4. **字符源**: 字符串验证码建议使用排除易混淆字符的字符集
-5. **性能考虑**: 高并发场景下注意 Redis 连接池配置
-6. **滑动验证码**:
-   - 返回的 JSON 数据包含主图和滑块图的 base64 编码
-   - 验证时允许 ±5 像素的误差范围
-   - 需要前端配合实现滑块交互组件
-   - 建议从 `go-captcha-assets` 加载真实的背景图片资源
-7. **点击验证码**:
-   - 返回的 JSON 数据包含主图、缩略图的 base64 编码和正确答案坐标
-   - 验证时允许 ±10 像素的误差范围
-   - 需要前端配合实现点击交互组件，按顺序点击指定字符
-   - 用户点击坐标应以 JSON 数组格式提交：`[{"x":100,"y":50},{"x":150,"y":80}]`
-   - 建议从 `go-captcha-assets` 加载真实的背景图片和字体资源
-8. **旋转验证码**:
-   - 返回的 JSON 数据包含主图、缩略图的 base64 编码和正确角度
-   - 验证时允许 ±5 度的误差范围
-   - 需要前端配合实现旋转交互组件（如滑块或旋钮）
-   - 用户旋转角度应以字符串形式提交：`"90"`
-   - 建议从 `go-captcha-assets` 加载真实的背景图片资源
+```go
+func (c *Captcha) Generate() (id, b64s, answer string, err error)
+func (c *Captcha) Save(ctx context.Context, captchaID, answer string) error
+func (c *Captcha) Verify(ctx context.Context, captchaID, userInput string) (bool, error)
+```
 
-## 许可证
+- `Generate`: digit/string/math/chinese return a base64 image; for slide/click/rotate `b64s` is the JSON string of the corresponding `XxxCaptchaData`
+- `Save`: writes to Redis with key `<KeyPrefix>:<captchaID>` and TTL `Expire`
+- `Verify`: a successful verification deletes the captcha; a missing/expired key returns `(false, nil)`
+  - Slide: X coordinate within ±5 px
+  - Click: JSON coordinate array compared point by point in click order, ±10 px per axis, count must match
+  - Rotate: angle within ±5 degrees (circular difference over 360)
+  - Others: exact string match
 
-MIT License
+### Extended Methods
+
+```go
+func (c *Captcha) VerifyAndDelete(ctx context.Context, captchaID, userInput string) (bool, error) // same as Verify
+func (c *Captcha) VerifyWithoutDelete(ctx context.Context, captchaID, userInput string) (bool, error)
+func (c *Captcha) Delete(ctx context.Context, captchaID string) error
+func (c *Captcha) Exists(ctx context.Context, captchaID string) (bool, error)
+func (c *Captcha) GetRemainingTime(ctx context.Context, captchaID string) (time.Duration, error)
+func (c *Captcha) GetConfig() *Config
+func (c *Captcha) SetConfig(config *Config) // ignored when config is nil
+```
+
+## Best Practices
+
+### Exclude Confusable Characters
+
+```go
+config.StringConfig.Source = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // exclude I, l, 1, O, 0, etc.
+```
+
+### Adjust Difficulty
+
+```go
+// Harder
+config.DigitConfig.MaxSkew = 1.0    // more skew
+config.DigitConfig.DotCount = 150   // more noise dots
+config.DigitConfig.CaptchaCount = 6 // more digits
+
+// Easier
+config.DigitConfig.MaxSkew = 0.3
+config.DigitConfig.DotCount = 30
+config.DigitConfig.CaptchaCount = 3
+```
+
+## Notes
+
+1. **Redis dependency**: make sure Redis is reachable; tune the connection pool for high concurrency
+2. **One-shot verification**: `Verify` deletes the captcha on success to prevent replay; use `VerifyWithoutDelete` when multiple checks are needed
+3. **Slide IDs carry the answer**: `SlideCaptchaData.ID` is built from the gap coordinates (`"X_Y"`), and the JSON also contains `XPosition` — both are sent to the client, effectively leaking the answer. The current implementation suits internal/demo use; for production, strip `XPosition` and the coordinate-based ID before responding, or generate your own opaque ID with a server-side mapping
+4. **Built-in background**: slide/click CAPTCHAs use a built-in 300x220 gradient background; the public API does not yet support replacing background images or fonts. Keep the default 300x220 master size for best results
+5. **Reserved fields**: see the "not effective yet" marks in the config tables above; tuning them has no effect
+6. **TTL**: the default is 5 minutes; avoid keeping captchas valid for too long
+7. **Character source**: exclude confusable characters for string captchas
+
+## License
+
+MIT

@@ -1,123 +1,258 @@
 # notify
 
-多渠道通知投递的统一抽象。只管"怎么发"：给定已解析好的渠道配置与一条正文就绪的消息，发出去并拿回执。配置从哪来、失败怎么记账、要不要重试，都是调用方编排层的事。
+English | [简体中文](README.zh-CN.md)
 
-全部裸 HTTP 实现（APNs 为标准库 HTTP/2），零厂商 SDK、零模板引擎依赖。
+A unified abstraction for multi-channel notification delivery. It only answers "how to send": given a resolved channel config and a message whose body is already composed, deliver it and return the receipt. Where the config comes from, how failures are booked, and whether to retry are all the caller's orchestration concerns.
 
-## 渠道总览
+Every channel is a bare-HTTP implementation (APNs uses the standard library's HTTP/2): zero vendor SDKs, zero template-engine dependencies.
 
-| 包 | 渠道 | Target 语义 | 回执 |
-|---|---|---|---|
-| `email/` | SMTP 邮件（薄封装同库 mailer） | 收件地址 | — |
-| `webhook/` | 群机器人/自建对端：钉钉、飞书、企微（签名风格）+ HMAC 自有方案 | 回调 URL | — |
-| `sms/` | 阿里云 Dysmsapi / 腾讯云 SMS（模板短信） | 手机号 | requestId/serialNo |
-| `yunpian/` | 云片短信（自由文本） | 手机号 | sid |
-| `twilio/` | Twilio SMS（国际） | E.164 号码 | 消息 SID |
-| `telegram/` | Telegram Bot sendMessage | chat_id | message_id |
-| `wechat/` | 微信公众号模板消息 | openid | msgid |
-| `wecom/` | 企业微信**应用消息**（推成员个人） | touser（`\|` 相连 / @all） | — |
-| `jpush/` | 极光推送 | registration_id | msg_id |
-| `push/` | 设备厂商推送：APNs、FCM、华为、荣耀、小米、OPPO、vivo | 设备令牌/regId | 各家消息 ID |
-| `bark/` | Bark（iOS 自带推送 App） | device_key | — |
-| `ntfy/` | ntfy.sh / 自建 | 主题名 | 消息 ID |
-| `gotify/` | Gotify 自建服务 | （收件身份是 AppToken） | 消息 ID |
-| `slack/` | Slack Incoming Webhook | （URL 即收件身份） | — |
-| `discord/` | Discord Webhook | （URL 即收件身份） | message id |
-| `gchat/` | Google Chat 入站 Webhook | （URL 即收件身份） | 消息资源名 |
-| `pushover/` | Pushover | 用户 key | request ID |
-| `teams/` | MS Teams 工作流 Webhook（Adaptive Card） | （URL 即收件身份） | — |
-| `dingtalk/` | 钉钉工作通知（推成员个人） | userid_list（`\|` 相连） | task_id |
-| `feishu/` | 飞书应用消息（im/v1） | open_id/user_id/email/chat_id | message_id |
-| `getui/` | 个推 v2 | cid | — |
-| `huaweisms/` | 华为云短信 MSGSMS（模板） | 手机号 | smsMsgId |
-| `line/` | LINE Messaging API | userId/groupId/roomId | — |
-| `whatsapp/` | WhatsApp Business Cloud API | 收件号（无 + 的 E.164） | wamid |
-| `mattermost/` | Mattermost 入站 Webhook | （URL 即收件身份） | — |
-| `rocketchat/` | Rocket.Chat chat.postMessage | 频道 / @user | 消息 _id |
-| `zulip/` | Zulip（stream） | stream 频道名 | 消息 ID |
-| `matrix/` | Matrix 客户端 API | 房间 ID | event_id |
-| `pagerduty/` | PagerDuty Events v2（告警） | dedup key（可选） | dedup key |
-| `opsgenie/` | Opsgenie Alerts v2（告警） | alias（可选） | requestId |
-| `sendgrid/` | SendGrid Mail v3 | 收件邮箱 | X-Message-Id |
-| `mailgun/` | Mailgun Messages API | 收件邮箱 | 消息 id |
-| `postmark/` | Postmark 邮件 API | 收件邮箱 | MessageID |
-| `vonage/` | Vonage（原 Nexmo）国际短信 | 收件号（无 + 的 E.164） | message-id |
-| `serverchan/` | Server酱（微信个人推送） | （SendKey 即收件绑定） | — |
-| `wxpusher/` | WxPusher（微信个人推送） | UID | messageId |
-| `pushdeer/` | PushDeer（自建微信推送） | （PushKey 即收件绑定） | — |
-| `pushbullet/` | Pushbullet | 设备 device_iden（可选） | iden |
-| `join/` | Join by joaoapps | 设备 ID（逗号相连，可选） | — |
-| `webex/` | Cisco Webex 消息 | roomId 或人员邮箱 | 消息 id |
-| `homeassistant/` | Home Assistant notify 服务 | （Service 决定通知面） | — |
-| `ifttt/` | IFTTT Maker Webhooks | event 事件名 | — |
-| `datadog/` | Datadog Events | host（可选） | 事件 ID |
+## Features
 
-## 结构
+- **One interface**: a single `Service` interface and a single `Message` / `Receipt` shape across 43 channel subpackages;
+- **Zero SDKs**: each channel speaks the vendor's HTTP protocol directly (APNs via the standard library HTTP/2 + ES256 token auth), keeping the dependency footprint tiny;
+- **Three-way error classification**: configuration (`ErrNotConfigured`) / invalid token (`ErrInvalidToken`) / delivery failure, so callers' ledgers can tell SKIPPED from "delete the device row" from "retry makes sense";
+- **SSRF guard**: an http.Client that resolves and dials the chosen IP itself, with an intranet CIDR blocklist covering loopback, RFC1918, CGNAT, link-local (including cloud metadata endpoints), multicast and reserved ranges;
+- **Channel registry**: `Registry` registers and looks up services by `Name()` — written once at assembly time, read-only at runtime.
 
-```
-notify/
-├── notify.go      Message / Receipt / Service 接口 / 哨兵 / Registry
-├── ssrf.go        SSRF 防线：内网 CIDR 拦网表 + 解析后直连的 guarded http.Client
-└── <渠道>/        每渠道一个子包：Config + New(client, cfg) + Service{Name, Send}
+## Installation
+
+Standalone module:
+
+```bash
+go get github.com/tx7do/go-utils/notify@latest
 ```
 
-## 用法
+Import channel subpackages as needed:
 
 ```go
 import (
     "github.com/tx7do/go-utils/notify"
     "github.com/tx7do/go-utils/notify/sms"
 )
-
-svc, err := sms.New(nil, sms.Config{
-    Provider:     sms.ProviderAliyun,
-    AccessKeyID:  "ak",
-    AccessSecret: "sk",
-    SignName:     "签名",
-    TemplateCode: "SMS_123",
-})
-if err != nil { ... }
-
-receipt, err := svc.Send(ctx, &notify.Message{
-    Target: "13800138000",
-    Params: map[string]string{"code": "123456"},
-})
 ```
 
-## 错误语义
+## Quick Start
 
-`Send` 返回 error 一律是投递失败，但分三类：
+```go
+package main
 
-- **配置类**（包 `notify.ErrNotConfigured`）：没配 / 配错 / 停用 / 目标不合法 / SSRF 拦截——发生在联系对端**之前**，重试也不会变好。调用方（台账类系统）据此记 SKIPPED 而非 FAILED。
-- **令牌失效**（包 `notify.ErrInvalidToken`）：厂商明确判定的收件令牌作废（APNs 410/Unregistered、FCM 404/410、华为 0x80200xxx 段、小米 20201/20202、OPPO 2008、vivo 10080、JPush 1011）——调用方应删设备行自清理，重试没有意义。
-- **投递类**（其余 error）：拨过号、递过单，被对端拒绝或链路故障——重试有意义。
+import (
+	"context"
+	"fmt"
+	"log"
 
-webhook 的 `ErrBlockedTarget` 可用 `errors.Is` 沿链判别（拦网与拨号错误都归配置类，但打没打过 DNS 是排障时要知道的事）。
+	"github.com/tx7do/go-utils/notify"
+	"github.com/tx7do/go-utils/notify/sms"
+)
 
-## 各包要点
+func main() {
+	svc, err := sms.New(nil, sms.Config{
+		Provider:     sms.ProviderAliyun,
+		AccessKeyID:  "ak",
+		AccessSecret: "sk",
+		SignName:     "SignName",
+		TemplateCode: "SMS_123",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-**webhook** — 签名风格由 `Config.SignStyle` 决定：`CUSTOM`（HMAC-SHA256 盖 "时间戳.正文"，签名进 `X-Gw-Signature` 头）、`NONE`、`DINGTALK`（毫秒签名进 URL query）、`FEISHU`（签名进 body 顶层）、`WECOM`（凭据在 URL key 上）。钉钉/飞书/企微都会在 HTTP 200 里报业务失败，判据落在 body 的 errcode/code 上，只看状态码会把"对方没收"记成成功。正文形状：三家内置 text 模板；CUSTOM/NONE 用 `Config.DefaultPayload` 钩子（业务字段类型归调用方）或库内置三字段默认。模板占位符 `{{name}}` 单趟替换（不递归），基础变量之外 `Message.Params` 每键皆可用。
+	receipt, err := svc.Send(context.Background(), &notify.Message{
+		Target: "13800138000",
+		Params: map[string]string{"code": "123456"},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(receipt.ProviderID)
+}
+```
 
-**sms / yunpian** — 阿里云按参数名整表传 JSON（模板 `${name}`），腾讯云按参数名排序取值传位置参数（模板 `{1}{2}`，单参数无感）；云片收整段自由文本（含签名【】），手机号统一经 `NormalizePhoneNumber` 归一。服务商名拼错在 `New` 当场报错；必填项缺失走 `Precheck`（点名缺哪个字段）。
+### Registry: route channels by name
 
-**telegram** — `Message.Target` 为 chat_id，`Title` 与 `Content` 以空行相连为消息文本；`Config.ParseMode` 可选 MarkdownV2/HTML（配了之后转义归调用方）。HTTP 200 里 body `ok=false` 也判失败。
+Hand assembled channel implementations to a `Registry` and look them up by `Name()` at runtime (`Register` overwrites a same-named previous one):
 
-**wechat / wecom** — 同一套 access_token 缓存形态（提前 60s 刷新，40014/40001/42001 强刷重试一次）。`wechat` 发公众号模板消息（openid，`Params` 渲染 `{KEY}` 占位）；`wecom` 发企业微信应用消息（touser 成员账号 `|` 相连或 `@all`，agentid 数字出站）。
+```go
+registry := notify.NewRegistry()
+registry.Register(emailSvc)  // anything implementing notify.Service
+registry.Register(smsSvc)
 
-**push** — 七家设备厂商（APNs/FCM/华为/荣耀/小米/OPPO/vivo），`Message.Target` 为设备令牌，`Params` 进数据面（OPPO/vivo 通知栏形态无数据面）。APNs 标准库 HTTP/2 + ES256 Token 鉴权，provider token 缓存 50 分钟；多设备遍历、失效令牌清理与聚合是调用方编排层的事。
+if svc, ok := registry.Service("sms"); ok {
+    _, _ = svc.Send(ctx, msg)
+}
+```
 
-**工作通知/应用消息（dingtalk/feishu）** — 与群机器人分工：机器人推群，这两个凭应用凭据推成员个人。dingtalk 是异步受理（task_id 进回执，送达结果靠回调）；feishu 的 content 字段是"JSON 字符串套 JSON"（内层对象先序列化成串再嵌入），tenant_access_token 缓存 + 失效强刷重试一次（99991661/99991663）。
+## Channel Overview
 
-**个人推送（serverchan/wxpusher/pushdeer/pushbullet/join）** — 微信个人推送三件套靠 SendKey/AppToken/PushKey 绑定收件人；WxPusher 成功码是 1000 不是 0；Pushbullet 鉴权头是 `Access-Token` 不是 Bearer；Join 的 Target 是逗号相连的 deviceIds。
+| Package | Channel | Target semantics | Receipt |
+|---|---|---|---|
+| `email/` | SMTP mail (thin wrapper over the sibling mailer module) | recipient address | — |
+| `webhook/` | Group bots / self-hosted endpoints: DingTalk, Feishu, WeCom (signature styles) + custom HMAC | callback URL | — |
+| `sms/` | Alibaba Cloud Dysmsapi / Tencent Cloud SMS (template SMS) | phone number | requestId/serialNo |
+| `yunpian/` | Yunpian SMS (free text) | phone number | sid |
+| `twilio/` | Twilio SMS (international) | E.164 number | message SID |
+| `telegram/` | Telegram Bot sendMessage | chat_id | message_id |
+| `wechat/` | WeChat Official Account template message | openid | msgid |
+| `wecom/` | WeCom **app messages** (to individual members) | touser (`\|`-joined / @all) | — |
+| `jpush/` | JPush | registration_id | msg_id |
+| `push/` | Device vendor push: APNs, FCM, Huawei, Honor, Xiaomi, OPPO, vivo | device token / regId | vendor message ID |
+| `bark/` | Bark (iOS push app) | device_key | — |
+| `ntfy/` | ntfy.sh / self-hosted | topic name | message ID |
+| `gotify/` | Self-hosted Gotify | (recipient identity is the AppToken) | message ID |
+| `slack/` | Slack Incoming Webhook | (URL is the recipient identity) | — |
+| `discord/` | Discord Webhook | (URL is the recipient identity) | message id |
+| `gchat/` | Google Chat incoming webhook | (URL is the recipient identity) | message resource name |
+| `pushover/` | Pushover | user key | request ID |
+| `teams/` | MS Teams workflow webhook (Adaptive Card) | (URL is the recipient identity) | — |
+| `dingtalk/` | DingTalk work notification (to individual members) | userid_list (`\|`-joined) | task_id |
+| `feishu/` | Feishu app message (im/v1) | open_id/user_id/email/chat_id | message_id |
+| `getui/` | GeTui v2 | cid | — |
+| `huaweisms/` | Huawei Cloud SMS MSGSMS (template) | phone number | smsMsgId |
+| `line/` | LINE Messaging API | userId/groupId/roomId | — |
+| `whatsapp/` | WhatsApp Business Cloud API | recipient (E.164 without +) | wamid |
+| `mattermost/` | Mattermost incoming webhook | (URL is the recipient identity) | — |
+| `rocketchat/` | Rocket.Chat chat.postMessage | channel / @user | message _id |
+| `zulip/` | Zulip (stream) | stream name | message ID |
+| `matrix/` | Matrix client API | room ID | event_id |
+| `pagerduty/` | PagerDuty Events v2 (alerting) | dedup key (optional) | dedup key |
+| `opsgenie/` | Opsgenie Alerts v2 (alerting) | alias (optional) | requestId |
+| `sendgrid/` | SendGrid Mail v3 | recipient email | X-Message-Id |
+| `mailgun/` | Mailgun Messages API | recipient email | message id |
+| `postmark/` | Postmark email API | recipient email | MessageID |
+| `vonage/` | Vonage (formerly Nexmo) international SMS | recipient (E.164 without +) | message-id |
+| `serverchan/` | ServerChan (WeChat personal push) | (SendKey binds the recipient) | — |
+| `wxpusher/` | WxPusher (WeChat personal push) | UID | messageId |
+| `pushdeer/` | PushDeer (self-hosted WeChat push) | (PushKey binds the recipient) | — |
+| `pushbullet/` | Pushbullet | device device_iden (optional) | iden |
+| `join/` | Join by joaoapps | device IDs (comma-joined, optional) | — |
+| `webex/` | Cisco Webex messages | roomId or person email | message id |
+| `homeassistant/` | Home Assistant notify service | (the Service decides the notification surface) | — |
+| `ifttt/` | IFTTT Maker Webhooks | event name | — |
+| `datadog/` | Datadog Events | host (optional) | event ID |
 
-**监控/家居自动化（datadog/homeassistant/ifttt）** — Datadog 的 Target 落 host 字段（事件归属主机）；HA 的 Target 落 data.target 由 notify 平台解释、Params 原样进 data；IFTTT 按 value1/2/3 值槽映射。
+## Structure
 
-**告警渠道（pagerduty/opsgenie）** — Target 是去重键（dedup key / alias）：同键事件被平台关联为同一告警的重现而非新告警，这是告警渠道与通知渠道最大的语义差异。PagerDuty 的 Title 落 payload.custom_details；Opsgenie 的 message 由 Title 顶上、Content 兜底，全文进 description。
+```
+notify/
+├── notify.go      Message / Receipt / Service interface / sentinels / Registry
+├── ssrf.go        SSRF guard: intranet CIDR blocklist + resolve-then-dial guarded http.Client
+└── <channel>/     one subpackage per channel: Config + New(client, cfg) + Service{Name, Send}
+```
 
-**国际 IM/短信（line/whatsapp/matrix/rocketchat/zulip/mattermost/twilio）** — LINE/WhatsApp 凭频道令牌直推（WhatsApp 收件号无 + 前缀，走 24h 会话窗口或模板）；Matrix 用 PUT + 事务 ID（房间 ID 的 ! 和 : 要显式转义成 %21/%3A，url.PathEscape 不动它们）；Rocket.Chat 走 X-User-Id/X-Auth-Token 双头；Zulip stream 消息必须有 topic（Config 默认 + Params 覆盖）。
+## Core Interface (notify.go)
 
-**webhook 型渠道（slack/discord/gchat/teams/gotify/bark/ntfy/pushover/mattermost）** — Target 语义见总览表；带 Title 的组合各按平台惯例排版（Slack/Google Chat 用 mrkdwn 粗体行，Discord 走 embed 卡片，Teams 走 Adaptive Card）。Params 在 bark（原生字段直传 JSON）、pushover（原生字段直传表单）、ntfy/gotify（priority 覆盖）有各自约定，见各包文档。
+```go
+type Message struct {
+    Target  string            // delivery target, interpreted per channel (address/phone/URL/token…)
+    Title   string            // title (the email Subject; ignored by title-less channels)
+    Content string            // body
+    Params  map[string]string // channel-native parameters (template params/placeholders/native fields)
+}
+
+type Receipt struct {
+    ProviderID string // vendor-side message/request ID when available, for reconciliation
+}
+
+type Service interface {
+    Name() string // channel name ("email" / "webhook" / "sms"…), used by the registry and routing
+    Send(ctx context.Context, msg *Message) (*Receipt, error)
+}
+```
+
+## Configuration & Constructors (per-package notes)
+
+**sms** — `sms.New(client *http.Client, cfg sms.Config) (*Service, error)`; pass a nil client to use the default-timeout client. Common `Config` fields:
+
+| Field | Description |
+|---|---|
+| `Provider` | `ALIYUN` / `TENCENT` (a misspelled name errors out immediately, not at first delivery) |
+| `AccessKeyID` / `AccessSecret` | Provider access key pair |
+| `SignName` | Registered SMS signature |
+| `TemplateCode` | Template ID (Aliyun bodies use `${name}`, Tencent bodies use `{1}{2}`) |
+| `AppID` | Tencent SmsSdkAppId, **required for Tencent**; leave empty for Aliyun |
+| `Region` | Region, **required for Tencent** (empty falls back to ap-guangzhou); Aliyun falls back to cn-hangzhou |
+
+`Precheck()` verifies required fields per provider (naming the missing one, no dialing); `NormalizePhoneNumber` normalizes phone numbers; empty `Params` is rejected outright — SMS has no free-text channel.
+
+**push** — the seven device-vendor channels each have a constructor; a nil client means the default client:
+
+```go
+apns, err := push.NewAPNs(nil, push.APNsConfig{...})     // (*APNs, error): the .p8 key is parsed at construction, misconfiguration surfaces immediately
+fcm    := push.NewFCM(nil, push.FCMConfig{})             // *FCM
+huawei := push.NewHuawei(nil, push.HuaweiConfig{})       // *Huawei
+honor  := push.NewHonor(nil, push.HuaweiConfig{})        // *Honor (shares Huawei's config struct)
+xiaomi := push.NewXiaomi(nil, push.XiaomiConfig{})       // *Xiaomi
+oppo   := push.NewOppo(nil, push.OppoConfig{})           // *Oppo
+vivo   := push.NewVivo(nil, push.VivoConfig{})           // *Vivo
+```
+
+All implement `notify.Service`; `Message.Target` is a single device's token/regId — multi-device fan-out, invalid-token cleanup and aggregation belong to the caller's orchestration layer. For token-invalid errors, `push.ErrInvalidToken` remains as an alias of the root `notify.ErrInvalidToken` (it used to be defined in this package, then moved up).
+
+**webhook** — the signature style is decided by `Config.SignStyle`: `CUSTOM` (HMAC-SHA256 over "timestamp.body", signature in the `X-Gw-Signature` header), `NONE`, `DINGTALK` (millisecond signature in the URL query), `FEISHU` (signature at the top level of the body), `WECOM` (credentials on the URL key). DingTalk/Feishu/WeCom report business failures inside HTTP 200; the verdict keys off errcode/code in the body — looking only at the status code books "not received" as success. Body shapes: built-in text templates for the three vendors; CUSTOM/NONE use the `Config.DefaultPayload` hook (field types are the caller's business) or the library's built-in three-field default. Template placeholders `{{name}}` are replaced in a single pass (no recursion); beyond the base variables every key of `Message.Params` is available.
+
+**telegram** — `Message.Target` is the chat_id; `Title` and `Content` are joined with a blank line as the message text; `Config.ParseMode` may be MarkdownV2/HTML (once set, escaping is the caller's job). A body with `ok=false` under HTTP 200 also counts as failure.
+
+**wechat / wecom** — the same access_token caching shape (refreshed 60s early, forced refresh + one retry on 40014/40001/42001). `wechat` sends Official Account template messages (openid, `Params` renders `{KEY}` placeholders); `wecom` sends WeCom app messages (touser is `|`-joined member accounts or `@all`, agentid sent numerically).
+
+**Work notifications / app messages (dingtalk/feishu)** — a division of labor with group bots: bots reach group chats, these two reach individuals via app credentials. dingtalk is asynchronous acceptance (task_id in the receipt; delivery results arrive via callback); feishu's content field is "JSON string wrapped in JSON" (the inner object is serialized to a string first), with tenant_access_token caching + forced refresh and one retry (99991661/99991663).
+
+**Personal push (serverchan/wxpusher/pushdeer/pushbullet/join)** — the WeChat personal trio binds recipients via SendKey/AppToken/PushKey; WxPusher's success code is 1000, not 0; Pushbullet's auth header is `Access-Token`, not Bearer; Join's Target is comma-joined deviceIds.
+
+**Monitoring / home automation (datadog/homeassistant/ifttt)** — Datadog's Target lands in the host field (which host the event belongs to); HA's Target lands in data.target for the notify platform to interpret, with Params passed into data as-is; IFTTT maps onto the value1/2/3 slots.
+
+**Alerting channels (pagerduty/opsgenie)** — Target is the deduplication key (dedup key / alias): events sharing a key are correlated by the platform as recurrences of one alert rather than new alerts — the biggest semantic difference from notification channels. PagerDuty's Title lands in payload.custom_details; Opsgenie's message is Title on top with Content as fallback, full text into description.
+
+**International IM/SMS (line/whatsapp/matrix/rocketchat/zulip/mattermost/twilio)** — LINE/WhatsApp push directly with the channel token (WhatsApp recipients have no + prefix and ride the 24h session window or a template); Matrix uses PUT + a transaction ID (the ! and : of room IDs must be escaped to %21/%3A explicitly — url.PathEscape leaves them alone); Rocket.Chat uses the X-User-Id/X-Auth-Token header pair; Zulip stream messages require a topic (Config default + Params override).
+
+**Webhook-shaped channels (slack/discord/gchat/teams/gotify/bark/ntfy/pushover/mattermost)** — Target semantics are in the overview table; Title-carrying combinations are laid out per platform convention (Slack/Google Chat use a bold mrkdwn line, Discord uses embed cards, Teams uses Adaptive Cards). Params has its own conventions in bark (native fields straight into JSON), pushover (native fields straight into the form), and ntfy/gotify (priority override) — see each package's docs.
+
+## Signing Helpers (exported by the sms package)
+
+The two vendors' outbound signing algorithms are exported as pure functions so custom clients can reuse them (e.g. to sign with the same credentials elsewhere):
+
+```go
+// Alibaba Cloud RPC style (HMAC-SHA1): canonical query sorted by parameter name,
+// stringToSign = "POST&%2F&" + percentEncode(canonical), key is AccessKeySecret + "&",
+// returns the base64 signature.
+func SignAliyunRPC(params url.Values, accessSecret string) string
+
+// Tencent Cloud TC3-HMAC-SHA256: a four-step derivation chain (date → service → tc3_request → stringToSign),
+// signing the entire JSON request body; now is the request instant.
+func SignTencentTC3(accessKeyID, accessSecret string, now time.Time, payload []byte) string
+```
+
+## Error Semantics
+
+Any error returned by `Send` means the delivery failed, in three classes:
+
+- **Configuration** (sentinel `notify.ErrNotConfigured`, defined in the root package `notify.go`): unconfigured / misconfigured / disabled / invalid target / SSRF-blocked — happens **before** contacting the peer, retrying never helps. Callers (ledger-style systems) book SKIPPED rather than FAILED.
+- **Invalid token** (sentinel `notify.ErrInvalidToken`, defined in the root package `notify.go`; the push package keeps the `push.ErrInvalidToken` alias): the vendor explicitly judged the recipient token dead (APNs 410/Unregistered, FCM 404/410, Huawei 0x80200xxx range, Xiaomi 20201/20202, OPPO 2008, vivo 10080, JPush 1011) — delete the device row and self-clean; retrying is pointless.
+- **Delivery** (any other error): dialed, submitted, and rejected by the peer or the link broke — retrying makes sense.
+
+The SSRF sentinel `notify.ErrBlockedTarget` is defined in the **root package** (`ssrf.go`); the webhook channel merely references it along the delivery chain via `errors.Is` (`webhook.go` files dial errors carrying it under the configuration class) — both blocked dials and dial failures are configuration-class, but whether DNS was ever touched is something you want to know when debugging:
+
+```go
+if errors.Is(err, notify.ErrBlockedTarget) {
+    // the target address was blocked by the SSRF guard: the peer was never contacted
+}
+```
+
+## SSRF Guard
+
+Outbound HTTP channels such as `webhook` use a client built by `NewGuardedClient(allowPrivate bool)`:
+
+- **The guard lives in dial, not URL validation**: the hostname is resolved here, one non-blocked IP is picked, and that IP is dialed directly — "the address checked" and "the address connected" are the same, which defeats records like `internal.example.com → 10.0.0.5` pointing intranet-ward;
+- **If any record of a name points intranet, the whole name is rejected** ("mixed" records are not allowed);
+- **No redirect following** (any 3xx counts as failure), 10s total request timeout, 5s dial timeout;
+- For local development, set the environment variable `NOTIFY_ALLOW_PRIVATE_TARGET=1` to turn the whole guard off (only the exact string `"1"` counts) — **never set this in production**.
+
+## Notes / Caveats
+
+- When `Service.Send` returns a non-nil error, the `Receipt` may still carry established facts (such as a vendor-side accepted ID);
+- Each channel's `New` errors out immediately on a misspelled provider name; missing required fields are caught by `Precheck` (sms) or at construction (APNs .p8 parsing) — neither should surface only at first delivery;
+- Config resolution, bookkeeping and retry orchestration are outside this package's scope;
+- Custom channels needing the SSRF guard can use the root package's exported `NewGuardedClient` / `IsBlockedIP` / `AllowPrivateTarget` directly.
 
 ## Credits
 
-发送层的原始实现在 go-wind-admin / go-wind-im 的通知渠道模块中打磨成形（SSRF 防线、签名风格、verdict 判据、access_token 缓存与台账错误语义），本包是其通用化抽取；其余渠道按官方文档以同一接口形态补齐。
+The sending layer's original implementation was polished in the notification channel modules of go-wind-admin / go-wind-im (the SSRF guard, signature styles, verdict criteria, access_token caching and ledger error semantics); this package is their generalized extraction. The remaining channels were added per official docs under the same interface shape.

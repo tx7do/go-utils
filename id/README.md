@@ -1,18 +1,32 @@
+# id
 
-# ID 生成器
+English | [简体中文](README.zh-CN.md)
 
-`id` package 提供多种唯一 ID 生成能力，覆盖通用主键、分布式时序 ID、订单号和机器标识。
+`id` is a standalone Go module (`github.com/tx7do/go-utils/id`) providing multiple unique-ID generation capabilities: general-purpose primary keys, distributed time-ordered IDs, order numbers, and machine identifiers.
 
-## 功能概览
+## Features
 
-- UUID/GUID：`NewGUIDv4`、`NewGUIDv7`（支持是否带横线）
-- 短 ID：`NewShortUUID`、`NewKSUID`、`NewXID`
-- 分布式 ID：`NewSnowflakeID`、`NewSonyflakeID`
-- MongoDB ID：`NewMongoObjectID`
-- 订单号：随机、自增、商户维度、带前缀 Snowflake/Sonyflake
-- 机器标识：`UnifyMachineID`、`FormatMachineID`
+- UUID/GUID: `NewGUIDv4`, `NewGUIDv7` (with or without hyphens)
+- Short IDs: `NewShortUUID`, `NewKSUID`, `NewXID`
+- MongoDB ID: `NewMongoObjectID`
+- Distributed IDs: `NewSnowflakeID` / `GenerateSnowflakeID`, `NewSonyflakeID` / `GenerateSonyflakeID`
+- Snowflake nodes: `NewSnowflakeNode` returns a reusable node instance with `Generate` / `GenerateString`
+- Order numbers: random, auto-incrementing, tenant-scoped, prefixed Snowflake/Sonyflake
+- Machine ID: `UnifyMachineID`, `FormatMachineID` (cross-platform, based on the embedded `id/machineid` subpackage)
 
-## 快速开始
+## Installation
+
+This package is a standalone module (it has its own `go.mod`), not a subpackage of the root module `github.com/tx7do/go-utils`:
+
+```bash
+go get github.com/tx7do/go-utils/id
+```
+
+```go
+import "github.com/tx7do/go-utils/id"
+```
+
+## Quick Start
 
 ```go
 package main
@@ -25,38 +39,42 @@ import (
 )
 
 func main() {
-	guid := id.NewGUIDv4(false)
-	guidV7 := id.NewGUIDv7(true)
+	guid := id.NewGUIDv4(false)   // 32 chars, no hyphens
+	guidV7 := id.NewGUIDv7(true)  // hyphenated UUIDv7 (falls back to v4 if the clock is unreliable)
 	shortID := id.NewShortUUID()
 	ksuid := id.NewKSUID()
 	xid := id.NewXID()
+	mongoID := id.NewMongoObjectID()
 
+	// Snowflake (nodes are cached by workerId and reused within the process)
 	sfID, err := id.NewSnowflakeID(1)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Sonyflake (process-wide singleton)
 	sonyID, err := id.NewSonyflakeID()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Machine ID (32 lowercase hex chars)
 	machineID, err := id.UnifyMachineID()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(guid, guidV7, shortID, ksuid, xid, sfID, sonyID, machineID)
+	fmt.Println(guid, guidV7, shortID, ksuid, xid, mongoID, sfID, sonyID, machineID)
 }
 ```
 
-## 主要 API
+## API Reference
 
-### UUID / 短 ID
+### UUID / Short IDs
 
 ```go
 func NewGUIDv4(withHyphen bool) string
-func NewGUIDv7(withHyphen bool) string
+func NewGUIDv7(withHyphen bool) string   // falls back to v4 if UUIDv7 generation fails
 func NewShortUUID() string
 func NewKSUID() string
 func NewXID() string
@@ -67,50 +85,69 @@ func NewMongoObjectID() string
 
 ```go
 func NewSnowflakeID(workerId int64) (int64, error)
-func GenerateSnowflakeID(workerId int64) int64
+func GenerateSnowflakeID(workerId int64) int64   // ignores errors, returns 0 on failure
 
-func NewSonyflakeID() (uint64, error)
-func GenerateSonyflakeID() uint64
+type SnowflakeNode struct{ /* ... */ }
+
+func NewSnowflakeNode(workerId int64) (*SnowflakeNode, error)
+func (sfNode *SnowflakeNode) Generate() int64
+func (sfNode *SnowflakeNode) GenerateString() string
+
+func NewSonyflakeID() (uint64, error)            // shares a single Sonyflake instance per process
+func GenerateSonyflakeID() uint64                // ignores errors, returns 0 on failure
 ```
 
-### 订单号
+- `NewSnowflakeID` / `GenerateSnowflakeID` cache `SnowflakeNode` instances by `workerId` in a process-wide `sync.Map`; the same `workerId` reuses the same node
+- Use `NewSnowflakeNode` directly when you need to hold an independent node instance for a long time (e.g. custom serialization scenarios)
+- The valid `workerId` range is 0–1023 (a 10-bit node constraint from the upstream `bwmarrin/snowflake` library); out-of-range values make `NewSnowflakeNode` return an error
+
+### Order Numbers
 
 ```go
-func GenerateOrderIdWithRandom(prefix string, tm *time.Time) string
-func GenerateOrderIdWithIncreaseIndex(prefix string, tm *time.Time) string
-func GenerateOrderIdWithTenantId(tenantID string) string
+func GenerateOrderIdWithRandom(prefix string, tm *time.Time) string          // prefix + 14-digit timestamp + 4-digit random number
+func GenerateOrderIdWithIncreaseIndex(prefix string, tm *time.Time) string   // prefix + 14-digit timestamp + auto-incrementing index
+func GenerateOrderIdWithTenantId(tenantID string) string                     // 14-digit timestamp + 5-char tenant ID + 4-digit random number
 func GenerateOrderIdWithPrefixSonyflake(prefix string) string
 func GenerateOrderIdWithPrefixSnowflake(workerId int64, prefix string) string
 ```
+
+- Passing `nil` for `tm` uses the current time
+- The auto-increment index is an in-process `uint32` counter: it starts at 0 and wraps back to 0 upon reaching 1000 (via `atomic.CompareAndSwap`); it is not persisted
+- `GenerateOrderIdWithTenantId`: tenant IDs longer than 5 chars are truncated; shorter ones are right-padded with `'0'`
 
 ### Machine ID
 
 ```go
 type FormatOption struct {
-	UpperCase  bool
-	WithHyphen bool
+	UpperCase  bool // true: uppercase, false: lowercase
+	WithHyphen bool // true: with hyphens, false: without
 }
 
-func UnifyMachineID() (string, error)
+func UnifyMachineID() (string, error)                  // equivalent to FormatMachineID{lowercase, no hyphens}
 func FormatMachineID(opt FormatOption) (string, error)
 ```
 
-- `UnifyMachineID`：返回 32 位小写十六进制字符串
-- `FormatMachineID`：支持大小写与 GUID 横线格式（8-4-4-4-12）
-- 当底层返回值格式异常时，会自动降级为哈希结果，保证稳定输出
+- `UnifyMachineID` returns a 32-char lowercase hexadecimal string
+- `FormatMachineID` supports upper/lowercase and GUID hyphen format (8-4-4-4-12)
+- If the cleaned underlying value is shorter than 32 hex chars, it automatically falls back to the first 32 chars of its SHA-256 hash, keeping the output length stable
 
-## Machine ID 平台说明
+## Notes
 
-底层依赖 `id/machineid` 子包，支持多平台（Windows、Linux、macOS、BSD、AIX、Z/OS）。
+- The underlying machine ID is read only once per process (`sync.Once` cache) by `UnifyMachineID` / `FormatMachineID`; later calls always return the cached value, so changing the system machine ID at runtime is not reflected
+- The `Generate*` helpers swallow underlying errors (returning the zero value on failure); prefer the `New*` functions and handle `error` in business code
+- Snowflake/Sonyflake rely on a monotonic clock; in multi-process deployments make sure each process uses a distinct `workerId`
+- This package depends on several mature third-party libraries (`google/uuid`, `bwmarrin/snowflake`, `sony/sonyflake`, `segmentio/ksuid`, `rs/xid`, `lithammer/shortuuid`, `mongo-driver`, etc.)
 
-## 说明
+## Platform Support
 
-- 本包依赖多个成熟第三方库（如 `uuid`、`snowflake`、`sonyflake`、`ksuid` 等）
-- `Generate*` 系列方法通常会忽略底层错误，业务中建议优先使用 `New*` 并处理 `error`
+Machine IDs are backed by the [`id/machineid`](./machineid/README.md) subpackage and work on Windows, Linux, macOS, BSD/Solaris, AIX, and z/OS without admin privileges.
 
-## 测试
+## Testing
 
-```sh
+```bash
 go test ./...
 ```
 
+## License
+
+MIT

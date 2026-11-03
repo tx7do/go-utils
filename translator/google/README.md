@@ -1,24 +1,43 @@
-# Google 翻译 (Google Translator)
+# google
 
-Google 翻译是谷歌提供的强大在线翻译服务，支持 100+ 种语言。本模块提供了三个版本的 Google 翻译 API 集成。
+Go translator wrapper for Google Translate, integrating three versions of the API: V1 (free unofficial endpoint), V2, and V3 (official Cloud Translation API).
 
-## 特性
+English | [简体中文](README.zh-CN.md)
 
-- 📚 **三个版本支持**：V1、V2、V3 API
-- 🌍 **100+ 语言支持**：覆盖全球大部分主流语言
-- 🔄 **灵活的配置**：支持 Options 模式动态配置
-- 🚀 **高性能**：优化的请求处理
-- 📱 **接口统一**：实现标准 `Translator` 接口
+## Introduction
 
-## 安装
+This module (`github.com/tx7do/go-utils/translator/google`) is the Google Translate implementation of the translator components in [go-utils](https://github.com/tx7do/go-utils). It is an **independent Go module** (with its own `go.mod`).
 
-```bash
-go get -u github.com/chenmingyong/go-utils/translator/google
+It provides a unified `Translate` entry point that dispatches to V1 / V2 / V3 based on the configured version, and the versioned methods can also be called directly. Its method signature matches the `Translator` interface of go-utils:
+
+```go
+// Translate translates text.
+func (t *Translator) Translate(source, sourceLang, targetLang string) (string, error)
 ```
 
-## 快速开始
+## Features
 
-### 基础使用（V1 - 免费方案）
+- **Three API versions**: V1 free unofficial endpoint; V2 and V3 are official APIs requiring an API Key
+- **Unified entry point**: `Translate` dispatches automatically according to `WithVersion`
+- **Direct versioned calls**: `TranslateV1` / `TranslateV2` / `TranslateV3`
+- **Automatic source-language detection**: V1 and V3 accept `auto`; V2 always detects automatically and returns the detected language
+- **Matches the `Translator` interface shape**: `Translate(source, sourceLang, targetLang string) (string, error)`
+
+## Installation
+
+This module is an independent Go module:
+
+```bash
+go get github.com/tx7do/go-utils/translator/google
+```
+
+```go
+import "github.com/tx7do/go-utils/translator/google"
+```
+
+## Quick Start
+
+### Basic usage (V1, free, no credentials)
 
 ```go
 package main
@@ -26,14 +45,17 @@ package main
 import (
 	"fmt"
 	"log"
-	"github.com/chenmingyong/go-utils/translator/google"
+
+	"github.com/tx7do/go-utils/translator/google"
 )
 
 func main() {
-	// V1 不需要 API Key，可直接使用
+	// NewTranslator(opts ...Option) *Translator; it does not return an error.
+	// Without options it defaults to V1.
 	translator := google.NewTranslator()
 
-	result, err := translator.Translate("Hello, world!", "en", "zh-CN")
+	// "auto" as the source language enables automatic detection
+	result, err := translator.Translate("Hello, world!", "auto", "zh-CN")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,336 +64,275 @@ func main() {
 }
 ```
 
-### 使用 V2 API（官方 API，需要 API Key）
+### Using the V2 API (official API, requires an API Key)
 
 ```go
 translator := google.NewTranslator(
-google.WithVersion("v2"),
-google.WithApiKey("your_google_api_key"),
+	google.WithVersion("v2"),
+	google.WithApiKey("your_google_api_key"),
 )
 
-result, err := translator.Translate("Hello", "en", "zh")
+// Translate returns (string, error)
+result, err := translator.Translate("Hello", "en", "zh-CN")
 if err != nil {
-log.Fatal(err)
+	log.Fatal(err)
 }
-
 fmt.Println("Translation:", result)
 ```
 
-### 使用 V3 API（最新版本）
+### Using the V3 API (official API, requires an API Key)
 
 ```go
 translator := google.NewTranslator(
-google.WithVersion("v3"),
-google.WithApiKey("your_google_api_key"),
+	google.WithVersion("v3"),
+	google.WithApiKey("your_google_api_key"),
 )
 
-result, err := translator.Translate("Hello", "en", "zh")
+result, err := translator.Translate("Hello", "en", "zh-CN")
 if err != nil {
-log.Fatal(err)
+	log.Fatal(err)
 }
-
 fmt.Println("Translation:", result)
 ```
 
-## API 文档
+## Configuration / Options
 
 ### NewTranslator
-
-创建一个新的 Google 翻译器。
 
 ```go
 func NewTranslator(opts ...Option) *Translator
 ```
 
-**参数：**
+**Parameters:** `opts`: optional configuration options.
 
-- `opts`: 可选的配置选项
-
-**返回值：**
-
-- `*Translator`: 翻译器实例
-
-**示例：**
-
-```go
-translator := google.NewTranslator(
-google.WithVersion("v2"),
-google.WithApiKey("your_api_key"),
-)
-```
+**Returns:** a `*Translator` instance; it does **not** return an error.
 
 ### Translate
-
-翻译文本。
 
 ```go
 func (t *Translator) Translate(source, sourceLang, targetLang string) (string, error)
 ```
 
-**参数：**
+Dispatches according to the version set with `WithVersion`:
 
-- `source`: 要翻译的文本
-- `sourceLang`: 源语言代码
-- `targetLang`: 目标语言代码
+- `"v1"` or empty (default) → `TranslateV1`
+- `"v2"` → `TranslateV2` (discards the detected language and returns only the text)
+- `"v3"` → `TranslateV3`
 
-**返回值：**
-
-- `string`: 翻译结果
-- `error`: 错误信息
-
-**示例：**
-
-```go
-result, err := translator.Translate("Hello", "en", "zh-CN")
-if err != nil {
-log.Fatal(err)
-}
-fmt.Println(result) // 你好
-```
-
-### Options（配置选项）
-
-#### WithVersion
-
-设置 API 版本。
+### WithVersion
 
 ```go
 func WithVersion(version string) Option
 ```
 
-**支持的版本：**
+Sets the API version to use: `"v1"` (default), `"v2"`, `"v3"`.
 
-- `"v1"`: 免费 API（默认），无需认证
-- `"v2"`: 谷歌官方 V2 API，需要 API Key
-- `"v3"`: 谷歌最新的 V3 API，需要 API Key
-
-**示例：**
-
-```go
-google.WithVersion("v2")
-```
-
-#### WithApiKey
-
-设置 Google API Key。
+### WithApiKey
 
 ```go
 func WithApiKey(key string) Option
 ```
 
-**示例：**
+Sets the Google API Key, required for V2 / V3; V1 does not need one.
+
+## Advanced Usage
+
+### Calling a Specific Version Directly
+
+Besides `Translate`, all three versioned methods can be called directly:
 
 ```go
-google.WithApiKey("AIzaSyDo...")
+func (t *Translator) TranslateV1(source, sourceLang, targetLang string) (string, error)
+
+func (t *Translator) TranslateV2(source, sourceLang, targetLang string) (string, language.Tag, error)
+
+func (t *Translator) TranslateV3(source, sourceLang, targetLang string) (string, error)
 ```
 
-## 三个版本的对比
-
-| 特性         | V1     | V2  | V3  |
-|------------|--------|-----|-----|
-| 是否免费       | ✅ 是    | ❌ 否 | ❌ 否 |
-| 需要 API Key | ❌ 否    | ✅ 是 | ✅ 是 |
-| 官方支持       | ⚠️ 半支持 | ✅ 是 | ✅ 是 |
-| 速度         | 中      | 快   | 最快  |
-| 准确度        | 良好     | 很好  | 最优  |
-| 使用限制       | 有（非官方） | 有   | 有   |
-
-### 版本选择建议
-
-- **V1**：适合小流量项目、演示、学习
-- **V2**：适合需要稳定、官方支持的项目
-- **V3**：适合大规模、高性能需求的项目
-
-## 支持的语言代码
-
-### 主流语言
-
-| 语言     | 代码      | 语言    | 代码   |
-|--------|---------|-------|------|
-| 中文（简体） | `zh-CN` | 英语    | `en` |
-| 中文（繁体） | `zh-TW` | 日语    | `ja` |
-| 韩语     | `ko`    | 俄语    | `ru` |
-| 德语     | `de`    | 法语    | `fr` |
-| 西班牙语   | `es`    | 意大利语  | `it` |
-| 葡萄牙语   | `pt`    | 荷兰语   | `nl` |
-| 瑞典语    | `sv`    | 挪威语   | `no` |
-| 丹麦语    | `da`    | 芬兰语   | `fi` |
-| 波兰语    | `pl`    | 捷克语   | `cs` |
-| 罗马尼亚语  | `ro`    | 匈牙利语  | `hu` |
-| 保加利亚语  | `bg`    | 克罗地亚语 | `hr` |
-| 塞尔维亚语  | `sr`    | 乌克兰语  | `uk` |
-| 俄语     | `ru`    | 白俄罗斯语 | `be` |
-
-### 亚洲语言
-
-| 语言     | 代码   | 语言    | 代码   |
-|--------|------|-------|------|
-| 泰语     | `th` | 越南语   | `vi` |
-| 老挝语    | `lo` | 缅甸语   | `my` |
-| 柬埔寨语   | `km` | 印尼语   | `id` |
-| 马来语    | `ms` | 菲律宾语  | `tl` |
-| 孟加拉语   | `bn` | 印地语   | `hi` |
-| 乌尔都语   | `ur` | 巴基斯坦语 | `pa` |
-| 古吉拉特语  | `gu` | 卡纳达语  | `kn` |
-| 泰卢固语   | `te` | 泰米尔语  | `ta` |
-| 马拉雅拉姆语 | `ml` | 马拉地语  | `mr` |
-
-### 中东和非洲语言
-
-| 语言    | 代码   | 语言    | 代码   |
-|-------|------|-------|------|
-| 阿拉伯语  | `ar` | 希伯来语  | `iw` |
-| 波斯语   | `fa` | 土耳其语  | `tr` |
-| 库尔德语  | `ku` | 阿塞拜疆语 | `az` |
-| 斯瓦希里语 | `sw` | 豪萨语   | `ha` |
-| 约鲁巴语  | `yo` | 伊博语   | `ig` |
-| 科萨语   | `xh` | 祖鲁语   | `zu` |
-
-### 欧洲语言
-
-| 语言     | 代码   | 语言     | 代码   |
-|--------|------|--------|------|
-| 阿尔巴尼亚语 | `sq` | 巴斯克语   | `eu` |
-| 加泰罗尼亚语 | `ca` | 科西嘉语   | `co` |
-| 加利西亚语  | `gl` | 冰岛语    | `is` |
-| 爱尔兰语   | `ga` | 拉丁语    | `la` |
-| 卢森堡语   | `lb` | 马耳他语   | `mt` |
-| 威尔士语   | `cy` | 苏格兰盖尔语 | `gd` |
-
-### 其他语言
-
-| 语言    | 代码    | 语言      | 代码    |
-|-------|-------|---------|-------|
-| 格鲁吉亚语 | `ka`  | 亚美尼亚语   | `hy`  |
-| 阿姆哈拉语 | `am`  | 爱沙尼亚语   | `et`  |
-| 拉脱维亚语 | `lv`  | 立陶宛语    | `lt`  |
-| 马其顿语  | `mk`  | 蒙古语     | `mn`  |
-| 尼泊尔语  | `ne`  | 僧伽罗语    | `si`  |
-| 世界语   | `eo`  | 毛利语     | `mi`  |
-| 夏威夷语  | `haw` | 海地克里奥尔语 | `ht`  |
-| 萨摩亚语  | `sm`  | 卢旺达语    | `rw`  |
-| 马尔加什语 | `mg`  | 哈萨克语    | `kk`  |
-| 吉尔吉斯语 | `ky`  | 乌兹别克语   | `uz`  |
-| 塔吉克语  | `tg`  | 土库曼语    | `tk`  |
-| 维吾尔语  | `ug`  | 普什图语    | `ps`  |
-| 信德语   | `sd`  | 奥利亚语    | `or`  |
-| 鞑靼语   | `tt`  | 弗里西语    | `fy`  |
-| 修纳语   | `sn`  | 齐切瓦语    | `ny`  |
-| 索马里语  | `so`  | 印尼爪哇语   | `jw`  |
-| 印尼巽他语 | `su`  | 宿务语     | `ceb` |
-| 意第绪语  | `yi`  | 苗语      | `hmn` |
-
-## 获取 API Key
-
-### 获取 Google API Key
-
-1. 访问 [Google Cloud Console](https://console.cloud.google.com/)
-2. 创建新项目
-3. 启用 Google Translate API
-4. 创建 API Key
-5. 复制 API Key 到配置中
-
-### 费用
-
-- **V1**: 免费（非官方 API）
-- **V2**: 按使用量计费（约 ¥15.5/100万字符）
-- **V3**: 按使用量计费（约 ¥15.5/100万字符）
-
-## 错误处理
+- **TranslateV1**: requests the free unofficial endpoint (`translate.googleapis.com/translate_a/single`); no authentication required.
+- **TranslateV2**: returns a **three-value tuple** `(text, detected source language, error)` where the second value is a `golang.org/x/text/language.Tag`. The `sourceLang` parameter is **ignored** — V2 always detects the source language automatically. `targetLang` is parsed with `language.Parse` and must be a valid BCP-47 language tag (such as `zh-CN` or `es`); a parse failure returns an error.
+- **TranslateV3**: calls the official Cloud Translation API v3 (`TranslateText`), always using the `text/plain` MIME type; `sourceLang` may be `auto`.
 
 ```go
-result, err := translator.Translate("Hello", "en", "zh-CN")
-if err != nil {
-switch err.Error() {
-case "error getting translate.googleapis.com":
-log.Println("网络连接错误")
-case "error 400 (Bad Request)":
-log.Println("请求参数错误")
-case "error unmarshalling data":
-log.Println("响应解析错误")
-default:
-log.Println("其他错误:", err)
-}
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/tx7do/go-utils/translator/google"
+)
+
+func main() {
+	translator := google.NewTranslator(google.WithApiKey("your_google_api_key"))
+
+	// TranslateV2 returns (text, detected source language, error); "en" is ignored
+	text, detected, err := translator.TranslateV2("Hello, world!", "en", "zh-CN")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Translation:", text)
+	fmt.Println("Detected source language:", detected.String())
 }
 ```
 
-## 最佳实践
+### Version Comparison
 
-### 1. 错误处理
+| Feature | V1 | V2 | V3 |
+|---------|----|----|----|
+| Free? | Free (unofficial endpoint, no SLA) | No (pay per use) | No (pay per use) |
+| API Key required | No | Yes | Yes |
+| Officially supported | No | Yes | Yes |
+| Source language | Supports `auto` | `sourceLang` ignored, always auto-detected | Supports `auto` |
+| Return value | Text | Text + detected source language (`TranslateV2`) | Text |
+| MIME type | - | - | Fixed `text/plain` |
+
+**Choosing a version**:
+
+- **V1**: for low-traffic projects, prototyping, and learning; it is an unofficial endpoint that may change or be rate-limited at any time
+- **V2**: for projects that need official support and the detected source language
+- **V3**: the currently recommended official API version
+
+### Error Handling
 
 ```go
-result, err := translator.Translate(text, sourceLang, targetLang)
-if err != nil {
-// 记录错误
-log.Printf("翻译失败: %v", err)
-// 返回原文或缓存结果
-return text, nil
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/tx7do/go-utils/translator/google"
+)
+
+func main() {
+	translator := google.NewTranslator()
+
+	result, err := translator.Translate("Hello", "en", "zh-CN")
+	if err != nil {
+		log.Printf("translate failed: %v", err)
+		return
+	}
+
+	fmt.Println(result)
 }
 ```
 
-### 2. 缓存翻译结果
+**V1** returns fixed error strings that can be matched with `err.Error()` (**V1 only**):
+
+- `error getting translate.googleapis.com`
+- `error reading response body`
+- `error 400 (Bad Request)`
+- `error unmarshalling data`
+- `no translated data in response`
+
+**V2 / V3** return errors from the official SDKs (including gRPC status context); handle them as plain `error` values and do **not** match on strings.
+
+### Using the Unified Interface
+
+This module does not import `go-utils/translator`, but its `Translate` method signature matches the `Translator` interface, so it can be assigned directly:
 
 ```go
-var cache = make(map[string]string)
+package main
 
-func translateWithCache(text, sourceLang, targetLang string) string {
-key := fmt.Sprintf("%s_%s_%s", text, sourceLang, targetLang)
-if v, ok := cache[key]; ok {
-return v
-}
+import (
+	"github.com/tx7do/go-utils/translator"
+	"github.com/tx7do/go-utils/translator/google"
+)
 
-result, _ := translator.Translate(text, sourceLang, targetLang)
-cache[key] = result
-return result
+func main() {
+	tr := google.NewTranslator() // defaults to V1, free
+	var iface translator.Translator = tr
+	_, _ = iface.Translate("Hello", "en", "zh-CN")
 }
 ```
 
-### 3. 批量翻译
+## Supported Language Codes
 
-```go
-func translateBatch(items []string, sourceLang, targetLang string) []string {
-results := make([]string, len(items))
-for i, item := range items {
-result, _ := translator.Translate(item, sourceLang, targetLang)
-results[i] = result
-}
-return results
-}
-```
+The following are Google-style language codes (as used by Google Translate — e.g. Hebrew is `iw`, Simplified Chinese is `zh-CN`), 109 in total. The source language may be `auto`; V2 target languages must be parseable by `language.Parse`. The full list is in the [Google Translate language list](https://cloud.google.com/translate/docs/languages).
 
-### 4. 超时控制（V2/V3）
+| Language | Code | Language | Code |
+|----------|------|----------|------|
+| Albanian | `sq` | Burmese | `my` |
+| Arabic | `ar` | Hmong | `hmn` |
+| Amharic | `am` | Xhosa | `xh` |
+| Azerbaijani | `az` | Zulu | `zu` |
+| Irish | `ga` | Nepali | `ne` |
+| Estonian | `et` | Norwegian | `no` |
+| Odia | `or` | Punjabi | `pa` |
+| Basque | `eu` | Portuguese | `pt` |
+| Belarusian | `be` | Pashto | `ps` |
+| Bulgarian | `bg` | Chichewa | `ny` |
+| Icelandic | `is` | Japanese | `ja` |
+| Polish | `pl` | Swedish | `sv` |
+| Bosnian | `bs` | Samoan | `sm` |
+| Persian | `fa` | Serbian | `sr` |
+| Afrikaans | `af` | Sesotho | `st` |
+| Tatar | `tt` | Sinhala | `si` |
+| Danish | `da` | Esperanto | `eo` |
+| German | `de` | Slovak | `sk` |
+| Russian | `ru` | Slovenian | `sl` |
+| French | `fr` | Swahili | `sw` |
+| Filipino | `tl` | Scottish Gaelic | `gd` |
+| Finnish | `fi` | Cebuano | `ceb` |
+| Frisian | `fy` | Somali | `so` |
+| Khmer | `km` | Tajik | `tg` |
+| Georgian | `ka` | Telugu | `te` |
+| Gujarati | `gu` | Tamil | `ta` |
+| Kazakh | `kk` | Thai | `th` |
+| Haitian Creole | `ht` | Turkish | `tr` |
+| Korean | `ko` | Turkmen | `tk` |
+| Hausa | `ha` | Welsh | `cy` |
+| Dutch | `nl` | Uyghur | `ug` |
+| Kyrgyz | `ky` | Urdu | `ur` |
+| Galician | `gl` | Ukrainian | `uk` |
+| Catalan | `ca` | Uzbek | `uz` |
+| Czech | `cs` | Spanish | `es` |
+| Kannada | `kn` | Hebrew | `iw` |
+| Corsican | `co` | Greek | `el` |
+| Croatian | `hr` | Hawaiian | `haw` |
+| Kurdish | `ku` | Sindhi | `sd` |
+| Latin | `la` | Hungarian | `hu` |
+| Latvian | `lv` | Shona | `sn` |
+| Lao | `lo` | Armenian | `hy` |
+| Lithuanian | `lt` | Igbo | `ig` |
+| Luxembourgish | `lb` | Italian | `it` |
+| Kinyarwanda | `rw` | Yiddish | `yi` |
+| Romanian | `ro` | Hindi | `hi` |
+| Malagasy | `mg` | Sundanese | `su` |
+| Maltese | `mt` | Indonesian | `id` |
+| Marathi | `mr` | Javanese | `jw` |
+| Malayalam | `ml` | English | `en` |
+| Malay | `ms` | Yoruba | `yo` |
+| Macedonian | `mk` | Vietnamese | `vi` |
+| Maori | `mi` | Chinese (Traditional) | `zh-TW` |
+| Mongolian | `mn` | Chinese (Simplified) | `zh-CN` |
+| Bengali | `bn` |  |  |
 
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-defer cancel()
+## Obtaining an API Key
 
-// 在 V2/V3 中使用 context 控制超时
-```
+1. Visit the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create (or select) a project
+3. Enable the Cloud Translation API
+4. Create an API Key and pass it to `WithApiKey`
 
-## 常见问题
+### Pricing
 
-### Q: V1 API 会被官方停用吗？
+- **V1**: free (unofficial endpoint, no SLA)
+- **V2 / V3**: pay per use — see [Google Cloud pricing](https://cloud.google.com/translate/pricing)
 
-A: V1 是非官方 API，没有 SLA 保证，但目前仍在工作。建议重要项目使用 V2 或 V3。
+## Notes
 
-### Q: 如何选择语言代码？
+- **No context support**: `Translate` and all versioned methods accept no `context.Context`; V2 / V3 create their clients and call the API with a fixed `context.Background()` internally, so no timeout can be passed in from outside. To apply a timeout, wrap the call externally with a goroutine + `select`.
+- **Clients are lazily created and cached**: the V2 / V3 clients are created on first use and stored in the `Translator` instance; reuse the instance instead of rebuilding it.
+- **V1 is unofficial**: implemented against the web translate endpoint, with no official SLA; it may change, be rate-limited, or stop working at any time. Avoid it for critical workloads.
+- **V2 ignores the source language**: regardless of what `sourceLang` is, V2 detects the language automatically and reports it via `TranslateV2`'s second return value.
+- **V1 is rate-limited**: there is no official quota documentation for this endpoint; control your request rate and prepare a fallback for throttling.
+- Advanced capabilities (very large texts, HTML translation via V3's `text/html` MIME) are not wrapped by this module; use the official SDK directly when needed.
 
-A:
+## Dependencies
 
-- 对于中文，使用 `zh-CN`（简体）或 `zh-TW`（繁体）
-- 对于英文，使用 `en`
-- 其他语言参考上面的语言表格
-
-### Q: V1 API 有速率限制吗？
-
-A: 是的，建议不要超过 1000 请求/天。
-
-### Q: 如何处理翻译错误？
-
-A: 检查网络连接、语言代码、API Key 有效性等。
-
-## 依赖项
+Matching `go.mod`:
 
 ```
 cloud.google.com/go/translate v1.12.7
@@ -379,13 +340,17 @@ golang.org/x/text v0.34.0
 google.golang.org/api v0.269.0
 ```
 
+## Acknowledgements
+
+- [Google Cloud Translation API](https://cloud.google.com/translate/docs)
+- [cloud.google.com/go/translate Go SDK](https://github.com/googleapis/google-cloud-go)
+
+## Related Links
+
+- [Google Cloud Console](https://console.cloud.google.com/)
+- [Google Translate language list](https://cloud.google.com/translate/docs/languages)
+- [Project home](https://github.com/tx7do/go-utils)
+
 ## License
 
-遵循项目原有的 License。
-
-## 相关链接
-
-- [Google Translate API 文档](https://cloud.google.com/translate/docs)
-- [Google Translate 语言代码](https://cloud.google.com/translate/docs/languages)
-- [Google Cloud Console](https://console.cloud.google.com/)
-- [项目主页](https://github.com/chenmingyong/go-utils)
+Released under the project [MIT License](https://github.com/tx7do/go-utils/blob/main/LICENSE).

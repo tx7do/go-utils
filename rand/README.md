@@ -1,13 +1,37 @@
 # rand
 
-`rand` 包提供两套随机能力：
+English | [简体中文](README.zh-CN.md)
 
-- **全局函数**：开箱即用，适合简单场景。
-- **Randomizer 实例**：可选择随机源和种子策略，适合需要可控行为的场景。
+`rand` is a standalone Go module (`github.com/tx7do/go-utils/rand`) built on Go 1.25's `math/rand/v2`, providing two layers of randomness:
 
-同时提供 `Seeder`（种子生成）和基于 SHA-256 的随机源扩展。
+- **Global functions**: ready to use, best for simple cases
+- **`Randomizer` instances**: choose the random source and seeding strategy, with fixed-seed reproducibility for controlled behavior
 
-## 快速开始
+It also provides `Seeder` (seed generation), `Sha256Source` (a SHA-256-based random source), and an O(1) weighted alias table.
+
+## Features
+
+- Four random sources: PCG (default), ChaCha8, SHA-256, Zipf
+- Five seeding strategies: UnixNano, MapHash, CryptoRand (default), RandomString, Fixed
+- Options-style construction: `New(opts ...Option)`
+- Rich business helpers: ranges, strings, times, weights, distributions (normal/exponential/log-normal/truncated normal), game dice, probability hits, jitter, and more
+- O(1) weighted sampling: `NewAliasTable*` + `AliasChoice`
+
+## Installation
+
+This package is a standalone module (it has its own `go.mod`), not a subpackage of the root module `github.com/tx7do/go-utils`:
+
+```bash
+go get github.com/tx7do/go-utils/rand
+```
+
+```go
+import utilsrand "github.com/tx7do/go-utils/rand"
+```
+
+> The package name is `rand`, which collides with the standard library `math/rand`; import it with an alias (e.g. `utilsrand`).
+
+## Quick Start
 
 ```go
 package main
@@ -19,111 +43,164 @@ import (
 )
 
 func main() {
-	// 1) 全局函数
+	// 1) Global functions
 	fmt.Println(utilsrand.RandomInt(1, 10))
 	fmt.Println(utilsrand.RandomString(12))
 
-	// 2) Randomizer（PCG + UnixNanoSeed）
-	r := utilsrand.NewRandomizer(utilsrand.PCGRandType, utilsrand.UnixNanoSeed)
+	// 2) Options style (defaults: PCG + CryptoRand seed)
+	r := utilsrand.New()
 	fmt.Println(r.RangeUint64(100, 200))
+	fmt.Println(r.PickString([]string{"a", "b", "c"}))
 
-	// 3) Zipf 分布
+	// 3) Legacy API: explicit random source and seeding strategy
+	r2 := utilsrand.NewRandomizer(utilsrand.PCGRandType, utilsrand.UnixNanoSeed)
+	fmt.Println(r2.RangeUint64(100, 200))
+
+	// 4) Zipf distribution (all four sources construct fine; the Zipf type additionally enables Zipf sampling)
 	z := utilsrand.NewZipfRandomizer(utilsrand.UnixNanoSeed, 1.2, 1.0, 100)
 	fmt.Println(z.ZipfUint64())
+
+	// 5) Fixed seed (reproducible sequence, useful in tests)
+	r3 := utilsrand.New(
+		utilsrand.WithRandType(utilsrand.PCGRandType),
+		utilsrand.WithFixedSeed(42),
+	)
+	fmt.Println(r3.IntN(100))
 }
 ```
 
-## 主要能力
+## Global Functions (rand.go)
 
-### 1) 全局随机函数（`rand.go`）
+- Floats: `Float32()`, `Float64()` (`[0, 1)`)
+- Basic ranges: `IntN`, `Int32N`, `Int64N` (`[0, n)`)
+- Closed-interval randoms: `RandomInt` / `RandomInt32` / `RandomInt64` / `RandomUint` / `RandomUint32` / `RandomUint64` / `RandomDuration`
+- Strings: `RandomString(l)` (letters + digits; returns "" for `l <= 0`)
+- Generic picking: `RandomChoice[T](array []T, n int) []T` (picks n elements without modifying the input)
+- Shuffling: `Shuffle[T any](array []T)` (in-place Fisher–Yates)
+- Weighted picks: `WeightedChoice`, `NonWeightedChoice`
+- Hash-based value: `SHA256Value(serverSeed, clientSeed string, nonce uint64) uint64`
 
-- 浮点：`Float32()`、`Float64()`（区间 `[0, 1)`）
-- 基础范围：`IntN`、`Int32N`、`Int64N`
-- 区间随机（闭区间）：
-  - `RandomInt` / `RandomInt32` / `RandomInt64`
-  - `RandomUint` / `RandomUint32` / `RandomUint64`
-  - `RandomDuration`
-- 其它：`RandomString`、`RandomChoice`、`Shuffle`
-- 权重选择：`WeightedChoice`、`NonWeightedChoice`
-- 哈希随机值：`SHA256Value(serverSeed, clientSeed, nonce)`
+## Randomizer (randomizer.go)
 
-### 2) `Randomizer`（`randomizer.go`）
-
-构造函数：
+### Construction
 
 ```go
-r := NewRandomizer(randType, seedType)
+func New(opts ...Option) *Randomizer                          // Options style; defaults PCG + CryptoRand
+func Default() *Randomizer                                    // process-wide shared default instance
+func NewRandomizer(randType RandType, seedType SeedType) *Randomizer       // legacy API
+func NewRandomizerWithSeed(randType RandType, seed uint64) *Randomizer     // legacy API
+func NewZipfRandomizer(seedType SeedType, s, q float64, v uint64) *Randomizer // legacy API
 ```
 
-支持的 `RandType`：
+### Options
 
-- `PCGRandType`（默认推荐）
-- `ChaCha8RandType`
-- `SHA256RandType`
-- `ZipfRandType`（注意：`NewRandomizer` 对该类型返回 `nil`，请使用 `NewZipfRandomizer`）
+| Option | Description |
+|--------|-------------|
+| `WithRandType(t RandType)` | Random source: `PCGRandType` (default) / `ChaCha8RandType` / `SHA256RandType` (for tests, not high performance) / `ZipfRandType` |
+| `WithSeedType(t SeedType)` | Seeding strategy: `CryptoRandSeed` (default) / `UnixNanoSeed` / `MapHashSeed` / `RandomStringSeed` / `FixedSeed` |
+| `WithFixedSeed(seed uint64)` | Fixed seed, highest priority (reproducible sequences) |
+| `WithZipfParams(s, q float64, v uint64)` | Zipf parameters (defaults s=1.1, q=1.0, v=100) |
+| `WithSecureMode()` | Cryptographically secure mode: `SecureInt64` then uses `crypto/rand` |
 
-支持的 `SeedType` 见下文 `Seeder`。
+> All four `RandType` values (including `ZipfRandType`) construct a valid `Randomizer`; the Zipf type only uses Zipf sampling in `ZipfUint64`/`Uint64`, while all other methods behave like the PCG type.
 
-`Randomizer` 提供与全局函数对应的方法：
+### Basic Methods
 
-- `RangeInt/RangeInt32/RangeInt64`
-- `RangeUint/RangeUint32/RangeUint64`
-- `RangeFloat32/RangeFloat64`
-- `WeightedChoice` / `NonWeightedChoice`
-- `RandomString` / `Shuffle`
-- `ZipfUint64`
+- Floats/integers: `Float32`, `Float64`, `Int`, `Int32`, `Int64`, `Uint32`, `Uint64`, `IntN`, `Int32N`, `Int64N`, `UintN`, `Uint32N`, `Uint64N`
+- Closed intervals: `RangeInt`, `RangeInt32`, `RangeInt64`, `RangeUint`, `RangeUint32`, `RangeUint64`, `RangeFloat32`, `RangeFloat64`
+- Weights: `WeightedChoice`, `NonWeightedChoice`, `WeightedBool(trueWeight, falseWeight int) bool`
+- Strings: `RandomString(l)` (requires `l >= 0`), `StringWithCharset(length, charset)`, `Hex(length)`, `LetterString(length)`
+- Distributions: `Normal(mean, stdDev)`, `Exp(lambda)`, `TruncatedNormal(mean, std, low, high)`, `LogNormal(mean, std)`, `ZipfUint64`, `Perm(n)`
+- Others: `Bool()`, `TimeBetween(min, max time.Time)`, `SecureInt64() int64`, `Shuffle(n int, swap func(i, j int))`
 
-## Seeder（`seeder.go`）
+### Representative Business Methods (selected)
 
-用于生成 `int64` 种子，构造方式：
+| Category | Methods |
+|----------|---------|
+| Picking | `Pick([]any) any`, `PickString([]string) string`, `PickInt([]int) int`, `RandomPickUniqueStr/RandomPickUniqueInt/RandomPickUnique(list, count)` |
+| Fake data | `UUID()`, `PhoneNumber()` (mainland China prefixes), `Email()`, `IDCard()` (simplified, not a real algorithm), `RandomIPv4/IPv6`, `RandomLatLng`, `RandomColorHex/RGB`, `RandomFilePath` |
+| Probability | `ProbabilityHit(p float64) bool` (percent 0–100), `ProbPermilleHit(permille int) bool` (permille 0–1000), `CritHit(rate)` |
+| Jitter | `JitterDuration(base, jitterPercent)`, `JitterInt(base, percent)`, `IntOffset`, `FloatOffset` |
+| Dice/Roll | `Roll(min, max)`, `D6`, `D10`, `D20`, `D100` |
+| Others | `RandomSign`, `RandomAngle`, `RandomAngleRad`, `CircleRandomPoint`, `RectRandomPoint`, `AttrAssign`, etc. |
+
+### O(1) Weighted Picking (Alias Table)
 
 ```go
-s := NewSeeder(seedType)
-seed := s.Seed()
+weights := []int{10, 20, 30, 40}
+table := r.NewAliasTable(weights)          // also NewAliasTableFloat32 / NewAliasTableFloat64
+idx := r.AliasChoice(table)                // O(1) weighted pick returning the original index; -1 for nil/empty tables
 ```
 
-可选 `SeedType`：
+Table construction filters invalid weights (int `<= 0`, float `<= 1e-7`) and keeps the original index mapping. When the weight set is static and sampling is frequent, the alias table outperforms the O(n)-per-call `WeightedChoice`.
 
-- `UnixNanoSeed`：时间戳 + 系统随机 + goroutine 数量扰动
-- `MapHashSeed`：基于 `maphash`
-- `CryptoRandSeed`：`crypto/rand`，失败时降级到 `UnixNano()`
-- `RandomStringSeed`：随机字符串映射到 `int64`，失败时降级到 `UnixNano()`
-- `FixedSeed`：固定种子（测试用），需通过 `Seed(manualSeed...)` 传入
+> `Randomizer` has no generic `RandomChoice` method (Go methods cannot declare type parameters); use `Pick/PickString/PickInt` for single picks and `RandomPickUnique*` for multi-picks.
 
-`Seeder` 额外方法：
+## Seeder (seeder.go)
 
-- `CryptoRand32() [32]byte`：生成 32 字节安全随机值（读取失败会 `panic`）
+```go
+s := utilsrand.NewSeeder(utilsrand.CryptoRandSeed)
+seed := s.Seed()                       // int64 seed
+seed = s.Seed(12345)                   // with FixedSeed, uses the manual seed
+```
 
-## 边界语义（重要）
+`SeedType`:
 
-### 区间函数
+- `UnixNanoSeed`: timestamp ^ crypto/rand ^ goroutine count jitter (falls back to the timestamp alone if the random read fails)
+- `MapHashSeed`: based on `maphash`
+- `CryptoRandSeed`: `crypto/rand`, falling back to `UnixNano()` on failure
+- `RandomStringSeed`: a random string mapped to `int64`, falling back to `UnixNano()` on failure
+- `FixedSeed`: fixed seed (for tests), passed via `Seed(manualSeed...)`
 
-- 全局 `RandomInt/RandomInt32/RandomInt64/RandomUint* / RandomDuration`：当 `min >= max` 返回 `max`。
-- `Randomizer.RangeInt`：当 `min >= max` 返回 `min`。
-- `Randomizer.RangeInt32/RangeInt64/RangeUint*`：当 `min >= max` 返回 `max`。
+Others: `CryptoRand32() [32]byte` (a 32-byte secure random value; panics if the read fails) and the package-level `Seed(seedType SeedType) int64`.
 
-### 权重选择
+## Sha256Source (sha256_source.go)
 
-两套 API 在极端输入下语义不完全一致，请按需选择：
+Implements the `math/rand/v2` `Source` interface, usable with `mathRand.New(src)`:
 
-- 全局 `WeightedChoice([]int{})` 返回 `-1`；
-  - 单元素返回 `0`
-  - 所有权重 <= 0 返回 `0`
-- `Randomizer.WeightedChoice([]int{})` 返回 `-1`；
-  - 单元素且 `<=0` 返回 `-1`
-  - 所有权重 <= 0 返回 `-1`
-- 全局 `NonWeightedChoice(nil)` 返回 `-1`，空切片 `[]int{}` 返回 `0`
-- `Randomizer.NonWeightedChoice([]int{})` 返回 `-1`
+```go
+src := utilsrand.NewSha256Source(seedBytes) // increments a nonce per call; outputs the first 8 bytes of SHA-256(seed||nonce)
+```
 
-## 使用建议
+## Edge Semantics (Important)
 
-- 业务随机：优先 `PCGRandType + UnixNanoSeed`。
-- 需要更稳定、可复现实验：使用 `FixedSeed` 并固定手工种子。
-- 需要偏斜分布：使用 `NewZipfRandomizer`。
-- 安全敏感场景：优先 `CryptoRandSeed` / `CryptoRand32`。
+### Interval Functions
 
-## 注意事项
+- Global `RandomInt/RandomInt32/RandomInt64/RandomUint*/RandomDuration`: return `max` when `min >= max`.
+- `Randomizer.RangeInt`: returns `min` when `min >= max`.
+- `Randomizer.RangeInt32/RangeInt64/RangeUint*/RangeFloat32/RangeFloat64`: return `max` when `min >= max`.
 
-- `NewRandomizer(ZipfRandType, ...)` 当前会返回 `nil`，不要直接调用。
-- `Randomizer.RandomString(l)` 需保证 `l >= 0`。
-- 全局函数与 `Randomizer` 的边界返回值并非完全一致，建议在业务层做统一封装。
+### Weighted Picks
+
+The two APIs differ on degenerate inputs; choose deliberately:
+
+- Global `WeightedChoice([]int{})` returns `-1`;
+  - a single element returns `0`
+  - all weights <= 0 return `0`
+- `Randomizer.WeightedChoice([]int{})` returns `-1`;
+  - a single element <= 0 returns `-1`
+  - all weights <= 0 return `-1`
+- Global `NonWeightedChoice(nil)` returns `-1`; an empty slice `[]int{}` returns `0`
+- `Randomizer.NonWeightedChoice([]int{})` returns `-1`
+
+### Shuffle Signatures
+
+- `Randomizer.Shuffle(n int, swap func(i, j int))`: mirrors `math/rand`'s `Shuffle`, swapping via a callback
+- Global `Shuffle[T any](array []T)`: shuffles the slice in place
+
+The signatures differ; do not mix them up.
+
+## Recommendations
+
+- General business randomness: plain `New()` (PCG + CryptoRand) is fine
+- Stable, reproducible sequences: `WithFixedSeed`
+- Skewed distributions: `WithRandType(ZipfRandType)` or `NewZipfRandomizer`
+- Cryptographically secure random integers: `WithSecureMode()` + `SecureInt64()` (without secure mode, `SecureInt64` degrades to a plain `Int64`)
+- Frequent weighted sampling: `NewAliasTable*` + `AliasChoice`
+
+## Notes
+
+- The package name collides with the standard library `math/rand`; import it with an alias
+- `Randomizer.RandomString(l)` requires `l >= 0` (negative values panic); the global `RandomString` returns "" for `l <= 0`
+- Edge-case return values are not fully consistent between global functions and `Randomizer`; consider wrapping them uniformly in your business layer
+- A `Randomizer` instance (including the shared instance from `Default()`) directly wraps a `math/rand/v2` `*Rand` and is not internally locked; concurrent calls from multiple goroutines require external synchronization (e.g. a mutex) or a separate instance per goroutine. The global functions use a locked default source and are safe for concurrent use

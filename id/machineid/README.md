@@ -1,196 +1,128 @@
-# machineid provides support for reading the unique machine id of most host OS's (without admin privileges)
+# machineid
 
-![Image of Gopher 47](logo.png)
+English | [简体中文](README.zh-CN.md)
 
-… because sometimes you just need to reliably identify your machines.
-
-[![GoDoc](https://godoc.org/github.com/denisbrodbeck/machineid?status.svg)](https://godoc.org/github.com/denisbrodbeck/machineid) [![Go Report Card](https://goreportcard.com/badge/github.com/denisbrodbeck/machineid)](https://goreportcard.com/report/github.com/denisbrodbeck/machineid)
-
-## Main Features
-
-* Cross-Platform (tested on Win7+, Debian 8+, Ubuntu 14.04+, OS X 10.6+, FreeBSD 11+)
-* No admin privileges required
-* Hardware independent (no usage of MAC, BIOS or CPU — those are too unreliable, especially in a VM environment)
-* IDs are unique<sup>[1](#unique-key-reliability)</sup> to the installed OS
-
-## Installation
-
-Get the library with
+`machineid` is a fork of [github.com/denisbrodbeck/machineid](https://github.com/denisbrodbeck/machineid) that reads the unique machine ID of most host OSs without admin privileges. The import path is `github.com/tx7do/go-utils/id/machineid`, and it is distributed as part of the `id` module:
 
 ```bash
-go get github.com/denisbrodbeck/machineid
+go get github.com/tx7do/go-utils/id
 ```
 
-You can also add the cli app directly to your `$GOPATH/bin` with
+> The upstream `cmd/machineid` CLI tool is not included in this repository; this package only exposes the Go API.
 
-```bash
-go get github.com/denisbrodbeck/machineid/cmd/machineid
-```
+## Features
+
+- Cross-platform (Windows, Linux, macOS, BSD/Solaris, AIX, z/OS)
+- No admin privileges required
+- Hardware independent (no use of MAC, BIOS, or CPU serials — those are too unreliable, especially in VM environments)
+- IDs stay stable for the lifetime of the OS installation
+- **Fork enhancements**: an extended Linux fallback chain that covers cloud hosts and container environments (see below)
+- Cryptographically secure `ProtectedID` (HMAC-SHA256) so the raw machine ID is never exposed
 
 ## Usage
 
-```golang
+Get the original machine ID:
+
+```go
 package main
 
 import (
-  "fmt"
-  "log"
-  "github.com/denisbrodbeck/machineid"
+	"fmt"
+	"log"
+
+	"github.com/tx7do/go-utils/id/machineid"
 )
 
 func main() {
-  id, err := machineid.ID()
-  if err != nil {
-    log.Fatal(err)
-  }
-  fmt.Println(id)
+	id, err := machineid.ID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(id)
 }
 ```
 
-Or even better, use securely hashed machine IDs:
+Better yet, use securely hashed machine IDs:
 
-```golang
+```go
 package main
 
 import (
-  "fmt"
-  "log"
-  "github.com/denisbrodbeck/machineid"
+	"fmt"
+	"log"
+
+	"github.com/tx7do/go-utils/id/machineid"
 )
 
 func main() {
-  id, err := machineid.ProtectedID("myAppName")
-  if err != nil {
-    log.Fatal(err)
-  }
-  fmt.Println(id)
+	id, err := machineid.ProtectedID("myAppName")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(id)
 }
 ```
 
 ### Function: ID() (string, error)
 
-Returns original machine id as a `string`.
+Returns the original machine ID as a `string`. Regard the returned ID as "confidential" and prefer `ProtectedID()`.
 
 ### Function: ProtectedID(appID string) (string, error)
 
-Returns hashed version of the machine ID as a `string`. The hash is generated in a cryptographically secure way, using a fixed, application-specific key (calculates HMAC-SHA256 of the app ID, keyed by the machine ID).
+Returns a hashed version of the machine ID: it calculates the HMAC-SHA256 of the application-specific app ID, keyed by the machine ID, and returns the hex-encoded digest. Different apps on the same machine get different, non-reversible IDs.
 
-## What you get
+## Sources per Platform
 
-This package returns the OS native machine UUID/GUID, which the OS uses for internal needs.
+This package returns the OS-native machine UUID/GUID, usually generated during system installation and constant afterwards:
 
-All machine IDs are usually generated during system installation and stay constant for all subsequent boots.
+* **Linux**: tries in order `/var/lib/dbus/machine-id` → `/etc/machine-id` → `/sys/class/dmi/id/product_uuid` (cloud hosts / bare metal) → `/proc/self/cgroup` → `/proc/self/mountinfo` (Docker container ID)
+* **Windows**: `MachineGuid` from registry `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography` → BIOS UUID (`wmic`/PowerShell) → primary NIC MAC address
+* **macOS**: `IOPlatformUUID`
+* **BSD**: OpenBSD prefers `sysctl -n hw.uuid`; others use `/etc/hostid`, falling back to `kenv -q smbios.system.uuid`
+* **AIX**: the `os_uuid` attribute from `lsattr`
+* **z/OS**: the system identifier read via the Language Environment (LE) runtime services
 
-The following sources are used:
+### Fork Enhancement: Linux Container Fallback Chain
 
-* **AIX** uses the OS (or WPAR if applicable) UUID from the `os_uuid` attribute
-* **BSD** uses `/etc/hostid` and `smbios.system.uuid` as a fallback
-* **Linux** uses `/var/lib/dbus/machine-id` ([man](http://man7.org/linux/man-pages/man5/machine-id.5.html))
-* **OS X** uses `IOPlatformUUID`
-* **Windows** uses the `MachineGuid` from `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography`
-* **Z/OS** uses the `SYSID` from `SYS1.PARMLIB(IEASYSxx)`
+The upstream implementation only reads the two dbus machine-id paths, which are often empty in containers or identical to the host. This fork keeps falling back when both paths fail:
+
+1. `/sys/class/dmi/id/product_uuid` — DMI product UUID of cloud hosts / VMs / bare metal
+2. `/proc/self/cgroup` — a cgroup path segment
+3. `/proc/self/mountinfo` — Docker container ID (matching `/docker/containers/<id>/hostname`)
+
+As a result, this fork succeeds noticeably more often than upstream in container and cloud-host environments.
 
 ## Unique Key Reliability
 
-Do note, that `machine-id` and `MachineGuid` can be changed by root/admin, although that may not come without cost (broken system services and more).
-Most IDs won't be regenerated by the OS, when you clone/image/restore a particular OS installation. This is a well known issue with cloned windows installs (not using the official sysprep tools).
+`machine-id` and `MachineGuid` can be changed by root/admin, although that may not come without cost (broken system services and more). Most IDs are not regenerated by the OS when you clone/image/restore an OS installation — a well-known issue with cloned Windows installs not using the official sysprep tools.
 
-**Linux** users can generate a new id with `dbus-uuidgen` and put the id into `/var/lib/dbus/machine-id` and `/etc/machine-id`.
-**Windows** users can use the `sysprep` [toolchain](https://docs.microsoft.com/en-us/windows-hardware/manufacture/desktop/sysprep--generalize--a-windows-installation) to create images, which produce valid images ready for distribution. Such images produce a new unique machine ID on each deployment.
+**Linux** users can generate a new ID with `dbus-uuidgen` and put it into `/var/lib/dbus/machine-id` and `/etc/machine-id`.
+**Windows** users can use the `sysprep` toolchain to create images, which produce a new unique machine ID on each deployment.
 
 ## Security Considerations
 
-A machine ID uniquely identifies the host. Therefore it should be considered "confidential", and must not be exposed in untrusted environments. If you need a stable unique identifier for your app, do not use the machine ID directly.
+A machine ID uniquely identifies the host, so it should be treated as "confidential" and never exposed in untrusted environments. If you need a stable unique identifier for your app, do not use the machine ID directly:
 
 > A reliable solution is to hash the machine ID in a cryptographically secure way, using a fixed, application-specific key.
 
-That way the ID will be properly unique, and derived in a constant way from the machine ID but there will be no way to retrieve the original machine ID from the application-specific one.
+That way the ID remains unique and deterministically derived from the machine ID, but the original machine ID cannot be recovered. Simply use the convenience API:
 
-Do something along these lines:
-
-```golang
-package main
-
-import (
-  "crypto/hmac"
-  "crypto/sha256"
-  "fmt"
-  "github.com/denisbrodbeck/machineid"
-)
-
-const appKey = "WowSuchNiceApp"
-
-func main() {
-  id, _ := machineid.ID()
-  fmt.Println(protect(appKey, id))
-  // Output: dbabdb7baa54845f9bec96e2e8a87be2d01794c66fdebac3df7edd857f3d9f97
-}
-
-func protect(appID, id string) string {
-  mac := hmac.New(sha256.New, []byte(id))
-  mac.Write([]byte(appID))
-  return fmt.Sprintf("%x", mac.Sum(nil))
-}
-```
-
-Or simply use the convenience API call:
-
-```golang
+```go
 hashedID, err := machineid.ProtectedID("myAppName")
 ```
 
-## Snippets
+## Manual Lookups per Platform
 
-Don't want to download code, and just need a way to get the data by yourself?
+* **AIX**: `lsattr -l sys0 -a os_uuid -E | cut -f 2 -d ' '`
+* **BSD**: `cat /etc/hostid` (or `kenv -q smbios.system.uuid`, which may be empty)
+* **Linux**: `cat /var/lib/dbus/machine-id` (or `cat /etc/machine-id` on some distributions)
+* **macOS**: `ioreg -rd1 -c IOPlatformExpertDevice | grep IOPlatformUUID`
+* **Windows**: `reg query HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid`
 
-Z/OS:
+## Acknowledgements
 
-```bash
-cat SYS1.PARMLIB(IEASYSxx) | grep SYSID
-```
-
-AIX:
-
-```bash
-lsattr -l sys0 -a os_uuid -E | cut -f 2 -d ' '
-```
-
-BSD:
-
-```bash
-cat /etc/hostid
-# or (might be empty)
-kenv -q smbios.system.uuid
-```
-
-Linux:
-
-```bash
-cat /var/lib/dbus/machine-id
-# or when not found (e.g. Fedora 20)
-cat /etc/machine-id
-```
-
-OS X:
-
-```bash
-ioreg -rd1 -c IOPlatformExpertDevice | grep IOPlatformUUID
-```
-
-Windows:
-
-```batch
-reg query HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography /v MachineGuid
-```
-or
-* Open Windows Registry via `regedit`
-* Navigate to `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography`
-* Take value of key `MachineGuid`
-
-## Credits
-
-The Go gopher was created by [Denis Brodbeck](https://github.com/denisbrodbeck) with [gopherize.me](https://gopherize.me/), based on original artwork from [Renee French](http://reneefrench.blogspot.com/).
+This package is based on [denisbrodbeck/machineid](https://github.com/denisbrodbeck/machineid) by [Denis Brodbeck](https://github.com/denisbrodbeck) (MIT license). The upstream MIT attribution is preserved (see [LICENSE.md](LICENSE.md), Copyright (c) 2017 Denis Brodbeck). The original Go gopher was created by Denis Brodbeck with [gopherize.me](https://gopherize.me/), based on original artwork from Renee French.
 
 ## License
 
-The MIT License (MIT) — [Denis Brodbeck](https://github.com/denisbrodbeck). Please have a look at the [LICENSE.md](LICENSE.md) for more details.
+MIT

@@ -1,25 +1,43 @@
-# 阿里翻译 (Alibaba Translator)
+# alibaba
 
-阿里翻译是阿里云提供的机器翻译服务，支持 200+ 种语言对组合，具有高准确度和低延迟。
+Go translator wrapper for Alibaba Cloud Machine Translation, built on the generic translation API (TranslateGeneral) of the official Alibaba Cloud alimt SDK.
 
-## 特性
+English | [简体中文](README.zh-CN.md)
 
-- 🌍 **200+ 语言支持**：涵盖全球主流语言
-- ⚡ **高性能低延迟**：优化的请求处理
-- 🔐 **企业级安全**：支持阿里云完整的安全机制
-- 🎯 **准确度高**：采用神经网络机器翻译 (NMT)
-- 📱 **接口统一**：实现标准 `Translator` 接口
-- 🔧 **灵活配置**：支持自定义区域设置
+## Introduction
 
-## 安装
+This module (`github.com/tx7do/go-utils/translator/alibaba`) is the Alibaba Cloud implementation of the translator components in [go-utils](https://github.com/tx7do/go-utils). It is an **independent Go module** (with its own `go.mod`).
 
-```bash
-go get -u github.com/chenmingyong/go-utils/translator/alibaba
+Its method signature matches the `Translator` interface of go-utils:
+
+```go
+// Translate translates text.
+func (t *Translator) Translate(source, sourceLang, targetLang string) (string, error)
 ```
 
-## 快速开始
+Internally it calls the Alibaba Cloud generic machine translation API `TranslateGeneral`, always using `FormatType=text` and `Scene=general`.
 
-### 基础使用
+## Features
+
+- Built on the official [alimt Go SDK](https://github.com/alibabacloud-go/alimt-20190107) (generic translation API)
+- Standard Alibaba Cloud AccessKey authentication
+- Configurable region (`WithRegionID`), defaulting to `cn-hangzhou`
+- Translates between dozens of languages; common language codes are listed in the table below (the authoritative list is the [Alibaba Cloud documentation](https://help.aliyun.com/document/detail/209537.html))
+- All errors are plain `error` values; there is no custom error type
+
+## Installation
+
+This module is an independent Go module:
+
+```bash
+go get github.com/tx7do/go-utils/translator/alibaba
+```
+
+```go
+import "github.com/tx7do/go-utils/translator/alibaba"
+```
+
+## Quick Start
 
 ```go
 package main
@@ -27,11 +45,12 @@ package main
 import (
 	"fmt"
 	"log"
-	"github.com/chenmingyong/go-utils/translator/alibaba"
+
+	"github.com/tx7do/go-utils/translator/alibaba"
 )
 
 func main() {
-	// 创建翻译器
+	// Create the translator
 	translator, err := alibaba.NewTranslator(
 		"your_access_key_id",
 		"your_access_key_secret",
@@ -40,17 +59,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// 翻译文本
+	// Translate text
 	result, err := translator.Translate("Hello, world!", "en", "zh")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Translation:", result) // 你好，世界！
+	fmt.Println("Translation:", result)
 }
 ```
 
-### 使用自定义区域
+With a custom region:
 
 ```go
 translator, err := alibaba.NewTranslator(
@@ -58,309 +77,299 @@ translator, err := alibaba.NewTranslator(
 	"your_access_key_secret",
 	alibaba.WithRegionID("cn-shanghai"),
 )
-if err != nil {
-	log.Fatal(err)
-}
-
-result, err := translator.Translate("Hello", "en", "zh")
-if err != nil {
-	log.Fatal(err)
-}
-
-fmt.Println("Translation:", result)
 ```
 
-## API 文档
+## Configuration / Options
 
 ### NewTranslator
-
-创建一个新的阿里翻译器。
 
 ```go
 func NewTranslator(accessKeyID, accessKeySecret string, opts ...Option) (*Translator, error)
 ```
 
-**参数：**
-- `accessKeyID`: 阿里云访问密钥 ID
-- `accessKeySecret`: 阿里云访问密钥密码
-- `opts`: 可选的配置选项
+**Parameters:**
 
-**返回值：**
-- `*Translator`: 翻译器实例
-- `error`: 错误信息
+- `accessKeyID`: Alibaba Cloud AccessKey ID
+- `accessKeySecret`: Alibaba Cloud AccessKey Secret
+- `opts`: optional configuration options
 
-**示例：**
-```go
-translator, err := alibaba.NewTranslator(
-	"LTAI5tXXXXXXXXXXXXXX",
-	"xXXXXXXXXXXXXXXXXXXXXXXXXX",
-)
-if err != nil {
-	log.Fatal(err)
-}
-```
+**Returns:** a `*Translator` instance and an error. An error is returned when the client fails to be created.
 
 ### Translate
-
-翻译文本。
 
 ```go
 func (t *Translator) Translate(source, sourceLang, targetLang string) (string, error)
 ```
 
-**参数：**
-- `source`: 要翻译的文本
-- `sourceLang`: 源语言代码
-- `targetLang`: 目标语言代码
+**Parameters:**
 
-**返回值：**
-- `string`: 翻译结果
-- `error`: 错误信息
+- `source`: the text to translate
+- `sourceLang`: source language code; pass `auto` for server-side automatic detection
+- `targetLang`: target language code
 
-**示例：**
-```go
-result, err := translator.Translate("Hello", "en", "zh")
-if err != nil {
-	log.Fatal(err)
-}
-fmt.Println(result) // 你好
-```
+**Returns:** the translated text and an error.
 
-### Options（配置选项）
-
-#### WithRegionID
-
-设置阿里云区域 ID。
+### WithRegionID
 
 ```go
 func WithRegionID(regionID string) Option
 ```
 
-**支持的区域：**
-- `cn-hangzhou`: 杭州（默认）
-- `cn-shanghai`: 上海
-- `cn-beijing`: 北京
-- `cn-zhangjiakou`: 张家口
-- `cn-huhehaote`: 呼和浩特
-- `cn-wulanchabu`: 乌兰察布
-- `cn-chengdu`: 成都
-- `cn-hongkong`: 香港
-- `ap-southeast-1`: 新加坡
-- `ap-southeast-2`: 悉尼
-- `ap-northeast-1`: 日本
-- `ap-south-1`: 孟买
-- `us-west-1`: 美国西部
-- `us-east-1`: 美国东部
-- `eu-west-1`: 欧洲
+Sets the Alibaba Cloud region ID. This is the **only** configuration option of this module; when unset, the default is `cn-hangzhou`. The request endpoint is derived per region as `mt.<regionID>.aliyuncs.com`.
 
-**示例：**
-```go
-alibaba.WithRegionID("cn-shanghai")
-```
+Regions listed in the source comments: `cn-hangzhou` (default), `cn-shanghai`, `cn-beijing`, `ap-southeast-1`, etc. Consult the Alibaba Cloud documentation for the available regions.
 
-## 支持的语言代码
+## Supported Language Codes
 
-### 主流语言
+The following is a reference of common language codes; the authoritative list is the [Alibaba Cloud documentation](https://help.aliyun.com/document/detail/209537.html).
 
-| 语言 | 代码 | 语言 | 代码 |
-|------|------|------|------|
-| 中文（简体） | `zh` | 英语 | `en` |
-| 中文（繁体） | `zh-TW` | 日语 | `ja` |
-| 韩语 | `ko` | 俄语 | `ru` |
-| 德语 | `de` | 法语 | `fr` |
-| 西班牙语 | `es` | 意大利语 | `it` |
-| 葡萄牙语 | `pt` | 荷兰语 | `nl` |
-| 瑞典语 | `sv` | 挪威语 | `no` |
-| 丹麦语 | `da` | 芬兰语 | `fi` |
-| 波兰语 | `pl` | 捷克语 | `cs` |
-| 罗马尼亚语 | `ro` | 匈牙利语 | `hu` |
-| 保加利亚语 | `bg` | 克罗地亚语 | `hr` |
-| 塞尔维亚语 | `sr` | 乌克兰语 | `uk` |
-| 白俄罗斯语 | `be` | 希腊语 | `el` |
+### Mainstream languages
 
-### 亚洲语言
+| Language | Code | Language | Code |
+|----------|------|----------|------|
+| Chinese (Simplified) | `zh` | English | `en` |
+| Chinese (Traditional) | `zh-TW` | Japanese | `ja` |
+| Korean | `ko` | Russian | `ru` |
+| German | `de` | French | `fr` |
+| Spanish | `es` | Italian | `it` |
+| Portuguese | `pt` | Dutch | `nl` |
+| Swedish | `sv` | Norwegian | `no` |
+| Danish | `da` | Finnish | `fi` |
+| Polish | `pl` | Czech | `cs` |
+| Romanian | `ro` | Hungarian | `hu` |
+| Bulgarian | `bg` | Croatian | `hr` |
+| Serbian | `sr` | Ukrainian | `uk` |
+| Belarusian | `be` | Greek | `el` |
 
-| 语言 | 代码 | 语言 | 代码 |
-|------|------|------|------|
-| 泰语 | `th` | 越南语 | `vi` |
-| 老挝语 | `lo` | 缅甸语 | `my` |
-| 柬埔寨语 | `km` | 印尼语 | `id` |
-| 马来语 | `ms` | 菲律宾语 | `tl` |
-| 孟加拉语 | `bn` | 印地语 | `hi` |
-| 乌尔都语 | `ur` | 巴基斯坦语 | `pa` |
-| 古吉拉特语 | `gu` | 泰卢固语 | `te` |
-| 泰米尔语 | `ta` | 马拉雅拉姆语 | `ml` |
-| 卡纳达语 | `kn` | 马拉地语 | `mr` |
+### Asian languages
 
-### 中东和非洲语言
+| Language | Code | Language | Code |
+|----------|------|----------|------|
+| Thai | `th` | Vietnamese | `vi` |
+| Lao | `lo` | Burmese | `my` |
+| Khmer | `km` | Indonesian | `id` |
+| Malay | `ms` | Filipino | `tl` |
+| Bengali | `bn` | Hindi | `hi` |
+| Urdu | `ur` | Punjabi | `pa` |
+| Gujarati | `gu` | Telugu | `te` |
+| Tamil | `ta` | Malayalam | `ml` |
+| Kannada | `kn` | Marathi | `mr` |
 
-| 语言 | 代码 | 语言 | 代码 |
-|------|------|------|------|
-| 阿拉伯语 | `ar` | 希伯来语 | `he` |
-| 波斯语 | `fa` | 土耳其语 | `tr` |
-| 库尔德语 | `ku` | 阿塞拜疆语 | `az` |
-| 斯瓦希里语 | `sw` | 豪萨语 | `ha` |
-| 约鲁巴语 | `yo` | 伊博语 | `ig` |
+### Middle East and Africa
 
-### 欧洲和其他语言
+| Language | Code | Language | Code |
+|----------|------|----------|------|
+| Arabic | `ar` | Hebrew | `he` |
+| Persian | `fa` | Turkish | `tr` |
+| Kurdish | `ku` | Azerbaijani | `az` |
+| Swahili | `sw` | Hausa | `ha` |
+| Yoruba | `yo` | Igbo | `ig` |
 
-| 语言 | 代码 | 语言 | 代码 |
-|------|------|------|------|
-| 阿尔巴尼亚语 | `sq` | 巴斯克语 | `eu` |
-| 加泰罗尼亚语 | `ca` | 加利西亚语 | `gl` |
-| 冰岛语 | `is` | 爱尔兰语 | `ga` |
-| 拉丁语 | `la` | 卢森堡语 | `lb` |
-| 马耳他语 | `mt` | 威尔士语 | `cy` |
-| 格鲁吉亚语 | `ka` | 亚美尼亚语 | `hy` |
-| 爱沙尼亚语 | `et` | 拉脱维亚语 | `lv` |
-| 立陶宛语 | `lt` | 马其顿语 | `mk` |
-| 蒙古语 | `mn` | 尼泊尔语 | `ne` |
+### European and other languages
 
-## 获取访问凭证
+| Language | Code | Language | Code |
+|----------|------|----------|------|
+| Albanian | `sq` | Basque | `eu` |
+| Catalan | `ca` | Galician | `gl` |
+| Icelandic | `is` | Irish | `ga` |
+| Latin | `la` | Luxembourgish | `lb` |
+| Maltese | `mt` | Welsh | `cy` |
+| Georgian | `ka` | Armenian | `hy` |
+| Estonian | `et` | Latvian | `lv` |
+| Lithuanian | `lt` | Macedonian | `mk` |
+| Mongolian | `mn` | Nepali | `ne` |
 
-### 获取 AccessKey ID 和 Secret
+## Advanced Usage
 
-1. 访问 [阿里云控制台](https://console.aliyun.com/)
-2. 登录你的阿里云账号
-3. 进入 "访问控制 (IAM)" 服务
-4. 创建 AccessKey：用户 → 我的信息 → AccessKey 管理
-5. 创建新的 AccessKey
-6. 保存 AccessKey ID 和 Secret
+### Error Handling
 
-### 启用机器翻译服务
-
-1. 访问 [阿里云机器翻译服务](https://www.aliyun.com/product/ai/mtranslation)
-2. 开通服务
-3. 选择合适的套餐（免费/按量付费）
-
-### 费用
-
-- **免费额度**：每月 100 万字符
-- **按量付费**：¥50/百万字符
-
-## 错误处理
+This module has **no** dedicated error type (such as `TranslateError`); every error is a plain `error` wrapped with `fmt.Errorf`. Simply check `err`:
 
 ```go
-result, err := translator.Translate("Hello", "en", "zh")
-if err != nil {
-	switch err.(type) {
-	case *alibaba.TranslateError:
-		log.Println("翻译 API 错误:", err)
-	default:
-		log.Println("其他错误:", err)
+package main
+
+import (
+	"errors"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/tx7do/go-utils/translator/alibaba"
+)
+
+func main() {
+	translator, err := alibaba.NewTranslator(
+		os.Getenv("ALIBABA_ACCESS_KEY_ID"),
+		os.Getenv("ALIBABA_ACCESS_KEY_SECRET"),
+	)
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	result, err := translator.Translate("Hello", "en", "zh")
+	if err != nil {
+		// Network/SDK errors wrap the underlying error; unwrap with
+		// errors.Unwrap / errors.Is as needed
+		if unwrapped := errors.Unwrap(err); unwrapped != nil {
+			log.Printf("underlying error: %v", unwrapped)
+		}
+		log.Fatal(err)
+	}
+
+	fmt.Println(result)
 }
 ```
 
-## 常见错误码
+Error message formats (matching the source code):
 
-| 错误码 | 含义 | 解决方案 |
-|--------|------|--------|
-| `InvalidParameter.RegionId` | 无效的区域 ID | 检查区域 ID 是否正确 |
-| `InvalidParameter.SourceLanguage` | 不支持的源语言 | 检查语言代码 |
-| `InvalidParameter.TargetLanguage` | 不支持的目标语言 | 检查语言代码 |
-| `Forbidden.Quota` | 配额已用尽 | 升级套餐或等待刷新 |
-| `Unauthorized` | 认证失败 | 检查 AccessKey ID 和 Secret |
+| Scenario | Error message format |
+|----------|----------------------|
+| SDK/network error | `alibaba translate error: <underlying error>` (wrapped with `%w`, can be unwrapped) |
+| Service returned an error code | `alibaba translate error: code=<number>, message=<description>` |
+| Empty response | `alibaba translate: empty response` |
+| Nil translation result | `alibaba translate: translation result is nil` |
 
-## 最佳实践
+For the meaning of Alibaba Cloud server-side error codes, refer to the [Alibaba Cloud API Error Center](https://api.aliyun.com/troubleshoot).
 
-### 1. 错误处理
-
-```go
-result, err := translator.Translate(text, sourceLang, targetLang)
-if err != nil {
-	// 记录错误
-	log.Printf("翻译失败: %v", err)
-	// 返回原文或缓存结果
-	return text, nil
-}
-```
-
-### 2. 缓存翻译结果
+### Caching Results
 
 ```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/tx7do/go-utils/translator/alibaba"
+)
+
 var cache = make(map[string]string)
 
-func translateWithCache(text, sourceLang, targetLang string) string {
+func translateWithCache(translator *alibaba.Translator, text, sourceLang, targetLang string) string {
 	key := fmt.Sprintf("%s_%s_%s", text, sourceLang, targetLang)
 	if v, ok := cache[key]; ok {
 		return v
 	}
-	
+
 	result, _ := translator.Translate(text, sourceLang, targetLang)
 	cache[key] = result
 	return result
 }
+
+func main() { _ = translateWithCache }
 ```
 
-### 3. 批量翻译
+### Batch Translation
 
 ```go
-func translateBatch(items []string, sourceLang, targetLang string) []string {
+package main
+
+import "github.com/tx7do/go-utils/translator/alibaba"
+
+func translateBatch(translator *alibaba.Translator, items []string, sourceLang, targetLang string) []string {
 	results := make([]string, len(items))
 	for i, item := range items {
-		result, _ := translator.Translate(item, sourceLang, targetLang)
-		results[i] = result
+		results[i], _ = translator.Translate(item, sourceLang, targetLang)
 	}
 	return results
 }
+
+func main() { _ = translateBatch }
 ```
 
-### 4. 超时控制
+### Using the Unified Interface
+
+This module does not import `go-utils/translator`, but its method signature matches the `Translator` interface, so it can be assigned directly:
 
 ```go
-ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-defer cancel()
+package main
 
-// 使用带超时的 context
+import (
+	"github.com/tx7do/go-utils/translator"
+	"github.com/tx7do/go-utils/translator/alibaba"
+)
+
+func main() {
+	tr, err := alibaba.NewTranslator("your_access_key_id", "your_access_key_secret")
+	if err != nil {
+		panic(err)
+	}
+	var iface translator.Translator = tr
+	_, _ = iface.Translate("Hello", "en", "zh")
+}
 ```
 
-## 常见问题
+## Obtaining Credentials
 
-### Q: 如何获取 AccessKey ID 和 Secret？
+1. Visit the [Alibaba Cloud console](https://console.aliyun.com/) and sign in
+2. Create an AccessKey: go to "Resource Access Management (RAM)" → Users → AccessKey management
+3. Save the AccessKey ID and AccessKey Secret
+4. Activate the [Machine Translation service](https://www.aliyun.com/product/ai/mtranslation) (a free tier is provided; usage beyond it is pay-per-use — see [official pricing](https://www.aliyun.com/price/product))
 
-A: 登录阿里云控制台，进入 IAM 服务，在 AccessKey 管理中创建新的 AccessKey。
+## Notes
 
-### Q: 支持哪些语言？
+- **No context support**: `Translate` does not accept a `context.Context`, and the module exposes no custom HTTP client or timeout configuration. To apply a timeout, wrap the call externally with a goroutine + `select`, for example:
 
-A: 支持 200+ 种语言，包括所有主流语言。详见上面的语言表。
+```go
+package main
 
-### Q: 翻译是否有字符限制？
+import (
+	"context"
+	"time"
+)
 
-A: 单次请求无字符限制，但超过 5000 字符会按比例收费。
+type result struct {
+	text string
+	err  error
+}
 
-### Q: 如何处理翻译错误？
+// translateWithTimeout applies an external timeout to a single translation call
+func translateWithTimeout(t interface {
+	Translate(source, sourceLang, targetLang string) (string, error)
+}, text, from, to string, timeout time.Duration) (string, error) {
+	ch := make(chan result, 1)
+	go func() {
+		text, err := t.Translate(text, from, to)
+		ch <- result{text, err}
+	}()
 
-A: 检查网络连接、凭证有效性、语言代码、配额使用情况等。
+	select {
+	case r := <-ch:
+		return r.text, r.err
+	case <-time.After(timeout):
+		return "", context.DeadlineExceeded // the translation goroutine keeps running in the background
+	}
+}
 
-### Q: 翻译准确度如何？
+func main() { _ = translateWithTimeout }
+```
 
-A: 使用神经网络机器翻译 (NMT) 技术，准确度高于统计模型。
+> Note: the in-flight request cannot actually be cancelled; this only makes the caller return on time.
 
-## 性能建议
+- The language code table is a reference of common languages; the authoritative list is the Alibaba Cloud documentation. When unsure, pass `auto` as the source language
+- Every call hits the Alibaba Cloud API; watch your rate limits and quota. The `Translator` instance holds the SDK client internally and is safe to reuse — do not rebuild it per call
+- This module always uses the general scene (`Scene=general`) and plain text format (`FormatType=text`); for domain-specific models (e-commerce, medical, etc.), use the alimt SDK directly
 
-1. **连接复用**：重用翻译器实例
-2. **批量处理**：一次翻译多个文本减少开销
-3. **缓存策略**：缓存常用翻译结果
-4. **异步翻译**：使用 goroutine 并发翻译
-5. **监控日志**：记录翻译失败和性能数据
+## Dependencies
 
-## 依赖项
+Matching `go.mod`:
 
 ```
-github.com/alibabacloud-go/alimt-20190107 v1.0.2
+github.com/alibabacloud-go/alimt-20190107 v1.0.0
 github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.15
 github.com/alibabacloud-go/tea v1.4.0
 ```
 
+## Acknowledgements
+
+- [Alibaba Cloud Machine Translation](https://www.aliyun.com/product/ai/mtranslation)
+- [alibabacloud-go/alimt-20190107 Go SDK](https://github.com/alibabacloud-go/alimt-20190107)
+
+## Related Links
+
+- [Alibaba Cloud Machine Translation documentation](https://help.aliyun.com/product/2477301.html)
+- [Alibaba Cloud console](https://console.aliyun.com/)
+- [Project home](https://github.com/tx7do/go-utils)
+
 ## License
 
-遵循项目原有的 License。
-
-## 相关链接
-
-- [阿里云机器翻译官方文档](https://help.aliyun.com/product/2477301.html)
-- [阿里云控制台](https://console.aliyun.com/)
-- [阿里云 API 参考](https://next.api.aliyun.com/document/Mt/2018-10-12/Translate)
-- [项目主页](https://github.com/chenmingyong/go-utils)
-
+Released under the project [MIT License](https://github.com/tx7do/go-utils/blob/main/LICENSE).

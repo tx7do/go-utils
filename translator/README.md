@@ -1,113 +1,130 @@
-# 翻译器
+# translator
 
-## 目标语言
+Machine translation package for go-utils: a unified `Translator` interface plus pluggable cloud-provider implementations.
 
-1. 阿尔巴尼亚语: `sq`
-2. 阿拉伯语: `ar`
-3. 阿姆哈拉语: `am`
-4. 阿塞拜疆语: `az`
-5. 爱尔兰语: `ga`
-6. 爱沙尼亚语: `et`
-7. 奥利亚语: `or`
-8. 巴斯克语: `eu`
-9. 白俄罗斯语: `be`
-10. 保加利亚语: `bg`
-11. 冰岛语: `is`
-12. 波兰语: `pl`
-13. 波斯尼亚语: `bs`
-14. 波斯语: `fa`
-15. 布尔语(南非荷兰语): `af`
-16. 鞑靼语: `tt`
-17. 丹麦语: `da`
-18. 德语: `de`
-19. 俄语: `ru`
-20. 法语: `fr`
-21. 菲律宾语: `tl`
-22. 芬兰语: `fi`
-23. 弗里西语: `fy`
-24. 高棉语: `km`
-25. 格鲁吉亚语: `ka`
-26. 古吉拉特语: `gu`
-27. 哈萨克语: `kk`
-28. 海地克里奥尔语: `ht`
-29. 韩语: `ko`
-30. 豪萨语: `ha`
-31. 荷兰语: `nl`
-32. 吉尔吉斯语: `ky`
-33. 加利西亚语: `gl`
-34. 加泰罗尼亚语: `ca`
-35. 捷克语: `cs`
-36. 卡纳达语: `kn`
-37. 科西嘉语: `co`
-38. 克罗地亚语: `hr`
-39. 库尔德语: `ku`
-40. 拉丁语: `la`
-41. 拉脱维亚语: `lv`
-42. 老挝语: `lo`
-43. 立陶宛语: `lt`
-44. 卢森堡语: `lb`
-45. 卢旺达语: `rw`
-46. 罗马尼亚语: `ro`
-47. 马尔加什语: `mg`
-48. 马耳他语: `mt`
-49. 马拉地语: `mr`
-50. 马拉雅拉姆语: `ml`
-51. 马来语: `ms`
-52. 马其顿语: `mk`
-53. 毛利语: `mi`
-54. 蒙古语: `mn`
-55. 孟加拉语: `bn`
-56. 缅甸语: `my`
-57. 苗语: `hmn`
-58. 南非科萨语: `xh`
-59. 南非祖鲁语: `zu`
-60. 尼泊尔语: `ne`
-61. 挪威语: `no`
-62. 旁遮普语: `pa`
-63. 葡萄牙语: `pt`
-64. 普什图语: `ps`
-65. 齐切瓦语: `ny`
-66. 日语: `ja`
-67. 瑞典语: `sv`
-68. 萨摩亚语: `sm`
-69. 塞尔维亚语: `sr`
-70. 塞索托语: `st`
-71. 僧伽罗语: `si`
-72. 世界语: `eo`
-73. 斯洛伐克语: `sk`
-74. 斯洛文尼亚语: `sl`
-75. 斯瓦希里语: `sw`
-76. 苏格兰盖尔语: `gd`
-77. 宿务语: `ceb`
-78. 索马里语: `so`
-79. 塔吉克语: `tg`
-80. 泰卢固语: `te`
-81. 泰米尔语: `ta`
-82. 泰语: `th`
-83. 土耳其语: `tr`
-84. 土库曼语: `tk`
-85. 威尔士语: `cy`
-86. 维吾尔语: `ug`
-87. 乌尔都语: `ur`
-88. 乌克兰语: `uk`
-89. 乌兹别克语: `uz`
-90. 西班牙语: `es`
-91. 希伯来语: `iw`
-92. 希腊语: `el`
-93. 夏威夷语: `haw`
-94. 信德语: `sd`
-95. 匈牙利语: `hu`
-96. 修纳语: `sn`
-97. 亚美尼亚语: `hy`
-98. 伊博语: `ig`
-99. 意大利语: `it`
-100. 意第绪语: `yi`
-101. 印地语: `hi`
-102. 印尼巽他语: `su`
-103. 印尼语: `id`
-104. 印尼爪哇语: `jw`
-105. 英语: `en`
-106. 约鲁巴语: `yo`
-107. 越南语: `vi`
-108. 中文（繁体）: `zh-TW`
-109. 中文（简体）: `zh-CN`
+English | [简体中文](README.zh-CN.md)
+
+## Introduction
+
+`translator` is the translation component collection of [go-utils](https://github.com/tx7do/go-utils).
+
+This module (`github.com/tx7do/go-utils/translator`) only defines the unified translator interface. It contains no provider implementations and has no third-party dependencies; each provider lives in its own sub-module and is installed separately. The interface is defined in `translator.go`:
+
+```go
+// Translator is a translator.
+type Translator interface {
+	// Translate translates text.
+	Translate(source, sourceLang, targetLang string) (string, error)
+}
+```
+
+## Features
+
+- **Unified interface**: every provider implements the same `Translate(source, sourceLang, targetLang string) (string, error)` method, so implementations are interchangeable
+- **Decoupled modules**: the interface module has zero dependencies; each provider is an independent Go module, so you only pull in what you use
+- **Multiple providers**: Alibaba Cloud Translate, Baidu Translate, Google Translate, and Volcengine Translate
+
+## Installation
+
+The interface module (an independent Go module):
+
+```bash
+go get github.com/tx7do/go-utils/translator
+```
+
+```go
+import "github.com/tx7do/go-utils/translator"
+```
+
+> This repository is a multi-module repository. `translator` and its sub-modules `alibaba`, `baidu`, `google`, and `volc` are all independent Go modules, each with its own `go.mod` and independently versioned.
+
+## Sub-module Comparison
+
+| Provider | Sub-module | Free? | Authentication | Import path | Provider docs |
+|----------|------------|-------|----------------|-------------|---------------|
+| Alibaba Cloud Machine Translation | [alibaba](alibaba/) | Free tier, pay-per-use beyond it (see official pricing) | AccessKey ID + AccessKey Secret | `github.com/tx7do/go-utils/translator/alibaba` | [Alibaba Cloud MT](https://help.aliyun.com/product/2477301.html) |
+| Baidu Translate | [baidu](baidu/) | Free tier (see official pricing) | AppID + SecretKey (MD5 signature) | `github.com/tx7do/go-utils/translator/baidu` | [Baidu Translate Open Platform](https://fanyi-api.baidu.com/) |
+| Google Translate | [google](google/) | V1 free (unofficial endpoint, no SLA); V2/V3 paid | None for V1; API Key for V2/V3 | `github.com/tx7do/go-utils/translator/google` | [Cloud Translation API](https://cloud.google.com/translate/docs) |
+| Volcengine Translate | [volc](volc/) | Free tier, pay-per-use beyond it (see official pricing) | AccessKey + SecretKey (HMAC-SHA256 signature) | `github.com/tx7do/go-utils/translator/volc` | [Volcengine Translate](https://www.volcengine.com/docs/4640/35107) |
+
+## Quick Start
+
+Example using Google Translate's free V1 endpoint (no credentials required):
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/tx7do/go-utils/translator/google"
+)
+
+func main() {
+	// NewTranslator(opts ...Option) *Translator, defaults to the V1 version
+	tr := google.NewTranslator()
+
+	// Translate(source, sourceLang, targetLang string) (string, error)
+	// "auto" as the source language enables automatic detection
+	result, err := tr.Translate("Hello, world!", "auto", "zh-CN")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Translation:", result)
+}
+```
+
+Install the corresponding sub-module:
+
+```bash
+go get github.com/tx7do/go-utils/translator/google
+```
+
+### Using the Unified Interface
+
+The sub-modules do not import this interface package, but their `Translate` method signature matches `translator.Translator`. Thanks to Go's structural typing, any provider's translator can be assigned directly to a `translator.Translator`:
+
+```go
+package main
+
+import (
+	"github.com/tx7do/go-utils/translator"
+	"github.com/tx7do/go-utils/translator/volc"
+)
+
+// Program against the interface: business code does not depend on a specific provider
+func translateText(tr translator.Translator, text, from, to string) (string, error) {
+	return tr.Translate(text, from, to)
+}
+
+func main() {
+	tr, err := volc.NewTranslator("your-access-key", "your-secret-key")
+	if err != nil {
+		panic(err)
+	}
+	_, _ = translateText(tr, "Hello", "en", "zh")
+}
+```
+
+## Advanced Usage
+
+- **Switching providers**: when business code only depends on `translator.Translator`, switching providers is just a matter of replacing the constructor (constructor parameters differ per provider; see each sub-module's README)
+- **Multi-provider fallback**: combine multiple implementations and fall back to a secondary provider when the primary one fails
+- **Language codes**: each provider uses its own language code system; see the language code table in the corresponding sub-module's README (the Google-style code table is in [google/README.md](google/README.md))
+
+## Notes
+
+- Providers differ in capabilities, billing, and rate limiting; read the "Notes" section of the corresponding sub-module's README before production use
+- Each sub-module is an independent Go module: you must install the full sub-module path (e.g. `github.com/tx7do/go-utils/translator/alibaba`); installing only the parent module brings in no provider implementation
+- This README no longer ships a generic language code table: the old table used Google-style codes (such as `iw` and `zh-CN`) and only applied to the Google provider; it has moved to [google](google/README.md)
+
+## Acknowledgements
+
+- Thanks to the cloud providers offering machine translation services: [Alibaba Cloud](https://www.aliyun.com/), [Baidu](https://www.baidu.com/), [Google Cloud](https://cloud.google.com/), and [Volcengine](https://www.volcengine.com/)
+- The sub-modules are built on the Alibaba Cloud Go SDK, the Baidu Translate Open Platform API, the Google Cloud Translation Go SDK, and the Volcengine Translate API respectively
+
+## License
+
+This project is licensed under the [MIT License](https://github.com/tx7do/go-utils/blob/main/LICENSE).
