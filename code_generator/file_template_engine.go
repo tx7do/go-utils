@@ -19,6 +19,13 @@ type FileTemplateEngine struct {
 
 // NewFileTemplateEngine 创建并预加载模板目录（支持 .tpl/.tmpl 后缀）
 func NewFileTemplateEngine(root string) (*FileTemplateEngine, error) {
+	return NewFileTemplateEngineWithFuncMap(root, nil)
+}
+
+// NewFileTemplateEngineWithFuncMap 创建并预加载模板目录，可在解析前注入自定义函数。
+// 新版 text/template（Go 1.27+）在解析期即校验模板中引用的函数名，
+// 引用自定义函数的模板必须通过该构造器传入 FuncMap，否则构建失败。
+func NewFileTemplateEngineWithFuncMap(root string, funcs template.FuncMap) (*FileTemplateEngine, error) {
 	e := &FileTemplateEngine{
 		root:      root,
 		templates: make(map[string]*template.Template),
@@ -26,7 +33,7 @@ func NewFileTemplateEngine(root string) (*FileTemplateEngine, error) {
 	if root == "" {
 		root = "."
 	}
-	err := e.loadAll()
+	err := e.loadAll(funcs)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +41,7 @@ func NewFileTemplateEngine(root string) (*FileTemplateEngine, error) {
 }
 
 // loadAll 加载 root 目录下的所有模板文件
-func (e *FileTemplateEngine) loadAll() error {
+func (e *FileTemplateEngine) loadAll(funcs template.FuncMap) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -55,7 +62,11 @@ func (e *FileTemplateEngine) loadAll() error {
 		}
 		// use slash-separated template key
 		key := filepath.ToSlash(rel)
-		tmpl, err := template.ParseFiles(path)
+		t := template.New(filepath.Base(path))
+		if len(funcs) > 0 {
+			t = t.Funcs(funcs)
+		}
+		tmpl, err := t.ParseFiles(path)
 		if err != nil {
 			return err
 		}

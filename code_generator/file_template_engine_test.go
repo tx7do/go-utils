@@ -25,7 +25,6 @@ func TestFileTemplateEngine_LoadListRenderAndInstallFuncMap(t *testing.T) {
 	// create templates
 	writeFile(t, td, "hello.tpl", "Hello {{.Name}}")
 	writeFile(t, td, "sub/service.tmpl", "Service: {{.Svc}}")
-	writeFile(t, td, "func.tpl", "Upper: {{up .Val}}")
 
 	engine, err := NewFileTemplateEngine(td)
 	if err != nil {
@@ -39,9 +38,6 @@ func TestFileTemplateEngine_LoadListRenderAndInstallFuncMap(t *testing.T) {
 	}
 	if !contains(templates, "sub/service.tmpl") {
 		t.Fatalf("missing sub/service.tmpl in templates: %v", templates)
-	}
-	if !contains(templates, "func.tpl") {
-		t.Fatalf("missing func.tpl in templates: %v", templates)
 	}
 
 	// Render simple template
@@ -79,22 +75,39 @@ func TestFileTemplateEngine_LoadListRenderAndInstallFuncMap(t *testing.T) {
 	if !os.IsNotExist(err) {
 		t.Fatalf("expected os.ErrNotExist, got: %v", err)
 	}
+}
 
-	// func.tpl should fail before installing func map
-	_, err = engine.Render("func.tpl", map[string]string{"Val": "hello"})
-	if err == nil {
-		t.Fatalf("expected error rendering func.tpl without func map")
+func TestFileTemplateEngine_WithFuncMapAndInstallFuncMap(t *testing.T) {
+	td := t.TempDir()
+
+	// 模板引用自定义函数 up：新版 text/template 在解析期校验函数名，
+	// 必须通过 NewFileTemplateEngineWithFuncMap 在解析前注入。
+	writeFile(t, td, "func.tpl", "Upper: {{up .Val}}")
+
+	engine, err := NewFileTemplateEngineWithFuncMap(td, template.FuncMap{
+		"up": strings.ToUpper,
+	})
+	if err != nil {
+		t.Fatalf("NewFileTemplateEngineWithFuncMap error: %v", err)
 	}
 
-	// install func map and render
+	out, err := engine.Render("func.tpl", map[string]string{"Val": "hello"})
+	if err != nil {
+		t.Fatalf("Render func.tpl error: %v", err)
+	}
+	if string(out) != "Upper: HELLO" {
+		t.Fatalf("unexpected func.tpl output: %q", string(out))
+	}
+
+	// InstallFuncMap 重解析后可整体替换同名函数实现
 	engine.InstallFuncMap(template.FuncMap{
-		"up": strings.ToUpper,
+		"up": func(s string) string { return "[" + strings.ToUpper(s) + "]" },
 	})
 	out, err = engine.Render("func.tpl", map[string]string{"Val": "hello"})
 	if err != nil {
 		t.Fatalf("Render func.tpl after InstallFuncMap error: %v", err)
 	}
-	if string(out) != "Upper: HELLO" {
+	if string(out) != "Upper: [HELLO]" {
 		t.Fatalf("unexpected func.tpl output after InstallFuncMap: %q", string(out))
 	}
 }

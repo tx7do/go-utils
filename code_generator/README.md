@@ -125,7 +125,8 @@ When nothing matches, `EmbeddedTemplateEngine` returns `template not found: <tpl
 - `func NewEmbeddedTemplateEngine(srcs map[string][]byte) (*EmbeddedTemplateEngine, error)` — equivalent to `NewEmbeddedTemplateEngineFromMap(srcs, nil)`;
 - `func NewEmbeddedTemplateEngineFromMap(srcs map[string][]byte, funcs template.FuncMap) (*EmbeddedTemplateEngine, error)` — parses templates one by one (empty entries are skipped); `funcs` are injected before parsing;
 - `type FileTemplateEngine struct`;
-- `func NewFileTemplateEngine(root string) (*FileTemplateEngine, error)` — recursively loads every `.tpl` / `.tmpl` under `root` (an empty `root` is treated as `"."`); keys are `/`-separated relative paths.
+- `func NewFileTemplateEngine(root string) (*FileTemplateEngine, error)` — recursively loads every `.tpl` / `.tmpl` under `root` (an empty `root` is treated as `"."`); keys are `/`-separated relative paths;
+- `func NewFileTemplateEngineWithFuncMap(root string, funcs template.FuncMap) (*FileTemplateEngine, error)` — same as above, but injects `funcs` **before** parsing, which is required for templates that reference custom functions.
 
 All three `TemplateEngine` methods (`Render` / `ListTemplates` / `InstallFuncMap`) are implemented and exported on both implementations.
 
@@ -134,8 +135,8 @@ All three `TemplateEngine` methods (`Render` / `ListTemplates` / `InstallFuncMap
 - **Built-in keys win over `Vars`**: the render data starts as a copy of `Vars`, then `Module` / `ProjectName` / `Project` / `OutDir` are written unconditionally — a `Vars` key with the same name is overwritten by these four built-ins;
 - **`ctx` has no effect**: the context argument of `CodeGenerator.Generate` is ignored (the parameter is `_`), so a write cannot be cancelled through it;
 - **File templates are loaded once at construction**: changes on disk after `NewFileTemplateEngine` are not seen; rebuild the engine to pick them up;
-- **Template functions must exist at parse time**: Go's `text/template` validates function names during parsing, so a template referencing an unregistered function makes **engine construction fail** — `EmbeddedTemplateEngine` requires providing them via the `funcs` argument of `NewEmbeddedTemplateEngineFromMap`; `FileTemplateEngine` has no construction parameter for a `FuncMap`, so it cannot load templates that use custom functions;
-- **`InstallFuncMap` works by re-parsing the template trees**: for templates that parsed successfully it installs/overrides same-named function implementations (verified: the implementation of `toupper` can be swapped wholesale); templates whose re-parse fails are left untouched (silently skipped). It cannot rescue an engine that failed to build over a missing function — that construction already errored;
+- **Template functions must exist at parse time**: Go's `text/template` validates function names during parsing, so a template referencing an unregistered function makes **engine construction fail** — `EmbeddedTemplateEngine` requires providing them via the `funcs` argument of `NewEmbeddedTemplateEngineFromMap`, and `FileTemplateEngine` requires `NewFileTemplateEngineWithFuncMap`;
+- **`InstallFuncMap` works by re-parsing the template trees**: for templates that parsed successfully it installs/overrides same-named function implementations (verified: the implementation of `toupper` can be swapped wholesale); templates whose re-parse fails are left untouched (silently skipped). It cannot rescue an engine that failed to build over a missing function — construct with the `funcs` parameter instead;
 - **Suffix-match ordering is not guaranteed**: name matching iterates a map, so when several keys end with `/<tplName>` it is nondeterministic which one wins — pass the full key when in doubt;
 - **Overwrites**: `Generate` never confirms before replacing an existing output file; it is atomically overwritten;
 - **`FileExt` is appended only when there is no extension**: if the template name still carries an extension after `.tpl` / `.tmpl` removal (e.g. `x.yaml.tpl` → `x.yaml`), `FileExt` is not appended.

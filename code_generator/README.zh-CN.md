@@ -123,7 +123,8 @@ engine.InstallFuncMap(template.FuncMap{"up": strings.ToUpper})
 - `func NewEmbeddedTemplateEngine(srcs map[string][]byte) (*EmbeddedTemplateEngine, error)` —— 等价于 `NewEmbeddedTemplateEngineFromMap(srcs, nil)`；
 - `func NewEmbeddedTemplateEngineFromMap(srcs map[string][]byte, funcs template.FuncMap) (*EmbeddedTemplateEngine, error)` —— 逐条解析模板（空内容跳过），`funcs` 在解析前注入；
 - `type FileTemplateEngine struct`；
-- `func NewFileTemplateEngine(root string) (*FileTemplateEngine, error)` —— 递归加载 `root` 下所有 `.tpl` / `.tmpl`（`root` 为空按 `"."` 处理），键为以 `/` 分隔的相对路径。
+- `func NewFileTemplateEngine(root string) (*FileTemplateEngine, error)` —— 递归加载 `root` 下所有 `.tpl` / `.tmpl`（`root` 为空按 `"."` 处理），键为以 `/` 分隔的相对路径；
+- `func NewFileTemplateEngineWithFuncMap(root string, funcs template.FuncMap) (*FileTemplateEngine, error)` —— 与上者相同，但在解析**之前**注入 `funcs`，模板引用自定义函数时必须用它构造。
 
 `TemplateEngine` 的三个方法（`Render` / `ListTemplates` / `InstallFuncMap`）在两个实现上均已导出实现。
 
@@ -132,8 +133,8 @@ engine.InstallFuncMap(template.FuncMap{"up": strings.ToUpper})
 - **内置键优先于 `Vars`**：渲染数据先复制 `Vars`，再无条件写入 `Module` / `ProjectName` / `Project` / `OutDir`，同名 `Vars` 键会被这四个内置键覆盖；
 - **`ctx` 未生效**：`CodeGenerator.Generate` 的 context 参数被忽略（形参为 `_`），无法通过它取消写入；
 - **文件模板只在构建时加载一次**：`NewFileTemplateEngine` 构造后磁盘上的模板改动不会被感知，需重新构建引擎；
-- **模板函数必须在解析时已存在**：Go `text/template` 在解析阶段即校验函数名，模板引用未注册函数会导致**引擎构建失败**——`EmbeddedTemplateEngine` 需通过 `NewEmbeddedTemplateEngineFromMap` 的 `funcs` 参数提供；`FileTemplateEngine` 没有注入 `FuncMap` 的构造参数，因此无法加载引用自定义函数的模板；
-- **`InstallFuncMap` 通过重新解析模板树生效**：对已成功解析的模板补装/覆盖同名函数的实现（实测可将 `toupper` 的实现整体替换），重新解析失败的模板保持原样（静默跳过）；它无法拯救构建时因缺函数而失败的引擎——那时构建早已报错；
+- **模板函数必须在解析时已存在**：Go `text/template` 在解析阶段即校验函数名，模板引用未注册函数会导致**引擎构建失败**——`EmbeddedTemplateEngine` 需通过 `NewEmbeddedTemplateEngineFromMap` 的 `funcs` 参数提供，`FileTemplateEngine` 需使用 `NewFileTemplateEngineWithFuncMap`；
+- **`InstallFuncMap` 通过重新解析模板树生效**：对已成功解析的模板补装/覆盖同名函数的实现（实测可将 `toupper` 的实现整体替换），重新解析失败的模板保持原样（静默跳过）；它无法拯救构建时因缺函数而失败的引擎——请改用带 `funcs` 参数的构造器；
 - **后缀匹配的顺序不保证**：模板名匹配按 map 遍历，存在多个以 `/<tplName>` 结尾的键时命中哪一个是不确定的，建议传完整键名；
 - **覆盖写**：`Generate` 对已存在的输出文件不做任何确认，直接原子覆盖；
 - **`FileExt` 只在"无扩展名"时追加**：模板名去掉 `.tpl` / `.tmpl` 后若自带扩展名（如 `x.yaml.tpl` → `x.yaml`），不会追加 `FileExt`。
