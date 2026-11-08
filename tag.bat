@@ -69,3 +69,4 @@ git tag code_generator/v0.0.2
 git tag copierutil/v0.0.9
 git tag jwtutil/v0.0.4
 git tag code_generator/v0.0.3
+git tag netutil/v0.2.0
