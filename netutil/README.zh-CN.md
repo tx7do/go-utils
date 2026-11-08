@@ -10,9 +10,12 @@
   - 私有/回环/链路本地/云元数据等危险网段封禁：`IsBlockedIP` / `IsBlockedIPAddr`
   - URL 静态校验：`ValidateURL`（仅允许 http/https、host 非空、拒绝 `user:pass@host` 形式的 userinfo）
   - 域名解析校验：`LookupAndCheckHost`（任一解析结果落入禁投网段即报错，返回通过校验的 IP 列表）
-- **客户端真实 IP 解析**（`client_ip.go`）
+- **客户端真实 IP 解析**（`client_ip.go`，fail-closed 语义）
+  - 默认**不信任任何代理**：未配置可信代理时 XFF / X-Real-IP 一律不采信，内网网段也不默认可信（历史上"默认信任 RFC1918"正是伪造绕过审计的入口）
   - `ClientIPFromRequest` 按可信代理白名单从 `X-Forwarded-For` 链从右向左解析，防止攻击者伪造 XFF 头绕过基于 IP 的限流/审计
-  - `SetTrustedProxies` 在启动时一次性指定实际反向代理网段，覆盖默认值
+  - `SetTrustedProxies` / `SetTrustedProxiesFromEnvVar` 在启动时一次性指定实际反向代理网段
+- **kratos 上下文助手**（`context.go`）
+  - `ClientIPFromContext` / `HeaderFromContext` / `CookieFromContext`：service 层从 kratos context 读取客户端 IP / 请求头 / HttpOnly cookie；非 HTTP 形态返回零值而非 panic
 
 ## 安装
 
@@ -36,11 +39,15 @@ package main
 import "github.com/tx7do/go-utils/netutil"
 
 func main() {
-	// 用实际的反向代理网段覆盖默认值；放在 main / 服务初始化阶段，调用一次
+	// 默认不信任任何代理；显式指定实际的反向代理网段；
+	// 放在 main / 服务初始化阶段，调用一次
 	netutil.SetTrustedProxies([]string{"10.0.0.0/8", "192.168.1.2"})
 
-	// 传入空切片表示不信任任何代理（始终使用 TCP 直连对端 IP）
-	// netutil.SetTrustedProxies([]string{})
+	// 或从环境变量读取逗号分隔的网段串（变量未设置/为空 = 不信任任何代理）
+	netutil.SetTrustedProxiesFromEnvVar("GOWIND_TRUSTED_PROXIES")
+
+	// 传入空切片/nil 同样表示不信任任何代理（始终使用 TCP 直连对端 IP）
+	// netutil.SetTrustedProxies(nil)
 }
 ```
 
@@ -153,21 +160,21 @@ func safeDial(ctx context.Context, rawURL string) (net.Conn, error) {
 
 | 函数 | 说明 |
 |------|------|
-| `SetTrustedProxies(cidrs []string)` | 设置可信代理 CIDR 列表（覆盖默认值）。应在服务启动阶段调用一次。**空切片表示不信任任何代理**（始终使用 RemoteAddr）。不带掩码的单 IP 按 `/32`（IPv4）或 `/128`（IPv6）处理；非法 CIDR 会被跳过忽略 |
+| `SetTrustedProxies(cidrs []string)` | 设置可信代理 CIDR 列表。应在服务启动阶段调用一次。**空切片/nil 表示不信任任何代理**（始终使用 RemoteAddr）。不带掩码的单 IP 按 `/32`（IPv4）或 `/128`（IPv6）处理；非法条目会被跳过忽略 |
+| `ParseTrustedProxies(raw string) []string` | 把逗号分隔的网段串（env 配置形态）解析为合法条目；非法条目跳过，全空/全非法返回 `nil` |
+| `SetTrustedProxiesFromEnvVar(name string)` | 从指定环境变量读取逗号分隔的网段配置并生效；变量未设置/为空时清空可信代理表 |
 | `ClientIPFromRequest(req *http.Request) string` | 解析客户端真实 IP；`req` 为 `nil` 时返回 `""` |
 
-#### 默认可信网段
+#### 默认语义：fail-closed
 
-未调用 `SetTrustedProxies` 时，默认信任以下网段（`client_ip.go` 的 `defaultTrustedProxyCIDRs`）：
-
-- RFC1918 私有地址：`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`
-- 回环：`127.0.0.0/8`、`::1/128`
-- IPv6 唯一本地地址（ULA）：`fc00::/7`
-
-生产部署应通过 `SetTrustedProxies` 精确指定实际反向代理网段。
+未调用 `SetTrustedProxies` 时**不信任任何代理**：XFF / X-Real-IP 一律不采信，
+即使对端是内网地址。解析语义上不存在"安全的默认网段"——内网网段同样是潜在
+客户端，把 RFC1918 默认视为可信会让任意内网主机伪造 XFF。生产部署必须通过
+`SetTrustedProxies` / `SetTrustedProxiesFromEnvVar` 精确指定实际反向代理网段。
 
 #### ClientIPFromRequest 解析策略
 
+0. 未配置可信代理 → 直接返回对端 IP，完全忽略一切转发头。
 1. 取 `RemoteAddr` 的直连对端 IP（TCP 连接的真实来源，无法伪造）。
 2. 对端 IP 不是可信代理（或无法解析）→ 直接返回对端 IP，完全忽略 XFF。
 3. 对端是可信代理 → 从 `X-Forwarded-For` 链**从右向左**跳过可信跳，第一个非可信
@@ -175,10 +182,18 @@ func safeDial(ctx context.Context, rawURL string) (net.Conn, error) {
 4. XFF 为空或全部非法 → 才采信 `X-Real-IP`（前提仍是对端为可信代理）。
 5. 兜底：对端 IP（如直连 nginx 的场景）。
 
+### kratos 上下文助手（`context.go`）
+
+| 函数 | 说明 |
+|------|------|
+| `ClientIPFromContext(ctx context.Context) string` | 从 kratos server context 解析客户端真实 IP（等价于对取到的 `*http.Request` 调 `ClientIPFromRequest`）；非 HTTP 传输返回 `""` |
+| `HeaderFromContext(ctx context.Context) http.Header` | 从 kratos server context 提取 HTTP 请求头；非 HTTP 传输返回 `nil` |
+| `CookieFromContext(ctx context.Context, name string) string` | 从 kratos server context 提取具名 cookie 值；非 HTTP 传输或无此 cookie 返回 `""` |
+
 ## 注意事项
 
-- `SetTrustedProxies` 应在服务启动阶段调用一次；`ClientIPFromRequest` 每次调用都会
-  在首次使用时以默认值完成初始化（`sync.Once`），但生产环境不应依赖默认值。
+- `SetTrustedProxies` 应在服务启动阶段调用一次。未配置时代理信任表为空（fail-closed），
+  所有请求按直连对端处理。
 - 始终部署在内网反代（nginx 等）之后时，将可信代理收敛为实际反代网段，避免内网
   任意主机被当作可信代理。
 - `LookupAndCheckHost` 的校验结果与真正建连之间存在时间窗口，务必配合"固定 IP 拨号"

@@ -11,9 +11,12 @@ English | [简体中文](README.zh-CN.md)
   - Blocks private/loopback/link-local/cloud-metadata ranges: `IsBlockedIP` / `IsBlockedIPAddr`
   - Static URL validation: `ValidateURL` (http/https only, host required, rejects `user:pass@host` userinfo)
   - Hostname resolution checks: `LookupAndCheckHost` (errors out if any resolved address falls into a blocked range, returns the validated IP list)
-- **Client real-IP resolution** (`client_ip.go`)
+- **Client real-IP resolution** (`client_ip.go`, fail-closed semantics)
+  - By default **no proxy is trusted**: without explicit configuration, XFF / X-Real-IP are ignored entirely — even private-range peers (historically, "trust RFC1918 by default" was exactly the spoofing entry point that bypassed auditing)
   - `ClientIPFromRequest` walks the `X-Forwarded-For` chain right-to-left through trusted proxies only, so attackers cannot spoof XFF to bypass IP-based rate limiting or auditing
-  - `SetTrustedProxies` overrides the defaults with your actual reverse-proxy ranges once at startup
+  - `SetTrustedProxies` / `SetTrustedProxiesFromEnvVar` configure your actual reverse-proxy ranges once at startup
+- **Kratos context helpers** (`context.go`)
+  - `ClientIPFromContext` / `HeaderFromContext` / `CookieFromContext`: read the client IP / request headers / HttpOnly cookies from a Kratos server context; non-HTTP transports return zero values instead of panicking
 
 ## Installation
 
@@ -37,12 +40,16 @@ package main
 import "github.com/tx7do/go-utils/netutil"
 
 func main() {
-	// Override the defaults with your actual reverse-proxy ranges;
+	// No proxy is trusted by default; specify your actual reverse-proxy ranges;
 	// call once in main / service initialization.
 	netutil.SetTrustedProxies([]string{"10.0.0.0/8", "192.168.1.2"})
 
-	// An empty slice means "trust no proxy" (always use the TCP peer IP).
-	// netutil.SetTrustedProxies([]string{})
+	// Or read a comma-separated list from an environment variable
+	// (unset / empty means "trust no proxy").
+	netutil.SetTrustedProxiesFromEnvVar("GOWIND_TRUSTED_PROXIES")
+
+	// An empty slice / nil likewise means "trust no proxy" (always use the TCP peer IP).
+	// netutil.SetTrustedProxies(nil)
 }
 ```
 
@@ -160,22 +167,22 @@ addresses (`ip.IsUnspecified()` / `ip.IsInterfaceLocalMulticast()`) as blocked.
 
 | Function | Description |
 |----------|-------------|
-| `SetTrustedProxies(cidrs []string)` | Sets the trusted proxy CIDR list (overrides the defaults). Call once at startup. **An empty slice means no proxy is trusted** (RemoteAddr is always used). A bare IP without a mask is treated as `/32` (IPv4) or `/128` (IPv6); invalid CIDRs are skipped |
+| `SetTrustedProxies(cidrs []string)` | Sets the trusted proxy CIDR list. Call once at startup. **An empty slice / nil means no proxy is trusted** (RemoteAddr is always used). A bare IP without a mask is treated as `/32` (IPv4) or `/128` (IPv6); invalid entries are skipped |
+| `ParseTrustedProxies(raw string) []string` | Parses a comma-separated range list (env-config form) into valid entries; invalid entries are skipped, empty/all-invalid input returns `nil` |
+| `SetTrustedProxiesFromEnvVar(name string)` | Reads a comma-separated range list from the named environment variable; unset/empty clears the trusted-proxy table |
 | `ClientIPFromRequest(req *http.Request) string` | Resolves the client real IP; returns `""` when `req` is `nil` |
 
-#### Default trusted ranges
+#### Default semantics: fail-closed
 
-Without `SetTrustedProxies`, the following ranges are trusted by default
-(`defaultTrustedProxyCIDRs` in `client_ip.go`):
-
-- RFC1918 private ranges: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
-- Loopback: `127.0.0.0/8`, `::1/128`
-- IPv6 unique local addresses (ULA): `fc00::/7`
-
-In production, specify your actual reverse-proxy ranges precisely via `SetTrustedProxies`.
+Without `SetTrustedProxies`, **no proxy is trusted**: XFF / X-Real-IP are ignored
+entirely, even for private-range peers. There is no "safe default range" here —
+private ranges are potential clients too, and trusting RFC1918 by default lets any
+internal host spoof XFF. In production, specify your actual reverse-proxy ranges
+precisely via `SetTrustedProxies` / `SetTrustedProxiesFromEnvVar`.
 
 #### ClientIPFromRequest resolution strategy
 
+0. No trusted proxies configured → return the peer IP and ignore every forwarding header.
 1. Take the direct peer IP from `RemoteAddr` (the real source of the TCP connection, cannot be spoofed).
 2. If the peer is not a trusted proxy (or is unparseable) → return the peer IP and ignore XFF entirely.
 3. If the peer is a trusted proxy → walk the `X-Forwarded-For` chain **right-to-left**, skipping trusted hops;
@@ -183,10 +190,18 @@ In production, specify your actual reverse-proxy ranges precisely via `SetTruste
 4. If XFF is empty or entirely invalid → fall back to `X-Real-IP` (still only when the peer is a trusted proxy).
 5. Fallback: the peer IP itself (e.g. a direct connection to nginx).
 
+### Kratos context helpers (`context.go`)
+
+| Function | Description |
+|----------|-------------|
+| `ClientIPFromContext(ctx context.Context) string` | Resolves the client real IP from a Kratos server context (equivalent to calling `ClientIPFromRequest` on the extracted `*http.Request`); returns `""` for non-HTTP transports |
+| `HeaderFromContext(ctx context.Context) http.Header` | Extracts HTTP request headers from a Kratos server context; returns `nil` for non-HTTP transports |
+| `CookieFromContext(ctx context.Context, name string) string` | Extracts a named cookie value from a Kratos server context; returns `""` for non-HTTP transports or missing cookies |
+
 ## Notes
 
-- Call `SetTrustedProxies` once at startup. `ClientIPFromRequest` lazily initializes
-  the defaults on first use (`sync.Once`), but production deployments should not rely on the defaults.
+- Call `SetTrustedProxies` once at startup. Without configuration the trusted-proxy
+  table is empty (fail-closed) and every request is treated as a direct connection.
 - When always deployed behind an internal reverse proxy (nginx etc.), narrow the trusted
   proxies to the actual proxy ranges so arbitrary internal hosts are not treated as trusted.
 - There is a time-of-check-to-time-of-use window between `LookupAndCheckHost` and the
