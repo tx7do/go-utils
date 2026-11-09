@@ -88,14 +88,14 @@ func TestSignLogContent_NilKeyErrors(t *testing.T) {
 // ---- 测试辅助：与 SignLogContent 相同的签名内容序列化 + 标准库验签 ----
 
 type signContent struct {
-	TenantID uint32 `json:"tenant_id"`
-	UserID   uint32 `json:"user_id"`
+	TenantID uint64 `json:"tenant_id"`
+	UserID   uint64 `json:"user_id"`
 	Sec      int64  `json:"sec"`
 	Nanos    int32  `json:"nanos"`
 	LogHash  string `json:"log_hash"`
 }
 
-func signContentJSON(tenantID, userID uint32, sec int64, nanos int32, logHash string) []byte {
+func signContentJSON(tenantID, userID uint64, sec int64, nanos int32, logHash string) []byte {
 	b, _ := json.Marshal(signContent{TenantID: tenantID, UserID: userID, Sec: sec, Nanos: nanos, LogHash: logHash})
 	return b
 }
