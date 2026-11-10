@@ -100,14 +100,14 @@ func HashLog(msg proto.Message, excludeFields ...string) string {
 // 兼容说明：tenantID/userID 为 uint64，但 encoding/json 对小值（<2^53，
 // 现网自增 ID 恒在此范围内）输出的十进制串与旧 uint32 版本逐字节一致，
 // 存量日志签名仍可验证。
-func SignLogContent(priv *ecdsa.PrivateKey, tenantID, userID uint64, createdAt *timestamppb.Timestamp, logHash string) ([]byte, error) {
+func SignLogContent(priv *ecdsa.PrivateKey, tenantID, userID int64, createdAt *timestamppb.Timestamp, logHash string) ([]byte, error) {
 	if priv == nil {
 		return nil, fmt.Errorf("ecdsa private key is nil: signing unavailable")
 	}
 
 	type signContent struct {
-		TenantID uint64 `json:"tenant_id"`
-		UserID   uint64 `json:"user_id"`
+		TenantID int64 `json:"tenant_id"`
+		UserID   int64 `json:"user_id"`
 		Sec      int64  `json:"sec"`   // createdAt 秒数
 		Nanos    int32  `json:"nanos"` // createdAt 纳秒数
 		LogHash  string `json:"log_hash"`
