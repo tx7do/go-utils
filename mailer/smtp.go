@@ -7,11 +7,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"mime"
 	"net"
 	"net/mail"
 	"net/smtp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // SmtpConfig SMTP 连接配置
@@ -55,13 +57,39 @@ func IsSupportedTlsMode(mode string) bool {
 	return parseTlsMode(mode) != tlsUnrecognized
 }
 
-// SendMail 通过 SMTP 发送一封纯文本邮件。
+// sendOptions 聚合 SendMail 的可选行为开关。
+type sendOptions struct {
+	html bool // 正文按 text/html 声明
+}
+
+// SendOption 定制 SendMail 的报文行为。
+type SendOption func(*sendOptions)
+
+// WithHTML 将正文 Content-Type 声明为 text/html; charset=UTF-8。
+// 缺省为 text/plain。
+func WithHTML() SendOption {
+	return func(o *sendOptions) { o.html = true }
+}
+
+// nowFunc 报文 Date 头的时间源；测试冻结它以获得确定性报文。
+var nowFunc = time.Now
+
+// SendMail 通过 SMTP 发送一封邮件（缺省纯文本，WithHTML 可切 HTML）。
 // to 可为多个收件人。
+//
+// 报文头自动处理两件容易踩坑的事：
+//   - Subject 含非 ASCII（如中文）时按 RFC 2047 编码，ASCII 主题原样穿透；
+//   - 按 RFC 5322 补 Date 头（部分反垃圾网关会因缺 Date 直接拒收）。
 //
 // ctx 贯穿到 TCP 建连：SMTP 服务端不可达时 net.Dial 会一直卡到操作系统级的
 // 连接超时（Windows 上可达 20s+），而发送验证码邮件是登录链路里的同步调用，
 // 没有 ctx 就没有任何一层能把它打断。
-func SendMail(ctx context.Context, cfg SmtpConfig, to []string, subject, body string) error {
+func SendMail(ctx context.Context, cfg SmtpConfig, to []string, subject, body string, opts ...SendOption) error {
+	var o sendOptions
+	for _, f := range opts {
+		f(&o)
+	}
+
 	if cfg.Host == "" || cfg.Port == 0 {
 		return fmt.Errorf("smtp host/port is not configured")
 	}
@@ -82,7 +110,7 @@ func SendMail(ctx context.Context, cfg SmtpConfig, to []string, subject, body st
 		fromHeader = (&mail.Address{Name: cfg.FromName, Address: from}).String()
 	}
 
-	msg := buildMessage(fromHeader, to, subject, body)
+	msg := buildMessageWith(fromHeader, to, subject, body, o)
 
 	var client *smtp.Client
 	var err error
@@ -158,7 +186,20 @@ func dialStartTLS(ctx context.Context, addr, host string) (*smtp.Client, error) 
 	return client, nil
 }
 
+// buildMessage 缺省选项（纯文本）的报文拼装；供既有调用方与测试使用。
 func buildMessage(from string, to []string, subject, body string) []byte {
+	return buildMessageWith(from, to, subject, body, sendOptions{})
+}
+
+func buildMessageWith(from string, to []string, subject, body string, o sendOptions) []byte {
+	// QEncoding.Encode 对纯 ASCII 输入原样返回，非 ASCII 才编码——无条件套用安全。
+	subject = mime.QEncoding.Encode("UTF-8", subject)
+
+	contentType := "text/plain; charset=UTF-8"
+	if o.html {
+		contentType = "text/html; charset=UTF-8"
+	}
+
 	header := make([]byte, 0, 512+len(subject)+len(body))
 	header = append(header, "From: "...)
 	header = append(header, from...)
@@ -168,7 +209,12 @@ func buildMessage(from string, to []string, subject, body string) []byte {
 	header = append(header, "\r\n"...)
 	header = append(header, "Subject: "...)
 	header = append(header, subject...)
-	header = append(header, "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n"...)
+	header = append(header, "\r\n"...)
+	header = append(header, "Date: "...)
+	header = append(header, nowFunc().Format(time.RFC1123Z)...)
+	header = append(header, "\r\nMIME-Version: 1.0\r\nContent-Type: "...)
+	header = append(header, contentType...)
+	header = append(header, "\r\n\r\n"...)
 	header = append(header, body...)
 	header = append(header, "\r\n"...)
 	return header

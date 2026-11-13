@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -232,11 +233,27 @@ func closedPort(t *testing.T) (host string, port uint32) {
 // buildMessage 白盒测试
 // ---------------------------------------------------------------------------
 
+// frozenNow 报文 Date 头使用的确定时间。
+var frozenNow = time.Unix(1763000000, 0)
+
+func frozenNowLine() string {
+	return "Date: " + frozenNow.Format(time.RFC1123Z) + "\r\n"
+}
+
+// freezeNow 把报文时间源冻结为 frozenNow，测试结束恢复。
+func freezeNow(t *testing.T) {
+	t.Helper()
+	old := nowFunc
+	nowFunc = func() time.Time { return frozenNow }
+	t.Cleanup(func() { nowFunc = old })
+}
+
 // TestBuildMessage 逐项断言 buildMessage 的产物：From、To（单/多收件人、
-// 空收件人列表）、Subject、MIME 头、头部与正文的空行分隔、正文及其行尾，
+// 空收件人列表）、Subject、Date、MIME 头、头部与正文的空行分隔、正文及其行尾，
 // 最后与完整字节序列做精确比对，锁定任何一处拼装偏差。
 func TestBuildMessage(t *testing.T) {
 	t.Parallel()
+	freezeNow(t)
 
 	tests := []struct {
 		name         string
@@ -251,19 +268,21 @@ func TestBuildMessage(t *testing.T) {
 			name:    "single recipient",
 			from:    "sender@example.test",
 			to:      []string{"rcpt1@example.test"},
-			subject: "单元测试主题",
+			subject: "unit test subject",
 			body:    "正文第一行\r\n正文第二行",
 			wantContains: []string{
 				"From: sender@example.test\r\n",
 				"To: rcpt1@example.test\r\n",
-				"Subject: 单元测试主题\r\n",
+				"Subject: unit test subject\r\n",
+				frozenNowLine(),
 				"MIME-Version: 1.0\r\n",
 				"Content-Type: text/plain; charset=UTF-8\r\n",
 				"正文第一行\r\n正文第二行\r\n",
 			},
 			wantFull: "From: sender@example.test\r\n" +
 				"To: rcpt1@example.test\r\n" +
-				"Subject: 单元测试主题\r\n" +
+				"Subject: unit test subject\r\n" +
+				frozenNowLine() +
 				"MIME-Version: 1.0\r\n" +
 				"Content-Type: text/plain; charset=UTF-8\r\n" +
 				"\r\n" +
@@ -279,6 +298,7 @@ func TestBuildMessage(t *testing.T) {
 				"From: noreply@example.test\r\n",
 				"To: rcpt1@example.test, rcpt2@example.test, rcpt3@example.test\r\n",
 				"Subject: multi subject\r\n",
+				frozenNowLine(),
 				"MIME-Version: 1.0\r\n",
 				"Content-Type: text/plain; charset=UTF-8\r\n",
 				"multi body\r\n",
@@ -286,6 +306,7 @@ func TestBuildMessage(t *testing.T) {
 			wantFull: "From: noreply@example.test\r\n" +
 				"To: rcpt1@example.test, rcpt2@example.test, rcpt3@example.test\r\n" +
 				"Subject: multi subject\r\n" +
+				frozenNowLine() +
 				"MIME-Version: 1.0\r\n" +
 				"Content-Type: text/plain; charset=UTF-8\r\n" +
 				"\r\n" +
@@ -301,6 +322,7 @@ func TestBuildMessage(t *testing.T) {
 				"From: \r\n",
 				"To: \r\n",
 				"Subject: \r\n",
+				frozenNowLine(),
 				"MIME-Version: 1.0\r\n",
 				"Content-Type: text/plain; charset=UTF-8\r\n",
 				"\r\n\r\n",
@@ -308,6 +330,7 @@ func TestBuildMessage(t *testing.T) {
 			wantFull: "From: \r\n" +
 				"To: \r\n" +
 				"Subject: \r\n" +
+				frozenNowLine() +
 				"MIME-Version: 1.0\r\n" +
 				"Content-Type: text/plain; charset=UTF-8\r\n" +
 				"\r\n" +
@@ -328,6 +351,31 @@ func TestBuildMessage(t *testing.T) {
 				"完整报文必须与逐字节期望值精确一致")
 		})
 	}
+}
+
+// TestBuildMessage_CJKSubjectEncoded 非 ASCII 主题必须按 RFC 2047 编码——
+// 裸中文主题在多数网关/客户端会乱码甚至整封信被判垃圾。
+// ASCII 主题原样穿透（QEncoding.Encode 对不需要编码的输入恒等返回）。
+func TestBuildMessage_CJKSubjectEncoded(t *testing.T) {
+	t.Parallel()
+
+	got := string(buildMessage("sender@example.test", []string{"to@example.test"}, "单元测试主题", "b"))
+	require.Contains(t, got, "Subject: =?UTF-8?", "非 ASCII 主题必须走 RFC 2047 编码")
+	require.NotContains(t, got, "Subject: 单元测试主题", "裸中文主题不允许直发")
+	require.Contains(t, got, "?=", "编码词必须闭合")
+
+	// ASCII 主题原样
+	plain := string(buildMessage("sender@example.test", []string{"to@example.test"}, "plain ascii", "b"))
+	require.Contains(t, plain, "Subject: plain ascii\r\n", "ASCII 主题必须原样穿透")
+}
+
+// TestBuildMessage_ContentType_HTML WithHTML 选项把 Content-Type 切到 text/html。
+func TestBuildMessage_ContentType_HTML(t *testing.T) {
+	t.Parallel()
+
+	got := string(buildMessageWith("sender@example.test", []string{"to@example.test"}, "s", "<p>b</p>", sendOptions{html: true}))
+	require.Contains(t, got, "Content-Type: text/html; charset=UTF-8\r\n")
+	require.NotContains(t, got, "text/plain")
 }
 
 // ---------------------------------------------------------------------------
@@ -486,6 +534,7 @@ func TestSendMail_PlaintextSessionSucceeds(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			freezeNow(t)
 
 			srv := startFakeSMTPServer(t, fakeServerOptions{})
 			cfg := SmtpConfig{
@@ -502,6 +551,7 @@ func TestSendMail_PlaintextSessionSucceeds(t *testing.T) {
 			want := tc.fromLine +
 				"To: rcpt1@example.test, rcpt2@example.test\r\n" +
 				"Subject: plain subject\r\n" +
+				frozenNowLine() +
 				"MIME-Version: 1.0\r\n" +
 				"Content-Type: text/plain; charset=UTF-8\r\n" +
 				"\r\n" +
@@ -518,6 +568,7 @@ func TestSendMail_PlaintextSessionSucceeds(t *testing.T) {
 // （标准库 smtp.PlainAuth 对 localhost 的豁免规则）。
 func TestSendMail_AuthAcceptedThenSendSucceeds(t *testing.T) {
 	t.Parallel()
+	freezeNow(t)
 
 	srv := startFakeSMTPServer(t, fakeServerOptions{authReply: "235 ok\r\n"})
 	cfg := SmtpConfig{
@@ -535,6 +586,7 @@ func TestSendMail_AuthAcceptedThenSendSucceeds(t *testing.T) {
 	want := "From: sender@example.test\r\n" +
 		"To: rcpt1@example.test\r\n" +
 		"Subject: auth subject\r\n" +
+		frozenNowLine() +
 		"MIME-Version: 1.0\r\n" +
 		"Content-Type: text/plain; charset=UTF-8\r\n" +
 		"\r\n" +
