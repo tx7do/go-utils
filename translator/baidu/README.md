@@ -6,7 +6,7 @@ English | [简体中文](README.zh-CN.md)
 
 ## Introduction
 
-This module (`github.com/tx7do/go-utils/translator/baidu`) is the Baidu Translate implementation of the translator components in [go-utils](https://github.com/tx7do/go-utils). It is an **independent Go module** (with its own `go.mod`) and has no third-party dependencies.
+This module (`github.com/tx7do/go-utils/translator/baidu`) is the Baidu Translate implementation of the translator components in [go-utils](https://github.com/tx7do/go-utils). It is an **independent Go module** (with its own `go.mod`) and has no third-party runtime dependencies (testify is used in tests only).
 
 Its method signature matches the `Translator` interface of go-utils:
 
@@ -21,8 +21,11 @@ Internally it calls the Baidu general translation API (`https://fanyi-api.baidu.
 
 - Built on the Baidu Translate Open Platform general translation API
 - AppID + SecretKey authentication with the signature computed automatically (MD5)
-- Built-in 30-second HTTP timeout
-- `auto` source language for automatic detection
+- **BCP47 language normalization**: pass `zh-CN` / `en-US` / `ar` … — `NormalizeLang` maps them to Baidu language codes (`zh` / `en` / `ara` …); unknown codes fall back to the lowercased language part without the region suffix
+- **Multi-segment results joined**: the Baidu API splits text by line and returns multiple segments; this module joins them back with `\n`
+- Built-in 30-second request timeout, 10 MiB response size cap
+- Empty input short-circuits to `("", nil)`; missing credentials fail fast with a clear error
+- Configurable endpoint (`WithEndpoint`) and HTTP client (`WithHTTPClient`) — the endpoint option is handy for injecting a mock server in tests
 - No custom error type; errors are plain `error` values
 
 ## Installation
@@ -54,8 +57,8 @@ func main() {
 	// Note: NewTranslator does not return an error.
 	translator := baidu.NewTranslator("your_app_id", "your_secret_key")
 
-	// Translate text
-	result, err := translator.Translate("Hello, world!", "en", "zh")
+	// Translate text; language tags may be BCP47 ("en-US") or Baidu codes ("en")
+	result, err := translator.Translate("Hello, world!", "en-US", "zh-CN")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -69,17 +72,31 @@ func main() {
 ### NewTranslator
 
 ```go
-func NewTranslator(appID, secretKey string) *Translator
+func NewTranslator(appID, secretKey string, opts ...Option) *Translator
 ```
 
 **Parameters:**
 
 - `appID`: the Baidu Translate AppID
 - `secretKey`: the Baidu Translate SecretKey
+- `opts`: optional configuration (see below)
 
-**Returns:** a `*Translator` instance. It does **not** return an error — construction performs no network requests.
+**Returns:** a `*Translator` instance. It does **not** return an error — construction performs no network requests, and credential presence is checked per `Translate` call instead.
 
-This module has no configuration options: the HTTP client uses a fixed 30-second timeout that cannot be changed.
+### Options
+
+| Option | Signature | Description |
+|--------|-----------|-------------|
+| `WithEndpoint` | `WithEndpoint(endpoint string)` | Override the API endpoint; inject a mock server in tests |
+| `WithHTTPClient` | `WithHTTPClient(c *http.Client)` | Replace the HTTP client (custom proxy / timeout policy). The default is a 30-second-timeout client |
+
+### NormalizeLang
+
+```go
+func NormalizeLang(lang string) string
+```
+
+Maps a BCP47 language tag to a Baidu language code (`zh-CN` → `zh`, `zh-TW` → `cht`, `ar` → `ara`, …). Unlisted tags are passed through as the lowercased language part without the region suffix (`xxx-YY` → `xxx`). `Translate` applies it to both language arguments automatically; call it yourself only if you need the mapping elsewhere (e.g. for display).
 
 ### Translate
 
@@ -89,9 +106,9 @@ func (t *Translator) Translate(source, sourceLang, targetLang string) (string, e
 
 **Parameters:**
 
-- `source`: the text to translate
-- `sourceLang`: source language code; pass `auto` for automatic detection
-- `targetLang`: target language code
+- `source`: the text to translate; whitespace-only input returns `("", nil)` without hitting the API
+- `sourceLang`: source language; `auto`, empty string, or any BCP47 tag not resolvable to a concrete language triggers automatic detection
+- `targetLang`: target language
 
 **Returns:** the translated text and an error.
 
@@ -103,6 +120,8 @@ func (t *Translator) Translate(source, sourceLang, targetLang string) (string, e
 4. Obtain the AppID and SecretKey
 
 ## Supported Languages
+
+Inputs accept BCP47 tags (normalized automatically); the table below lists the resulting Baidu codes.
 
 | Language | Code | Language | Code |
 |----------|------|----------|------|
@@ -139,7 +158,7 @@ func (t *Translator) Translate(source, sourceLang, targetLang string) (string, e
 | Bulgarian | `bg` | Sindhi | `sd` |
 | Slovenian | `sl` | Sinhala | `si` |
 
-See the [official documentation](https://fanyi-api.baidu.com/api/trans/product/apidoc) for more supported languages.
+Traditional Chinese (`zh-TW` / `zh-HK`) maps to `cht`. See the [official documentation](https://fanyi-api.baidu.com/api/trans/product/apidoc) for more supported languages.
 
 ## Advanced Usage
 
@@ -162,8 +181,8 @@ func main() {
 
 	result, err := translator.Translate("Hello", "en", "zh")
 	if err != nil {
-		// err.Error() looks like "baidu translate error: 54001 - Invalid sign";
-		// parse the numeric code before the "-" if needed
+		// err.Error() looks like "baidu translator: api error 54001: Invalid sign";
+		// parse the numeric code after "api error" if needed
 		log.Printf("translate failed: %v", err)
 		return
 	}
@@ -176,10 +195,13 @@ Error message formats (matching the source code):
 
 | Scenario | Error message format |
 |----------|----------------------|
-| API returned an error code | `baidu translate error: <error_code> - <error_msg>` |
-| HTTP status is not 200 | `baidu translate error: status <status code>, body: <response body>` |
-| No translation result in the response | `baidu translate: invalid response format` |
-| Network request failed | the underlying error (e.g. `*url.Error`) is returned as-is |
+| Missing credentials | `baidu translator: appid/secret is not configured` |
+| API returned an error code | `baidu translator: api error <error_code>: <error_msg>` |
+| HTTP status is not 200 | `baidu translator: unexpected status <status>: <response body>` |
+| Response decoding failed | `baidu translator: decode response: <underlying error>` |
+| Network request failed | `baidu translator: request: <underlying error>` |
+
+An API response with an empty `trans_result` array returns `("", nil)` — no error.
 
 ### Common Error Codes
 
@@ -220,12 +242,25 @@ func main() {
 }
 ```
 
+### Testing with a Mock Endpoint
+
+```go
+srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"trans_result": []map[string]string{{"src": "hello", "dst": "你好"}},
+	})
+}))
+
+tr := baidu.NewTranslator("appid", "secret", baidu.WithEndpoint(srv.URL))
+```
+
 ## Notes
 
-1. **Long texts return only the first segment**: the Baidu API splits long text by line and returns multiple segments in the `trans_result` array; this module returns only the first segment's translation (`trans_result[0].dst`). Split long texts yourself before calling.
-2. **HTTP timeout is fixed at 30 seconds and is not configurable**: the module uses `&http.Client{Timeout: 30 * time.Second}` internally and offers no customization option.
-3. **Signature algorithm**: `sign = MD5(appID + query + salt + secretKey)`, where `salt` is a randomly generated `int64` per request. The signature is computed automatically; no manual work is needed.
-4. Per-request text length and rate limits are documented in the [official documentation](https://fanyi-api.baidu.com/api/trans/product/apidoc); split long texts and mind the QPS limits.
+1. **Signature algorithm**: `sign = MD5(appID + query + salt + secretKey)`, where `salt` is a random `uint64` per request. The signature is computed automatically; no manual work is needed.
+2. **Long texts**: the Baidu API splits text by line and returns multiple segments; this module joins them with `\n` and returns the whole translation. Mind the per-request length and QPS limits in the [official documentation](https://fanyi-api.baidu.com/api/trans/product/apidoc).
+3. **Timeouts**: the default HTTP client and the per-request context are both capped at 30 seconds; replace the client via `WithHTTPClient` if you need a different policy.
+4. The response body is read up to 10 MiB; larger responses fail with a decode error rather than exhausting memory.
 5. Every call hits the Baidu API; watch your account quota and billing. The `Translator` instance is reusable.
 
 ## Acknowledgements
