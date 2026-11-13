@@ -1,7 +1,7 @@
 package sliceutil
 
 import (
-	"strconv"
+	"fmt"
 	"strings"
 )
 
@@ -24,9 +24,11 @@ func FilterBlacklist(data []string, blacklist []string) []string {
 }
 
 // NumberSliceToString 把数字切片格式化为逗号分隔的十进制字符串。
-func NumberSliceToString(numbers []uint32) string {
+// 泛型约束覆盖全部有符号/无符号整型（含各项目不同的 ID 位宽口径）。
+func NumberSliceToString[T ~int | ~int8 | ~int16 | ~int32 | ~int64 |
+	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](numbers []T) string {
 	return strings.Join(
-		Map(numbers, func(value uint32, _ int, _ []uint32) string { return strconv.FormatUint(uint64(value), 10) }),
+		Map(numbers, func(value T, _ int, _ []T) string { return fmt.Sprint(value) }),
 		",",
 	)
 }
