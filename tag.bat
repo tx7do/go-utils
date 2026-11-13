@@ -74,3 +74,4 @@ git tag printrender/v0.1.0
 git tag printrender/v0.1.1
 git tag crypto/v0.0.6
 git tag jwtutil/v0.0.5
+git tag translator/baidu/v0.0.2
