@@ -89,3 +89,4 @@ git tag sfs2x/v0.0.6
 git tag sfs2x/v0.0.7
 git tag sfs2x/v0.0.8
 git tag currency/v0.0.2
+git tag currency/v0.0.3
