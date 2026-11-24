@@ -90,6 +90,7 @@ msg, err := sfs2x.DecodeFrame(frame)
 - **帧形态**：`DecodeFrame` 两种长度形态（header bit `0x08`）都接受。`EncodeFrame` 发短形态，载荷超过 65535 字节时自动切换 BIG_SIZE（uint32），与官方客户端一致。
 - **解码边界安全**：截断或畸形输入返回错误，绝不 panic。`DecodeFrame` 对压缩（0x20）、加密（0x40）、非二进制帧显式报错拒绝，不做误导性硬解。
 - **压缩**：header bit `0x20` 的帧携带 zlib 压缩载荷；本包不做解压——对端若发该形态请在传输层处理。
+- **UTF_STRING 上限**：线格式以 uint16 携带字符串长度，超过 65535 字节的值无法编码（长度字段静默截断——与官方客户端同款上限）；更大载荷请用 BYTE_ARRAY（uint32 长度）。
 - **类型安全**：类型化读取器（`GetInt` 等）使用无检查类型断言，不匹配即 panic。不可信输入请先查 `GetType` 或用 `Get` 安全断言。
 
 ## 协议忠实度
@@ -99,6 +100,7 @@ msg, err := sfs2x.DecodeFrame(frame)
 | 行为 | 本包 | 官方客户端 API |
 |---|---|---|
 | 类型码 0–18 | ✓ 一致 | — |
+| 类型化数组（BOOL/SHORT/INT/LONG/FLOAT/DOUBLE/UTF_STRING） | ✓ 编码+解码 | 一致 |
 | BYTE_ARRAY 长度字段 | **uint32** | uint32（`writeInt`）——部分第三方移植误用 uint16 |
 | 其他数组/字符串长度字段 | uint16 | uint16 |
 | 嵌套对象/数组 marker | 类型字节兼任 marker（回退一字节） | 一致 |

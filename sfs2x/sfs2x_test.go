@@ -3,6 +3,9 @@ package sfs2x
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEncodeDecodeRoundtrip(t *testing.T) {
@@ -269,5 +272,129 @@ func TestDecodeFrame_RejectsFlags(t *testing.T) {
 		if !bytes.Contains([]byte(err.Error()), []byte(tc.match)) {
 			t.Fatalf("%s frame error %q must mention %q", name, err.Error(), tc.match)
 		}
+	}
+}
+
+// TestTypedArraysRoundtrip 七个标量数组类型全量回环——补上此前解码器缺失的
+// 7 个类型（bool/short/int/long/float/double/utf_string array）。
+func TestTypedArraysRoundtrip(t *testing.T) {
+	o := New()
+	o.Put("ba", TBoolArray, []bool{true, false, true})
+	o.Put("sa", TShortArray, []int16{-2, -1, 0, 1, 2})
+	o.Put("ia", TIntArray, []int32{-100000, 0, 100000})
+	o.Put("la", TLongArray, []int64{-9999999999, 0, 9999999999})
+	o.Put("fa", TFloatArray, []float32{1.5, -2.25})
+	o.Put("da", TDoubleArray, []float64{3.14159265358979, -0.5})
+	o.Put("ua", TUTFStringArray, []string{"alpha", "", "omega"})
+
+	decoded, err := Decode(o.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	ba, _ := decoded.Get("ba").([]bool)
+	assert.Equal(t, []bool{true, false, true}, ba)
+	sa, _ := decoded.Get("sa").([]int16)
+	assert.Equal(t, []int16{-2, -1, 0, 1, 2}, sa)
+	ia, _ := decoded.Get("ia").([]int32)
+	assert.Equal(t, []int32{-100000, 0, 100000}, ia)
+	la, _ := decoded.Get("la").([]int64)
+	assert.Equal(t, []int64{-9999999999, 0, 9999999999}, la)
+	fa, _ := decoded.Get("fa").([]float32)
+	require.Len(t, fa, 2)
+	assert.InDelta(t, 1.5, fa[0], 1e-6)
+	assert.InDelta(t, -2.25, fa[1], 1e-6)
+	da, _ := decoded.Get("da").([]float64)
+	assert.Equal(t, []float64{3.14159265358979, -0.5}, da)
+	ua, _ := decoded.Get("ua").([]string)
+	assert.Equal(t, []string{"alpha", "", "omega"}, ua)
+
+	// 类型码钉住：解码后条目类型必须与写入一致
+	for key, want := range map[string]Type{
+		"ba": TBoolArray, "sa": TShortArray, "ia": TIntArray, "la": TLongArray,
+		"fa": TFloatArray, "da": TDoubleArray, "ua": TUTFStringArray,
+	} {
+		if got := decoded.GetType(key); got != want {
+			t.Fatalf("GetType(%q) = %d, want %d", key, got, want)
+		}
+	}
+}
+
+// TestNegativeNumbersRoundtrip 负数两补数编码必须无损回环（此前只测了不 panic）。
+func TestNegativeNumbersRoundtrip(t *testing.T) {
+	o := New()
+	o.Put("s", TShort, int16(-1234))
+	o.Put("i", TInt, int32(-123456))
+	o.Put("l", TLong, int64(-1234567890123))
+
+	decoded, err := Decode(o.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	assert.Equal(t, int16(-1234), decoded.GetShort("s"))
+	assert.Equal(t, int32(-123456), decoded.GetInt("i"))
+	assert.Equal(t, int64(-1234567890123), decoded.GetLong("l"))
+}
+
+// TestEmptyObjectAndStrings 空对象/空串/空数组边界。
+func TestEmptyObjectAndStrings(t *testing.T) {
+	empty := New()
+	decoded, err := Decode(empty.Encode())
+	if err != nil {
+		t.Fatalf("empty object decode: %v", err)
+	}
+	if len(decoded.GetKeys()) != 0 {
+		t.Fatal("empty object must stay empty")
+	}
+
+	o := New()
+	o.Put("e", TUTFString, "")
+	o.Put("ea", TUTFStringArray, []string{})
+	o.Put("ia", TIntArray, []int32{})
+	decoded, err = Decode(o.Encode())
+	if err != nil {
+		t.Fatalf("empty values decode: %v", err)
+	}
+	if decoded.GetUTFString("e") != "" {
+		t.Fatal("empty string mismatch")
+	}
+	if got, _ := decoded.Get("ea").([]string); len(got) != 0 {
+		t.Fatal("empty string array mismatch")
+	}
+	if got, _ := decoded.Get("ia").([]int32); len(got) != 0 {
+		t.Fatal("empty int array mismatch")
+	}
+}
+
+// TestPutOverwriteKeepsSingleKey 同 key 重复 Put 必须覆盖且 keys 去重。
+func TestPutOverwriteKeepsSingleKey(t *testing.T) {
+	o := New()
+	o.Put("k", TUTFString, "first")
+	o.Put("k", TInt, int32(7))
+	o.Put("other", TBool, true)
+
+	if len(o.GetKeys()) != 2 {
+		t.Fatalf("keys after overwrite = %v, want [k other]", o.GetKeys())
+	}
+	decoded, err := Decode(o.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if decoded.GetInt("k") != 7 {
+		t.Fatal("overwrite must win")
+	}
+}
+
+// TestFloat32Precision float32 回环位精度。
+func TestFloat32Precision(t *testing.T) {
+	o := New()
+	o.Put("f", TFloat, float32(0.1))
+	decoded, err := Decode(o.Encode())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	got, _ := decoded.Get("f").(float32)
+	if float64(got) != float64(float32(0.1)) {
+		t.Fatalf("float32 roundtrip = %v, want %v", got, float32(0.1))
 	}
 }

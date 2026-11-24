@@ -103,6 +103,10 @@ msg, err := sfs2x.DecodeFrame(frame)
 - **Compression**: frames with header bit `0x20` set carry a zlib-compressed
   payload; this package does not decompress them — handle that variant at
   the transport layer if a peer emits it.
+- **UTF_STRING limit**: the wire format carries string lengths in a uint16,
+  so values longer than 65535 bytes cannot be encoded (silently truncated by
+  the length field — same ceiling as the official client). Use BYTE_ARRAY
+  (uint32 length) for larger payloads.
 - **Type safety**: the typed readers (`GetInt` etc.) use unchecked type
   assertions and panic on mismatch. For untrusted input, check `GetType`
   first or use `Get` with a safe cast.
@@ -115,6 +119,7 @@ port) and interoperability captures from a production peer:
 | Behavior | This package | Official client API |
 |---|---|---|
 | Type codes 0–18 | ✓ identical | — |
+| Typed arrays (BOOL/SHORT/INT/LONG/FLOAT/DOUBLE/UTF_STRING) | ✓ encode + decode | identical |
 | BYTE_ARRAY length field | **uint32** | uint32 (`writeInt`) — some third-party ports wrongly use uint16 |
 | Other arrays / strings length field | uint16 | uint16 |
 | Nested object/array marker | type byte doubles as marker (seek-back) | identical |

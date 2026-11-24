@@ -434,6 +434,108 @@ func decodeValue(data []byte, p *pos) (sfsEntry, error) {
 		copy(b, data[p.off:p.off+l])
 		p.off += l
 		return sfsEntry{typ, b}, nil
+	case TBoolArray:
+		n, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		a := make([]bool, n)
+		for i := range a {
+			v, err := readU8(data, p)
+			if err != nil {
+				return sfsEntry{}, err
+			}
+			a[i] = v != 0
+		}
+		return sfsEntry{typ, a}, nil
+	case TShortArray:
+		n, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		a := make([]int16, n)
+		for i := range a {
+			v, err := readU16(data, p)
+			if err != nil {
+				return sfsEntry{}, err
+			}
+			a[i] = int16(v)
+		}
+		return sfsEntry{typ, a}, nil
+	case TIntArray:
+		n, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		a := make([]int32, n)
+		for i := range a {
+			v, err := readU32(data, p)
+			if err != nil {
+				return sfsEntry{}, err
+			}
+			a[i] = int32(v)
+		}
+		return sfsEntry{typ, a}, nil
+	case TLongArray:
+		n, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		a := make([]int64, n)
+		for i := range a {
+			v, err := readU64(data, p)
+			if err != nil {
+				return sfsEntry{}, err
+			}
+			a[i] = int64(v)
+		}
+		return sfsEntry{typ, a}, nil
+	case TFloatArray:
+		n, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		a := make([]float32, n)
+		for i := range a {
+			v, err := readU32(data, p)
+			if err != nil {
+				return sfsEntry{}, err
+			}
+			a[i] = math.Float32frombits(uint32(v))
+		}
+		return sfsEntry{typ, a}, nil
+	case TDoubleArray:
+		n, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		a := make([]float64, n)
+		for i := range a {
+			v, err := readU64(data, p)
+			if err != nil {
+				return sfsEntry{}, err
+			}
+			a[i] = math.Float64frombits(v)
+		}
+		return sfsEntry{typ, a}, nil
+	case TUTFStringArray:
+		n, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		a := make([]string, n)
+		for i := range a {
+			l, err := readU16(data, p)
+			if err != nil {
+				return sfsEntry{}, err
+			}
+			if err := p.need(data, l); err != nil {
+				return sfsEntry{}, err
+			}
+			a[i] = string(data[p.off : p.off+l])
+			p.off += l
+		}
+		return sfsEntry{typ, a}, nil
 	case TSFSArray:
 		p.off-- // seek back: the type byte doubles as the marker
 		if err := p.need(data, 3); err != nil {
