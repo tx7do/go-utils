@@ -87,3 +87,4 @@ git tag sfs2x/v0.0.4
 git tag sfs2x/v0.0.5
 git tag sfs2x/v0.0.6
 git tag sfs2x/v0.0.7
+git tag sfs2x/v0.0.8
