@@ -93,6 +93,7 @@
 | ossutil | `github.com/tx7do/go-utils/ossutil` | 对象存储通用工具（与 SDK 解耦）：MIME/扩展名到分类桶映射、魔术头文件类型嗅探。 | [docs](./ossutil/README.md) |
 | distlock | `github.com/tx7do/go-utils/distlock` | 统一分布式锁抽象，屏蔽 Redis / Etcd 底层实现差异。 | [docs](./distlock/README.md) |
 | bank_card | `github.com/tx7do/go-utils/bank_card` | 银行卡 BIN 查询与校验：卡号归属行识别、Luhn 校验。 | [docs](./bank_card/README.md) |
+| currency | `github.com/tx7do/go-utils/currency` | 币种金额换算：ISO 4217 最小单位、统一固定精度账本单位（4 位小数），及两层单位的桥接。 | [docs](./currency/README.md) |
 
 ## 根模块工具包
 

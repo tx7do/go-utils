@@ -93,6 +93,7 @@ Import paths are shown in full. Rows marked with 📦 are subpackages of their p
 | ossutil | `github.com/tx7do/go-utils/ossutil` | SDK-agnostic object-storage helpers: MIME/extension-to-bucket mapping and magic-number file type detection. | [docs](./ossutil/README.md) |
 | distlock | `github.com/tx7do/go-utils/distlock` | Unified distributed-lock abstraction over Redis and Etcd backends. | [docs](./distlock/README.md) |
 | bank_card | `github.com/tx7do/go-utils/bank_card` | Bank card BIN lookup and validation: issuer identification and Luhn checksum checking. | [docs](./bank_card/README.md) |
+| currency | `github.com/tx7do/go-utils/currency` | Currency amount conversion: ISO 4217 minor units, a uniform fixed-precision ledger unit (4 decimals), and bridges between them. | [docs](./currency/README.md) |
 
 ## Root Module Packages
 
