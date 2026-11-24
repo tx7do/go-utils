@@ -67,7 +67,60 @@ currency.NormalizeOr("", "USD")     // "USD"
 | `MinorToBase(minor int64, code) int64` | Minor → ledger (× 10^(4−exponent)). |
 | `BaseToMinor(units int64, code) int64` | Ledger → minor (÷ 10^(4−exponent), toward zero). |
 | `DefaultCode` | Reference currency constant (`"USD"`) for unspecified fallbacks. |
+| `Money` + constructors/arithmetic | Typed amount (code + integer ledger units): `MoneyFromMinor` etc., `Add`/`Sub`/`Mul`/`Cmp`/`Allocate`/`Split` — mismatch-safe. |
+| `FormatMinor(minor, code) string` | Display render: thousands grouping + exponent decimals. |
+| `FormatBase(base, code) string` | Ledger-unit render, keeps sub-minor precision only when non-zero. |
+| `FormatSymbolMinor(minor, code) string` | Like `FormatMinor` with symbol prefix (`"$1,234.56"`, `"¥120"`). |
+| `ConvertMinor(minor, from, to, rate) (int64, error)` | Apply an explicit exchange rate between currencies. |
+| `ConvertBase(base, from, to, rate) (int64, error)` | Ledger-unit variant of `ConvertMinor`. |
+| `ToMinorFloor/Ceil`, `ToBaseFloor/Ceil` | Directional rounding variants for fee/settlement boundaries. |
+| `LookupInfo/Symbol/NumericCode/DisplayName/IsKnown` | ISO 4217 metadata: numeric code, symbol, English name for ~30 currencies. |
 | `BaseDigits` / `BaseFactor` | Ledger precision constants: `4` / `10000`. |
+
+## Money Type
+
+`Money` pairs a currency code with an integer ledger-unit amount. Arithmetic
+runs on integers only; currency mismatches return `ErrCurrencyMismatch`
+instead of silently mixing.
+
+```go
+price := currency.MoneyFromMinor("USD", 399) // $3.99
+total, err := price.Mul(5)                   // $19.95
+
+parts, err := total.Split(3) // exact-sum split, remainder to leading parts
+// parts sum == total — guaranteed in the ledger-unit domain
+```
+
+- Constructors: `NewMoney` / `MoneyFromBase` / `MoneyFromMinor` / `MoneyFromMajor`
+- Arithmetic: `Add` / `Sub` / `Mul` / `Neg` / `Abs` (mismatch-safe)
+- Comparison: `Cmp` / `IsZero` / `IsPositive` / `IsNegative`
+- Division: `Allocate(ratios)` largest-remainder exact split; `Split(n)` equal parts
+- Display: `String()` → `"1,234.56 USD"`; `FormatBase` / `FormatMinor` /
+  `FormatSymbolMinor` with thousands grouping and exponent-aware decimals
+  (`"120"` JPY, `"1.234"` KWD, `"0.001"` sub-cent USD)
+
+## Exchange Rates & Metadata
+
+```go
+out, err := currency.ConvertMinor(100, "USD", "JPY", 150) // ¥150
+out, err = currency.ConvertBase(base, "USD", "JPY", 150)
+
+info := currency.LookupInfo("JPY") // {Numeric:"392", Symbol:"¥", Name:"Japanese Yen"}
+currency.Symbol("USD")             // "$"
+currency.NumericCode("EUR")        // "978"
+currency.DisplayName("jpy")        // "Japanese Yen"
+currency.IsKnown("XYZ")            // false (conversions still work, 2-decimal fallback)
+```
+
+Rates are explicit floats supplied by the caller — this package never fetches
+or caches them. Treat converted values as settlement estimates; ledger-grade
+conversion should apply rates in the integer domain.
+
+## Rounding Policies
+
+The default conversions round half away from zero. Directional variants for
+fee/settlement boundaries: `ToMinorFloor` / `ToMinorCeil` /
+`ToBaseFloor` / `ToBaseCeil`.
 
 ## Precision Notes
 
