@@ -68,6 +68,12 @@ currency.NormalizeOr("", "USD")     // "USD"
 | `BaseToMinor(units int64, code) int64` | Ledger → minor (÷ 10^(4−exponent), toward zero). |
 | `DefaultCode` | Reference currency constant (`"USD"`) for unspecified fallbacks. |
 | `Money` + constructors/arithmetic | Typed amount (code + integer ledger units): `MoneyFromMinor` etc., `Add`/`Sub`/`Mul`/`Cmp`/`Allocate`/`Split` — mismatch-safe. |
+| `Sum / Min / Max`, `LessThan / GreaterThan` | Aggregates and comparison sugar (mismatch-safe). |
+| `MulRatio(num, den)` / `Percent(pct)` | Exact integer-ratio scaling and percentages — the ledger-grade path with zero floats. |
+| `RoundToMinor()` | Drop sub-minor ledger dust (half away from zero). |
+| `ParseMoney(s)` / `ParseMinor(s, code)` / `ParseBaseString(s, code)` | Parse money strings (`"1,234.56 USD"`, symbol-prefixed forms); sub-minor input is rejected, never silently rounded. |
+| `ConvertMinorExact(minor, from, to, num, den)` | `ConvertMinor` with the rate as an exact integer ratio — zero floats. |
+| `CodeFromSymbol(symbol)` | `"$"` → `"USD"` (ambiguous symbols prefer USD, else alphabetical). |
 | `FormatMinor(minor, code) string` | Display render: thousands grouping + exponent decimals. |
 | `FormatBase(base, code) string` | Ledger-unit render, keeps sub-minor precision only when non-zero. |
 | `FormatSymbolMinor(minor, code) string` | Like `FormatMinor` with symbol prefix (`"$1,234.56"`, `"¥120"`). |

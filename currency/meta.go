@@ -75,6 +75,13 @@ func DisplayName(code string) string {
 	return LookupInfo(code).Name
 }
 
+// CodeFromSymbol resolves a display symbol to a currency code ("$" →
+// "USD"; ambiguous symbols prefer USD when covered, otherwise the
+// alphabetically first code). Unknown symbols return "".
+func CodeFromSymbol(symbol string) string {
+	return symbolToCode[Normalize(symbol)]
+}
+
 // IsKnown reports whether the code carries metadata in this package. Being
 // unknown does NOT make a currency invalid — conversions still work with
 // the 2-decimal fallback.

@@ -188,6 +188,97 @@ func (m Money) Split(n int) ([]Money, error) {
 	return m.Allocate(ratios)
 }
 
+// Sum sums same-currency amounts (mismatch → ErrCurrencyMismatch).
+func Sum(first Money, rest ...Money) (Money, error) {
+	total, err := first.Add(Money{code: first.code})
+	if err != nil {
+		return Money{}, err
+	}
+	for _, m := range rest {
+		if total, err = total.Add(m); err != nil {
+			return Money{}, err
+		}
+	}
+	return total, nil
+}
+
+// Min returns the smaller of two same-currency amounts.
+func Min(a, b Money) (Money, error) {
+	cmp, err := a.Cmp(b)
+	if err != nil {
+		return Money{}, err
+	}
+	if cmp < 0 {
+		return a, nil
+	}
+	return b, nil
+}
+
+// Max returns the larger of two same-currency amounts.
+func Max(a, b Money) (Money, error) {
+	cmp, err := a.Cmp(b)
+	if err != nil {
+		return Money{}, err
+	}
+	if cmp > 0 {
+		return a, nil
+	}
+	return b, nil
+}
+
+// LessThan reports a < b (same currency).
+func (m Money) LessThan(o Money) (bool, error) {
+	cmp, err := m.Cmp(o)
+	return cmp < 0, err
+}
+
+// GreaterThan reports a > b (same currency).
+func (m Money) GreaterThan(o Money) (bool, error) {
+	cmp, err := m.Cmp(o)
+	return cmp > 0, err
+}
+
+// MulRatio scales the amount by the exact integer ratio num/den, rounding
+// half away from zero on ledger units. This is the ledger-grade rate/fee
+// application: no floats participate ("2.5%" = MulRatio(25, 1000)).
+func (m Money) MulRatio(num, den int64) (Money, error) {
+	if den == 0 {
+		return Money{}, fmt.Errorf("currency: mul ratio denominator is zero")
+	}
+	acc := new(big.Int).Mul(big.NewInt(m.base), big.NewInt(num))
+	q, r := new(big.Int).QuoRem(acc, big.NewInt(den), new(big.Int))
+	// half away from zero: |2r| >= |den| moves away from zero
+	twice := new(big.Int).Mul(r, big.NewInt(2))
+	if twice.Abs(twice).Cmp(big.NewInt(absI64(den))) >= 0 {
+		step := big.NewInt(1)
+		if acc.Sign() < 0 {
+			step = big.NewInt(-1)
+		}
+		q.Add(q, step)
+	}
+	return Money{code: m.code, base: q.Int64()}, nil
+}
+
+// Percent returns pct percent of the amount ("2.5%" = Percent(250)).
+// Equivalent to MulRatio(pct, 100).
+func (m Money) Percent(pct int64) (Money, error) {
+	return m.MulRatio(pct, 100)
+}
+
+// RoundToMinor rounds away sub-minor ledger dust (half away from zero),
+// keeping the currency and the ledger-unit domain: after allocation or
+// ratio math, callers often need amounts clean at display precision.
+func (m Money) RoundToMinor() Money {
+	return MoneyFromMinor(m.code, m.Minor())
+}
+
+func absI64(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
 // String renders the amount at display precision followed by the code,
 // e.g. "1,234.56 USD", "120 JPY".
 func (m Money) String() string {

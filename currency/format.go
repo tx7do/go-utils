@@ -3,6 +3,7 @@ package currency
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"strings"
 )
 
@@ -52,6 +53,41 @@ func ConvertBase(base int64, from, to string, rate float64) (int64, error) {
 	}
 	majorFrom := FromBase(base)
 	return ToBase(majorFrom * rate), nil
+}
+
+// ConvertMinorExact is the ledger-grade variant of ConvertMinor: the rate
+// is an exact integer ratio (num/den of `to` major per `from` major), so
+// no float participates anywhere. Rounding is half away from zero at the
+// target minor unit.
+//
+//	USD 100¢ → JPY at 150/1  = 15000¢? no: 1.00 USD × 150 = 150 JPY = 150 minor
+//	USD 100¢ → KWD at 3/10   = 0.30 KWD = 300 fils
+func ConvertMinorExact(minor int64, from, to string, num, den int64) (int64, error) {
+	if den == 0 {
+		return 0, fmt.Errorf("currency: rate denominator is zero")
+	}
+	// minor_to = minor_from × num × 10^exp(to) / (den × 10^exp(from))
+	acc := new(big.Int).Mul(big.NewInt(minor), big.NewInt(num))
+	acc.Mul(acc, big.NewInt(int64(math.Pow10(Exponent(to)))))
+	denom := big.NewInt(den)
+	denom.Mul(denom, big.NewInt(int64(math.Pow10(Exponent(from)))))
+	q, r := new(big.Int).QuoRem(acc, denom, new(big.Int))
+	twice := new(big.Int).Mul(r, big.NewInt(2))
+	if twice.Abs(twice).Cmp(big.NewInt(absI64D(denom.Int64()))) >= 0 {
+		step := big.NewInt(1)
+		if acc.Sign() < 0 {
+			step = big.NewInt(-1)
+		}
+		q.Add(q, step)
+	}
+	return q.Int64(), nil
+}
+
+func absI64D(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 func validateRate(rate float64) error {

@@ -228,3 +228,135 @@ func TestRoundingVariants(t *testing.T) {
 	assert.Equal(t, int64(2), ToBaseCeil(0.00015))
 	assert.Equal(t, int64(2), ToBaseCeil(0.00015))
 }
+
+// ============================================================
+// Parse（Format 反向）
+// ============================================================
+
+func TestParseMoneyRoundtrip(t *testing.T) {
+	// Money.String → ParseMoney 必须无损往返
+	for _, m := range []Money{
+		MoneyFromMinor("USD", 123456),
+		MoneyFromMinor("JPY", 120),
+		MoneyFromBase("USD", 12345678),
+		MoneyFromMinor("KWD", 1234),
+		MoneyFromMinor("USD", -9876),
+	} {
+		parsed, err := ParseMoney(m.String())
+		require.NoError(t, err, "parse %q", m.String())
+		assert.Equal(t, m.Code(), parsed.Code())
+		assert.Equal(t, m.Base(), parsed.Base(), "roundtrip %q", m.String())
+	}
+}
+
+func TestParseMinorVariants(t *testing.T) {
+	out, err := ParseMinor("1,234.56", "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(123456), out)
+
+	parsed, err := ParseMoney("$1,234.56 USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(123456), parsed.Minor(), "符号前缀剥离走 ParseMoney")
+
+	out, err = ParseMinor("-0.5", "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(-50), out)
+
+	// 亚分位拒绝（不静默舍入）
+	_, err = ParseMinor("0.001", "USD")
+	assert.Error(t, err)
+
+	// 0 位币种拒绝小数
+	_, err = ParseMinor("120.5", "JPY")
+	assert.Error(t, err)
+
+	out, err = ParseMinor("120", "JPY")
+	require.NoError(t, err)
+	assert.Equal(t, int64(120), out)
+}
+
+func TestCodeFromSymbol(t *testing.T) {
+	assert.Equal(t, "USD", CodeFromSymbol("$"))
+	assert.Equal(t, "CNY", CodeFromSymbol("¥"), "歧义符号取字典序首个")
+	assert.Equal(t, "EUR", CodeFromSymbol("€"))
+	assert.Empty(t, CodeFromSymbol("¤"), "未知符号返回空")
+}
+
+// ============================================================
+// 整数域精确汇率 / 比例乘法
+// ============================================================
+
+func TestConvertMinorExact(t *testing.T) {
+	out, err := ConvertMinorExact(100, "USD", "JPY", 150, 1)
+	require.NoError(t, err)
+	assert.Equal(t, int64(150), out)
+
+	out, err = ConvertMinorExact(100, "USD", "KWD", 3, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(300), out)
+
+	// 0 位币种吸收：101¢ × 1.50 = 1.515 JPY → 2 JPY minor（half away）
+	out, err = ConvertMinorExact(101, "USD", "JPY", 150, 100)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), out, "JPY 0 位小数吸收小数结果")
+
+	_, err = ConvertMinorExact(1, "USD", "EUR", 1, 0)
+	assert.Error(t, err)
+}
+
+func TestMoneyMulRatioAndPercent(t *testing.T) {
+	m := MoneyFromMinor("USD", 1000)
+
+	// 2.5% 手续费：1000 × 25/1000 = 25
+	fee, err := m.MulRatio(25, 1000)
+	require.NoError(t, err)
+	assert.Equal(t, int64(25), fee.Minor())
+
+	pct, err := m.Percent(250) // 250% = 2.5 倍
+	require.NoError(t, err)
+	assert.Equal(t, int64(2500), pct.Minor())
+
+	// 零除拒绝
+	_, err = m.MulRatio(1, 0)
+	assert.Error(t, err)
+}
+
+// ============================================================
+// 聚合 / 比较 / 归整
+// ============================================================
+
+func TestMoneyAggregates(t *testing.T) {
+	a := MoneyFromMinor("USD", 100)
+	b := MoneyFromMinor("USD", 300)
+
+	sum, err := Sum(a, b, MoneyFromMinor("USD", 50))
+	require.NoError(t, err)
+	assert.Equal(t, int64(450), sum.Minor())
+
+	_, err = Sum(a, MoneyFromMinor("EUR", 1))
+	assert.ErrorIs(t, err, ErrCurrencyMismatch)
+
+	min, err := Min(a, b)
+	require.NoError(t, err)
+	assert.Equal(t, int64(100), min.Minor())
+
+	max, err := Max(a, b)
+	require.NoError(t, err)
+	assert.Equal(t, int64(300), max.Minor())
+
+	lt, err := a.LessThan(b)
+	require.NoError(t, err)
+	assert.True(t, lt)
+	gt, err := b.GreaterThan(a)
+	require.NoError(t, err)
+	assert.True(t, gt)
+}
+
+func TestMoneyRoundToMinor(t *testing.T) {
+	// 分配产生亚分尘 → RoundToMinor 归整到展示精度
+	parts, _ := MoneyFromMinor("USD", 100).Split(3)
+	dusty := MoneyFromBase("USD", parts[0].Base()) // 3333 账本 = 0.3333
+	rounded := dusty.RoundToMinor()
+	assert.Equal(t, int64(33), rounded.Minor())
+	assert.Equal(t, int64(3300), rounded.Base(), "亚分尘被归整")
+}

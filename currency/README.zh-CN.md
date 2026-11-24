@@ -67,6 +67,12 @@ currency.NumericCode("EUR")          // "978"
 | `ToBase / FromBase / FromBaseInt` | 主币 ↔ 账本单位（统一 1e4，无币种参数）。 |
 | `MinorToBase / BaseToMinor` | 最小单位 ↔ 账本单位桥接（下发向零截断）。 |
 | `Money` + 构造/运算 | 类型化金额：`MoneyFromMinor` 等、`Add/Sub/Mul/Cmp/Allocate/Split`（币种校验）。 |
+| `Sum / Min / Max`、`LessThan / GreaterThan` | 聚合与比较糖（币种校验）。 |
+| `MulRatio(num, den)` / `Percent(pct)` | 精确整数比例乘法与百分比——账本级零浮点路径。 |
+| `RoundToMinor()` | 归整亚分账本尘（half away from zero）。 |
+| `ParseMoney(s)` / `ParseMinor(s, code)` / `ParseBaseString(s, code)` | 解析金额串（`"1,234.56 USD"`、符号前缀形态）；亚分输入显式拒绝，绝不静默舍入。 |
+| `ConvertMinorExact(minor, from, to, num, den)` | `ConvertMinor` 的整数分数汇率版——零浮点。 |
+| `CodeFromSymbol(symbol)` | `"$"` → `"USD"`（歧义符号优先 USD，其余字典序）。 |
 | `FormatMinor(base, code)` | 展示渲染：千分位 + 指数位小数。 |
 | `FormatBase(base, code)` | 账本单位渲染，非零亚分精度保留。 |
 | `FormatSymbolMinor(minor, code)` | 带符号前缀渲染（`"$1,234.56"`、`"¥120"`）。 |
