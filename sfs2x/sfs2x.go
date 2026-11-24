@@ -17,6 +17,8 @@
 //	NULL=0 BOOL=1 BYTE=2 SHORT=3 INT=4 LONG=5 FLOAT=6 DOUBLE=7 UTF_STRING=8
 //	BOOL_ARRAY=9 BYTE_ARRAY=10 SHORT_ARRAY=11 INT_ARRAY=12 LONG_ARRAY=13
 //	FLOAT_ARRAY=14 DOUBLE_ARRAY=15 UTF_STRING_ARRAY=16 SFS_ARRAY=17 SFS_OBJECT=18
+//	TEXT=20 (32-bit length string; CLASS=19 requires a peer-side registry and
+//	is not implemented)
 //
 // Scope note: EncodeFrame always emits the short (uint16) length form
 // without optional transforms; EncodeFrameWithOptions adds zlib
@@ -62,6 +64,7 @@ const (
 	TUTFStringArray Type = 16
 	TSFSArray       Type = 17
 	TSFSObject      Type = 18
+	TText           Type = 20
 	CompressionMask      = 0x20
 	LongLenMask          = 0x08
 	Signature            = 0x80
@@ -125,6 +128,16 @@ func (o *Object) GetLong(key string) int64 { return o.entries[key].val.(int64) }
 // GetUTFString reads a UTF_STRING value (empty string when absent or of a
 // different type).
 func (o *Object) GetUTFString(key string) string {
+	v, ok := o.entries[key].val.(string)
+	if !ok {
+		return ""
+	}
+	return v
+}
+
+// GetText reads a TEXT value (empty string when absent or of a different
+// type).
+func (o *Object) GetText(key string) string {
 	v, ok := o.entries[key].val.(string)
 	if !ok {
 		return ""
@@ -210,6 +223,10 @@ func encodeValue(buf *bytes.Buffer, t Type, v interface{}) {
 	case TUTFString:
 		s := v.(string)
 		buf.Write(encodeUint16(len(s)))
+		buf.WriteString(s)
+	case TText:
+		s := v.(string)
+		buf.Write(encodeUint32(len(s)))
 		buf.WriteString(s)
 	case TByteArray:
 		b := v.([]byte)
@@ -419,6 +436,17 @@ func decodeValue(data []byte, p *pos) (sfsEntry, error) {
 		return sfsEntry{typ, math.Float64frombits(v)}, nil
 	case TUTFString:
 		l, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		if err := p.need(data, l); err != nil {
+			return sfsEntry{}, err
+		}
+		s := string(data[p.off : p.off+l])
+		p.off += l
+		return sfsEntry{typ, s}, nil
+	case TText:
+		l, err := readU32(data, p)
 		if err != nil {
 			return sfsEntry{}, err
 		}
@@ -681,6 +709,9 @@ func DecodeFrameWithOptions(data []byte, opts FrameOptions) (*Object, error) {
 	off := 1
 	var ln int
 	if hdr&LongLenMask != 0 {
+		if len(data) < off+4 {
+			return nil, fmt.Errorf("frame too short for BIG_SIZE header: %d", len(data))
+		}
 		ln = int(binary.BigEndian.Uint32(data[off:]))
 		off += 4
 	} else {

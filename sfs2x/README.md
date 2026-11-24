@@ -126,11 +126,12 @@ port) and interoperability captures from a production peer:
 |---|---|---|
 | Type codes 0–18 | ✓ identical | — |
 | Typed arrays (BOOL/SHORT/INT/LONG/FLOAT/DOUBLE/UTF_STRING) | ✓ encode + decode | identical |
-| BYTE_ARRAY length field | **uint32** | uint32 (`writeInt`) — some third-party ports wrongly use uint16 |
+| BYTE_ARRAY | 4-byte length + raw bytes (official shape) | uint32 `writeInt` — ZewSFS wrongly uses u16 count + signed bytes; their Float/Double are native-endian (LE) instead of big-endian. Golden fixtures patch both. |
 | Other arrays / strings length field | uint16 | uint16 |
 | Nested object/array marker | type byte doubles as marker (seek-back) | identical |
 | Frame header flags | `0x80` BINARY, `0x08` BIG_SIZE (decode) | adds `0x40` ENCRYPTED, `0x10` BLUEBOX |
 | Compression (header `0x20`) | ✓ zlib, threshold-configurable (default 1024) | zlib, threshold 1024 |
+| Encryption (header `0x40`) interop | roundtrip only (offline RSA handshake not implemented) | session key via server RSA token handshake |
 | Encryption (header `0x40`) | ✓ AES-128-CBC, random IV + PKCS#7, 16-byte key | AES-128-CBC, random IV + PKCS#7 |
 | CLASS (19) / TEXT (20) types | not implemented | CLASS uses server-side registry serde |
 | **Object key ordering on encode** | **sorted** (deterministic output) | **insertion order** (OrderedHashMap) |

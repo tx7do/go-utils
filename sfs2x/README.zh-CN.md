@@ -104,11 +104,12 @@ msg, err := sfs2x.DecodeFrame(frame)
 |---|---|---|
 | 类型码 0–18 | ✓ 一致 | — |
 | 类型化数组（BOOL/SHORT/INT/LONG/FLOAT/DOUBLE/UTF_STRING） | ✓ 编码+解码 | 一致 |
-| BYTE_ARRAY 长度字段 | **uint32** | uint32（`writeInt`）——部分第三方移植误用 uint16 |
+| BYTE_ARRAY | 4 字节长度 + 原始字节（官方形态） | uint32 `writeInt`——ZewSFS 误用 u16 计数 + 有符号字节，其 Float/Double 是本机小端而非大端；黄金样本已对两处打符合性补丁 |
 | 其他数组/字符串长度字段 | uint16 | uint16 |
 | 嵌套对象/数组 marker | 类型字节兼任 marker（回退一字节） | 一致 |
 | 帧头标志 | `0x80` BINARY、`0x08` BIG_SIZE（解码侧） | 另有 `0x40` ENCRYPTED、`0x10` BLUEBOX |
 | 压缩（header `0x20`） | ✓ zlib，阈值可配（默认 1024） | zlib，阈值 1024 |
+| 加密互操作 | 仅回环验证（离线 RSA 握手未实现） | 会话钥匙经服务端 RSA 令牌握手 |
 | 加密（header `0x40`） | ✓ AES-128-CBC，随机 IV + PKCS#7，16 字节钥匙 | AES-128-CBC，随机 IV + PKCS#7 |
 | CLASS (19) / TEXT (20) 类型 | 未实现 | CLASS 走服务端注册表序列化 |
 | **对象键序（编码侧）** | **排序**（确定性输出） | **插入序**（OrderedHashMap） |
