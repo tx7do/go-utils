@@ -52,6 +52,7 @@
 | Module | Import Path | Description | Docs |
 |---|---|---|---|
 | netutil | `github.com/tx7do/go-utils/netutil` | 网络安全工具：SSRF 防护（禁投网段、URL 校验、解析校验）与客户端真实 IP 提取。 | [docs](./netutil/README.md) |
+| sfs2x | `github.com/tx7do/go-utils/sfs2x` | SFS2X 二进制协议编解码：类型化键值对象、嵌套对象与数组、长度前缀帧。 | [docs](./sfs2x/README.md) |
 | geoip | `github.com/tx7do/go-utils/geoip` | IP 查询地理位置，支持 MaxMind GeoLite2、纯真（QQWry）、ip2region 三种数据库。 | [docs](./geoip/README.md) |
 | 📦 geoip/geolite | （`geoip` 模块子包） | MaxMind GeoLite2 mmdb 数据库查询。 | — |
 | 📦 geoip/qqwry | （`geoip` 模块子包） | 纯真 IP 库查询。 | — |

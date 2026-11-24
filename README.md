@@ -52,6 +52,7 @@ Import paths are shown in full. Rows marked with 📦 are subpackages of their p
 | Module | Import Path | Description | Docs |
 |---|---|---|---|
 | netutil | `github.com/tx7do/go-utils/netutil` | Network security utilities: SSRF protection (blocked ranges, URL validation, resolution checks) and real client IP extraction. | [docs](./netutil/README.md) |
+| sfs2x | `github.com/tx7do/go-utils/sfs2x` | SFS2X binary protocol codec: typed key/value objects, nested objects and arrays, and length-prefixed frames. | [docs](./sfs2x/README.md) |
 | geoip | `github.com/tx7do/go-utils/geoip` | IP geolocation backed by MaxMind GeoLite2, QQWry (纯真), and ip2region databases. | [docs](./geoip/README.md) |
 | 📦 geoip/geolite | (subpackage of `geoip`) | Queries against MaxMind GeoLite2 mmdb databases. | — |
 | 📦 geoip/qqwry | (subpackage of `geoip`) | Queries against the QQWry IP database. | — |
