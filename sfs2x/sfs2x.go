@@ -263,9 +263,13 @@ func writeTypedArray(buf *bytes.Buffer, t Type, n int, get func(int) interface{}
 }
 
 // Decode deserializes an SFSObject from binary data (which must start with
-// the 0x12 marker).
+// the 0x12 marker). Malformed or truncated input produces an error, never a
+// panic.
 func Decode(data []byte) (*Object, error) {
-	if len(data) == 0 || data[0] != byte(TSFSObject) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("invalid SFSObject marker: empty input")
+	}
+	if data[0] != byte(TSFSObject) {
 		return nil, fmt.Errorf("invalid SFSObject marker: %d", data[0])
 	}
 	p := &pos{off: 1} // skip 0x12
@@ -276,15 +280,70 @@ type pos struct {
 	off int
 }
 
+// need reports an error unless n more bytes are available at p.off.
+func (p *pos) need(data []byte, n int) error {
+	if n < 0 || p.off < 0 || p.off+n > len(data) {
+		return fmt.Errorf("truncated SFS data: need %d byte(s) at offset %d, have %d", n, p.off, len(data))
+	}
+	return nil
+}
+
+// readU8 reads one byte and advances.
+func readU8(data []byte, p *pos) (byte, error) {
+	if err := p.need(data, 1); err != nil {
+		return 0, err
+	}
+	v := data[p.off]
+	p.off++
+	return v, nil
+}
+
+// readU16 reads a big-endian uint16 and advances.
+func readU16(data []byte, p *pos) (int, error) {
+	if err := p.need(data, 2); err != nil {
+		return 0, err
+	}
+	v := int(binary.BigEndian.Uint16(data[p.off:]))
+	p.off += 2
+	return v, nil
+}
+
+// readU32 reads a big-endian uint32 and advances.
+func readU32(data []byte, p *pos) (int, error) {
+	if err := p.need(data, 4); err != nil {
+		return 0, err
+	}
+	v := int(binary.BigEndian.Uint32(data[p.off:]))
+	p.off += 4
+	return v, nil
+}
+
+// readU64 reads a big-endian uint64 and advances.
+func readU64(data []byte, p *pos) (uint64, error) {
+	if err := p.need(data, 8); err != nil {
+		return 0, err
+	}
+	v := binary.BigEndian.Uint64(data[p.off:])
+	p.off += 8
+	return v, nil
+}
+
 // decodeEntries parses entries starting at the count field (the caller has
 // already consumed the marker).
 func decodeEntries(data []byte, p *pos) (*Object, error) {
-	count := int(binary.BigEndian.Uint16(data[p.off:]))
-	p.off += 2
+	count, err := readU16(data, p)
+	if err != nil {
+		return nil, err
+	}
 	o := New()
 	for i := 0; i < count; i++ {
-		kl := int(binary.BigEndian.Uint16(data[p.off:]))
-		p.off += 2
+		kl, err := readU16(data, p)
+		if err != nil {
+			return nil, err
+		}
+		if err := p.need(data, kl); err != nil {
+			return nil, err
+		}
 		key := string(data[p.off : p.off+kl])
 		p.off += kl
 		val, err := decodeValue(data, p)
@@ -302,54 +361,84 @@ type sfsEntry struct {
 }
 
 func decodeValue(data []byte, p *pos) (sfsEntry, error) {
-	t := Type(data[p.off])
-	p.off++
-	switch t {
+	t, err := readU8(data, p)
+	if err != nil {
+		return sfsEntry{}, err
+	}
+	typ := Type(t)
+	switch typ {
 	case TNull:
-		return sfsEntry{t, nil}, nil
+		return sfsEntry{typ, nil}, nil
 	case TBool:
-		v := data[p.off]
-		p.off++
-		return sfsEntry{t, v != 0}, nil
+		v, err := readU8(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		return sfsEntry{typ, v != 0}, nil
 	case TByte:
-		v := data[p.off]
-		p.off++
-		return sfsEntry{t, v}, nil
+		v, err := readU8(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		return sfsEntry{typ, v}, nil
 	case TShort:
-		v := int16(binary.BigEndian.Uint16(data[p.off:]))
-		p.off += 2
-		return sfsEntry{t, v}, nil
+		v, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		return sfsEntry{typ, int16(v)}, nil
 	case TInt:
-		v := int32(binary.BigEndian.Uint32(data[p.off:]))
-		p.off += 4
-		return sfsEntry{t, v}, nil
+		v, err := readU32(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		return sfsEntry{typ, int32(v)}, nil
 	case TLong:
-		v := int64(binary.BigEndian.Uint64(data[p.off:]))
-		p.off += 8
-		return sfsEntry{t, v}, nil
+		v, err := readU64(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		return sfsEntry{typ, int64(v)}, nil
 	case TFloat:
-		v := math.Float32frombits(binary.BigEndian.Uint32(data[p.off:]))
-		p.off += 4
-		return sfsEntry{t, v}, nil
+		v, err := readU32(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		return sfsEntry{typ, math.Float32frombits(uint32(v))}, nil
 	case TDouble:
-		v := math.Float64frombits(binary.BigEndian.Uint64(data[p.off:]))
-		p.off += 8
-		return sfsEntry{t, v}, nil
+		v, err := readU64(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		return sfsEntry{typ, math.Float64frombits(v)}, nil
 	case TUTFString:
-		l := int(binary.BigEndian.Uint16(data[p.off:]))
-		p.off += 2
+		l, err := readU16(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		if err := p.need(data, l); err != nil {
+			return sfsEntry{}, err
+		}
 		s := string(data[p.off : p.off+l])
 		p.off += l
-		return sfsEntry{t, s}, nil
+		return sfsEntry{typ, s}, nil
 	case TByteArray:
-		l := int(binary.BigEndian.Uint32(data[p.off:]))
-		p.off += 4
+		l, err := readU32(data, p)
+		if err != nil {
+			return sfsEntry{}, err
+		}
+		if err := p.need(data, l); err != nil {
+			return sfsEntry{}, err
+		}
 		b := make([]byte, l)
 		copy(b, data[p.off:p.off+l])
 		p.off += l
-		return sfsEntry{t, b}, nil
+		return sfsEntry{typ, b}, nil
 	case TSFSArray:
 		p.off-- // seek back: the type byte doubles as the marker
+		if err := p.need(data, 3); err != nil {
+			return sfsEntry{}, err
+		}
 		n := int(binary.BigEndian.Uint16(data[p.off+1:]))
 		p.off += 3
 		a := make([]interface{}, n)
@@ -360,15 +449,23 @@ func decodeValue(data []byte, p *pos) (sfsEntry, error) {
 			}
 			a[i] = e.val
 		}
-		return sfsEntry{t, a}, nil
+		return sfsEntry{typ, a}, nil
 	case TSFSObject:
 		p.off-- // seek back: the type byte doubles as the marker
+		if err := p.need(data, 3); err != nil {
+			return sfsEntry{}, err
+		}
 		n := int(binary.BigEndian.Uint16(data[p.off+1:]))
 		p.off += 3
 		sub := New()
 		for i := 0; i < n; i++ {
-			kl := int(binary.BigEndian.Uint16(data[p.off:]))
-			p.off += 2
+			kl, err := readU16(data, p)
+			if err != nil {
+				return sfsEntry{}, err
+			}
+			if err := p.need(data, kl); err != nil {
+				return sfsEntry{}, err
+			}
 			key := string(data[p.off : p.off+kl])
 			p.off += kl
 			e, err := decodeValue(data, p)
@@ -377,34 +474,52 @@ func decodeValue(data []byte, p *pos) (sfsEntry, error) {
 			}
 			sub.Put(key, e.typ, e.val)
 		}
-		return sfsEntry{t, sub}, nil
+		return sfsEntry{typ, sub}, nil
 	}
-	return sfsEntry{}, fmt.Errorf("unknown SFS type %d @ %d", t, p.off)
+	return sfsEntry{}, fmt.Errorf("unknown SFS type %d @ %d", typ, p.off)
 }
 
 // ---- Framing ----
 
-// EncodeFrame wraps an Object into an SFS frame: signature byte (0x80),
-// uint16 payload length, payload.
+// EncodeFrame wraps an Object into an SFS frame: signature byte, payload
+// length, payload. The short (uint16) length form is used for payloads up
+// to 65535 bytes; larger payloads automatically switch to the BIG_SIZE
+// (0x08, uint32) form — matching the official client behavior.
 func EncodeFrame(o *Object) []byte {
 	payload := o.Encode()
 	var buf bytes.Buffer
-	buf.WriteByte(Signature)
-	buf.Write(encodeUint16(len(payload)))
+	if len(payload) > 0xFFFF {
+		buf.WriteByte(Signature | LongLenMask)
+		buf.Write(encodeUint32(len(payload)))
+	} else {
+		buf.WriteByte(Signature)
+		buf.Write(encodeUint16(len(payload)))
+	}
 	buf.Write(payload)
 	return buf.Bytes()
 }
 
 // DecodeFrame extracts the payload from an SFS frame and parses it into an
 // Object. Both uint16 and uint32 (header bit 0x08) length forms are
-// accepted; compressed frames are not handled (see package docs).
+// accepted. Compressed (0x20), encrypted (0x40), and non-binary frames are
+// rejected with an explicit error instead of garbage decode failures —
+// this package does not implement those variants (see package docs).
 func DecodeFrame(data []byte) (*Object, error) {
 	if len(data) < 3 {
 		return nil, fmt.Errorf("frame too short: %d", len(data))
 	}
+	hdr := data[0]
+	if hdr&Signature == 0 {
+		return nil, fmt.Errorf("not a binary SFS frame (header %02x)", hdr)
+	}
+	if hdr&CompressionMask != 0 {
+		return nil, fmt.Errorf("compressed frames not supported (header %02x)", hdr)
+	}
+	if hdr&0x40 != 0 {
+		return nil, fmt.Errorf("encrypted frames not supported (header %02x)", hdr)
+	}
 	off := 1
 	var ln int
-	hdr := data[0]
 	if hdr&LongLenMask != 0 {
 		ln = int(binary.BigEndian.Uint32(data[off:]))
 		off += 4

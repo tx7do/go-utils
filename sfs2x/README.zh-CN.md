@@ -87,7 +87,8 @@ msg, err := sfs2x.DecodeFrame(frame)
 ## 注意事项
 
 - **确定性编码**：key 在序列化前排序，同内容无论插入序如何都产出逐字节一致的输出（`GetKeys` 仍报告插入序）。
-- **帧形态**：`EncodeFrame` 恒发短形态（uint16 长度）。`DecodeFrame` 两种长度形态（header bit `0x08`）都接受。
+- **帧形态**：`DecodeFrame` 两种长度形态（header bit `0x08`）都接受。`EncodeFrame` 发短形态，载荷超过 65535 字节时自动切换 BIG_SIZE（uint32），与官方客户端一致。
+- **解码边界安全**：截断或畸形输入返回错误，绝不 panic。`DecodeFrame` 对压缩（0x20）、加密（0x40）、非二进制帧显式报错拒绝，不做误导性硬解。
 - **压缩**：header bit `0x20` 的帧携带 zlib 压缩载荷；本包不做解压——对端若发该形态请在传输层处理。
 - **类型安全**：类型化读取器（`GetInt` 等）使用无检查类型断言，不匹配即 panic。不可信输入请先查 `GetType` 或用 `Get` 安全断言。
 
@@ -102,8 +103,8 @@ msg, err := sfs2x.DecodeFrame(frame)
 | 其他数组/字符串长度字段 | uint16 | uint16 |
 | 嵌套对象/数组 marker | 类型字节兼任 marker（回退一字节） | 一致 |
 | 帧头标志 | `0x80` BINARY、`0x08` BIG_SIZE（解码侧） | 另有 `0x40` ENCRYPTED、`0x10` BLUEBOX |
-| 压缩（header `0x20`） | 未实现（传输层职责） | zlib，阈值 1024 |
-| 加密（header `0x40`） | 未实现 | AES-128-CBC，随机 IV + PKCS#7 |
+| 压缩（header `0x20`） | 未实现；`DecodeFrame` 对该标志显式拒绝 | zlib，阈值 1024 |
+| 加密（header `0x40`） | 未实现；`DecodeFrame` 对该标志显式拒绝 | AES-128-CBC，随机 IV + PKCS#7 |
 | CLASS (19) / TEXT (20) 类型 | 未实现 | CLASS 走服务端注册表序列化 |
 | **对象键序（编码侧）** | **排序**（确定性输出） | **插入序**（OrderedHashMap） |
 

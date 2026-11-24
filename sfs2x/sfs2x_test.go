@@ -178,3 +178,96 @@ func TestDeterministicEncoding(t *testing.T) {
 		t.Errorf("GetKeys must preserve insertion order, got %v", a.GetKeys())
 	}
 }
+
+// TestDecodeTruncatedNeverPanics walks every truncation of a rich object —
+// malformed input must produce an error, never a panic (a library decoding
+// untrusted bytes cannot afford slice-out-of-range crashes).
+func TestDecodeTruncatedNeverPanics(t *testing.T) {
+	inner := New()
+	inner.Put("tok", TUTFString, "abcdefgh")
+	inner.Put("blob", TByteArray, []byte{1, 2, 3, 4, 5, 6, 7, 8})
+	o := New()
+	o.Put("b", TBool, true)
+	o.Put("s", TShort, int16(-2))
+	o.Put("i", TInt, int32(-3))
+	o.Put("l", TLong, int64(-4))
+	o.Put("f", TFloat, float32(1.5))
+	o.Put("d", TDouble, 2.5)
+	o.Put("arr", TSFSArray, []interface{}{int32(1), "x", true})
+	o.Put("p", TSFSObject, inner)
+	full := o.Encode()
+
+	for cut := 0; cut <= len(full); cut++ {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Decode panicked on truncation %d/%d: %v", cut, len(full), r)
+				}
+			}()
+			_, _ = Decode(full[:cut]) // error expected (or full decode at cut==len)
+		}()
+	}
+
+	// 单字节翻转也不得 panic
+	for i := 0; i < len(full); i++ {
+		mutated := append([]byte(nil), full...)
+		mutated[i] ^= 0xFF
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Decode panicked on mutation @%d: %v", i, r)
+				}
+			}()
+			_, _ = Decode(mutated)
+		}()
+	}
+}
+
+// TestEncodeFrameAutoBigSize 载荷超过 uint16 上限时必须自动切换 BIG_SIZE
+// 长形态（0x08 + uint32）——静默截断会让对端按错误长度读帧。
+func TestEncodeFrameAutoBigSize(t *testing.T) {
+	o := New()
+	o.Put("big", TByteArray, make([]byte, 70000)) // payload > 0xFFFF
+
+	frame := EncodeFrame(o)
+	if frame[0]&LongLenMask == 0 {
+		t.Fatalf("payload %d must switch to BIG_SIZE form, header %02x", len(frame), frame[0])
+	}
+
+	decoded, err := DecodeFrame(frame)
+	if err != nil {
+		t.Fatalf("big frame decode: %v", err)
+	}
+	blob, ok := decoded.Get("big").([]byte)
+	if !ok || len(blob) != 70000 {
+		t.Fatalf("big payload roundtrip failed: got %d bytes", len(blob))
+	}
+}
+
+// TestDecodeFrame_RejectsFlags 压缩/加密/非二进制帧必须显式报错，
+// 而不是把未知载荷硬解成误导性的 marker 错误。
+func TestDecodeFrame_RejectsFlags(t *testing.T) {
+	payload := New().Encode()
+
+	build := func(hdr byte) []byte {
+		out := []byte{hdr, byte(len(payload) >> 8), byte(len(payload))}
+		return append(out, payload...)
+	}
+
+	for name, tc := range map[string]struct {
+		hdr   byte
+		match string
+	}{
+		"compressed": {Signature | CompressionMask, "compressed"},
+		"encrypted":  {Signature | 0x40, "encrypted"},
+		"non-binary": {CompressionMask, "not a binary"},
+	} {
+		_, err := DecodeFrame(build(tc.hdr))
+		if err == nil {
+			t.Fatalf("%s frame must be rejected", name)
+		}
+		if !bytes.Contains([]byte(err.Error()), []byte(tc.match)) {
+			t.Fatalf("%s frame error %q must mention %q", name, err.Error(), tc.match)
+		}
+	}
+}

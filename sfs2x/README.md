@@ -93,8 +93,13 @@ msg, err := sfs2x.DecodeFrame(frame)
 - **Deterministic encoding**: object keys are sorted before serialization,
   so identical content always produces byte-identical output regardless of
   insertion order (`GetKeys` still reports insertion order).
-- **Frame forms**: `EncodeFrame` always emits the short (uint16) length
-  form. `DecodeFrame` accepts both length forms (header bit `0x08`).
+- **Frame forms**: `DecodeFrame` accepts both length forms (header bit
+  `0x08`). `EncodeFrame` emits the short form and automatically switches to
+  BIG_SIZE (uint32) for payloads over 65535 bytes, like the official client.
+- **Bounds-safe decoding**: truncated or malformed input produces errors,
+  never panics. `DecodeFrame` rejects compressed (0x20), encrypted (0x40),
+  and non-binary frames with explicit errors instead of garbage decode
+  failures.
 - **Compression**: frames with header bit `0x20` set carry a zlib-compressed
   payload; this package does not decompress them — handle that variant at
   the transport layer if a peer emits it.
@@ -114,8 +119,8 @@ port) and interoperability captures from a production peer:
 | Other arrays / strings length field | uint16 | uint16 |
 | Nested object/array marker | type byte doubles as marker (seek-back) | identical |
 | Frame header flags | `0x80` BINARY, `0x08` BIG_SIZE (decode) | adds `0x40` ENCRYPTED, `0x10` BLUEBOX |
-| Compression (header `0x20`) | not implemented (transport-layer concern) | zlib, threshold 1024 |
-| Encryption (header `0x40`) | not implemented | AES-128-CBC, random IV + PKCS#7 |
+| Compression (header `0x20`) | not implemented; `DecodeFrame` rejects the flag explicitly | zlib, threshold 1024 |
+| Encryption (header `0x40`) | not implemented; `DecodeFrame` rejects the flag explicitly | AES-128-CBC, random IV + PKCS#7 |
 | CLASS (19) / TEXT (20) types | not implemented | CLASS uses server-side registry serde |
 | **Object key ordering on encode** | **sorted** (deterministic output) | **insertion order** (OrderedHashMap) |
 
