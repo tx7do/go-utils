@@ -101,3 +101,28 @@ msg, err := sfs2x.DecodeFrame(frame)
 - **Type safety**: the typed readers (`GetInt` etc.) use unchecked type
   assertions and panic on mismatch. For untrusted input, check `GetType`
   first or use `Get` with a safe cast.
+
+## Protocol Fidelity
+
+Verified against the official SFS2X Java client API behavior (via a faithful
+port) and interoperability captures from a production peer:
+
+| Behavior | This package | Official client API |
+|---|---|---|
+| Type codes 0–18 | ✓ identical | — |
+| BYTE_ARRAY length field | **uint32** | uint32 (`writeInt`) — some third-party ports wrongly use uint16 |
+| Other arrays / strings length field | uint16 | uint16 |
+| Nested object/array marker | type byte doubles as marker (seek-back) | identical |
+| Frame header flags | `0x80` BINARY, `0x08` BIG_SIZE (decode) | adds `0x40` ENCRYPTED, `0x10` BLUEBOX |
+| Compression (header `0x20`) | not implemented (transport-layer concern) | zlib, threshold 1024 |
+| Encryption (header `0x40`) | not implemented | AES-128-CBC, random IV + PKCS#7 |
+| CLASS (19) / TEXT (20) types | not implemented | CLASS uses server-side registry serde |
+| **Object key ordering on encode** | **sorted** (deterministic output) | **insertion order** (OrderedHashMap) |
+
+The one deliberate divergence is key ordering: this package sorts keys so
+that identical content yields byte-identical encodings (reproducible tests,
+hashable payloads, stable logging). Every compliant parser treats an
+SFSObject as a key/value map, so decode-side behavior is unaffected. If you
+need byte-for-byte fidelity with an official-client encoder, sort your
+insertion order to match theirs instead — or swap the `sort.Strings` call in
+`entriesBin` for insertion-order emission.
