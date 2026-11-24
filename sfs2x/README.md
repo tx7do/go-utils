@@ -87,6 +87,8 @@ msg, err := sfs2x.DecodeFrame(frame)
 | `Decode(data []byte) (*Object, error)` | Parse from binary (marker required). |
 | `EncodeFrame(o *Object) []byte` | Wrap into a frame (signature + uint16 length). |
 | `DecodeFrame(data []byte) (*Object, error)` | Parse a frame; accepts uint16 and uint32 length forms. |
+| `EncodeFrameWithOptions(o *Object, opts FrameOptions) ([]byte, error)` | Frame with optional zlib compression (threshold) and/or AES-128-CBC encryption (compress → encrypt). |
+| `DecodeFrameWithOptions(data []byte, opts FrameOptions) (*Object, error)` | Parse a frame with optional decryption/decompression (decrypt → decompress). |
 
 ## Notes
 
@@ -96,13 +98,17 @@ msg, err := sfs2x.DecodeFrame(frame)
 - **Frame forms**: `DecodeFrame` accepts both length forms (header bit
   `0x08`). `EncodeFrame` emits the short form and automatically switches to
   BIG_SIZE (uint32) for payloads over 65535 bytes, like the official client.
+- **Compression**: `DecodeFrame` decompresses `0x20` frames transparently;
+  `EncodeFrameWithOptions` zlib-compresses payloads over a configurable
+  threshold (official default: 1024).
+- **Encryption**: `EncodeFrameWithOptions` applies AES-128-CBC with a fresh
+  random IV per frame and PKCS#7 padding (header `0x40`, 16-byte key);
+  `DecodeFrameWithOptions` reverses it. Key management (handshake/session
+  key exchange) is out of scope — pass the negotiated key in.
 - **Bounds-safe decoding**: truncated or malformed input produces errors,
-  never panics. `DecodeFrame` rejects compressed (0x20), encrypted (0x40),
-  and non-binary frames with explicit errors instead of garbage decode
-  failures.
-- **Compression**: frames with header bit `0x20` set carry a zlib-compressed
-  payload; this package does not decompress them — handle that variant at
-  the transport layer if a peer emits it.
+  never panics. Encrypted frames without a key are rejected with an
+  explicit error. Decompressed output is capped at 64 MiB to resist
+  decompression bombs.
 - **UTF_STRING limit**: the wire format carries string lengths in a uint16,
   so values longer than 65535 bytes cannot be encoded (silently truncated by
   the length field — same ceiling as the official client). Use BYTE_ARRAY
@@ -124,8 +130,8 @@ port) and interoperability captures from a production peer:
 | Other arrays / strings length field | uint16 | uint16 |
 | Nested object/array marker | type byte doubles as marker (seek-back) | identical |
 | Frame header flags | `0x80` BINARY, `0x08` BIG_SIZE (decode) | adds `0x40` ENCRYPTED, `0x10` BLUEBOX |
-| Compression (header `0x20`) | not implemented; `DecodeFrame` rejects the flag explicitly | zlib, threshold 1024 |
-| Encryption (header `0x40`) | not implemented; `DecodeFrame` rejects the flag explicitly | AES-128-CBC, random IV + PKCS#7 |
+| Compression (header `0x20`) | ✓ zlib, threshold-configurable (default 1024) | zlib, threshold 1024 |
+| Encryption (header `0x40`) | ✓ AES-128-CBC, random IV + PKCS#7, 16-byte key | AES-128-CBC, random IV + PKCS#7 |
 | CLASS (19) / TEXT (20) types | not implemented | CLASS uses server-side registry serde |
 | **Object key ordering on encode** | **sorted** (deterministic output) | **insertion order** (OrderedHashMap) |
 

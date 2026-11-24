@@ -2,6 +2,7 @@ package sfs2x
 
 import (
 	"bytes"
+	"compress/zlib"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -247,8 +248,43 @@ func TestEncodeFrameAutoBigSize(t *testing.T) {
 	}
 }
 
-// TestDecodeFrame_RejectsFlags 压缩/加密/非二进制帧必须显式报错，
-// 而不是把未知载荷硬解成误导性的 marker 错误。
+// TestDecodeFrame_CompressedTransparent 压缩帧经 DecodeFrame 透明解压——
+// 不再是拒绝语义（压缩/加密已实现）。
+func TestDecodeFrame_CompressedTransparent(t *testing.T) {
+	inner := New()
+	inner.Put("blob", TByteArray, bytes.Repeat([]byte{7, 8, 9}, 512))
+	o := New()
+	o.Put("p", TSFSObject, inner)
+
+	frame, err := EncodeFrameWithOptions(o, FrameOptions{CompressThreshold: 64})
+	if err != nil {
+		t.Fatalf("encode compressed: %v", err)
+	}
+	if frame[0]&CompressionMask == 0 {
+		t.Fatalf("payload %d over threshold must set 0x20, header %02x", len(frame), frame[0])
+	}
+
+	decoded, err := DecodeFrame(frame) // 无选项也应透明解压
+	if err != nil {
+		t.Fatalf("compressed frame decode: %v", err)
+	}
+	if blob := decoded.GetSFSObject("p").Get("blob").([]byte); len(blob) != 1536 {
+		t.Fatalf("blob len = %d, want 1536", len(blob))
+	}
+
+	// 阈值以内不压缩
+	small := New()
+	small.Put("s", TUTFString, "hi")
+	smallFrame, err := EncodeFrameWithOptions(small, FrameOptions{CompressThreshold: 1024})
+	if err != nil {
+		t.Fatalf("encode small: %v", err)
+	}
+	if smallFrame[0]&CompressionMask != 0 {
+		t.Fatal("small payload must not be compressed")
+	}
+}
+
+// TestDecodeFrame_RejectsFlags 加密帧无钥匙必须显式报错；非二进制帧也必须拒绝。
 func TestDecodeFrame_RejectsFlags(t *testing.T) {
 	payload := New().Encode()
 
@@ -261,8 +297,7 @@ func TestDecodeFrame_RejectsFlags(t *testing.T) {
 		hdr   byte
 		match string
 	}{
-		"compressed": {Signature | CompressionMask, "compressed"},
-		"encrypted":  {Signature | 0x40, "encrypted"},
+		"encrypted":  {Signature | 0x40, "no decryption key"},
 		"non-binary": {CompressionMask, "not a binary"},
 	} {
 		_, err := DecodeFrame(build(tc.hdr))
@@ -396,5 +431,109 @@ func TestFloat32Precision(t *testing.T) {
 	got, _ := decoded.Get("f").(float32)
 	if float64(got) != float64(float32(0.1)) {
 		t.Fatalf("float32 roundtrip = %v, want %v", got, float32(0.1))
+	}
+}
+
+// TestEncryptDecryptFrameRoundtrip 加密帧全链路：EncodeFrameWithOptions →
+// DecodeFrameWithOptions。压缩+加密叠加时顺序必须与官方一致（先压后加密）。
+func TestEncryptDecryptFrameRoundtrip(t *testing.T) {
+	key := []byte("0123456789abcdef") // 16B
+
+	o := New()
+	o.Put("str", TUTFString, "payload for encryption test")
+	o.Put("n", TInt, int32(-42))
+
+	// 纯加密
+	frame, err := EncodeFrameWithOptions(o, FrameOptions{EncryptionKey: key})
+	if err != nil {
+		t.Fatalf("encode encrypted: %v", err)
+	}
+	if frame[0]&0x40 == 0 {
+		t.Fatal("encrypted frame must set 0x40")
+	}
+
+	// 随机 IV：同内容两次编码产出不同字节
+	frame2, err := EncodeFrameWithOptions(o, FrameOptions{EncryptionKey: key})
+	if err != nil {
+		t.Fatalf("encode encrypted again: %v", err)
+	}
+	if bytes.Equal(frame, frame2) {
+		t.Fatal("random IV must make encrypted frames non-deterministic")
+	}
+
+	decoded, err := DecodeFrameWithOptions(frame, FrameOptions{EncryptionKey: key})
+	if err != nil {
+		t.Fatalf("decrypt: %v", err)
+	}
+	if decoded.GetUTFString("str") != "payload for encryption test" || decoded.GetInt("n") != -42 {
+		t.Fatal("encrypted roundtrip mismatch")
+	}
+
+	// 无钥匙的 DecodeFrame 拒绝
+	if _, err := DecodeFrame(frame); err == nil {
+		t.Fatal("DecodeFrame without key must reject encrypted frame")
+	}
+
+	// 错钥匙 → 报错不 panic
+	wrong := []byte("fedcba9876543210")
+	if _, err := DecodeFrameWithOptions(frame, FrameOptions{EncryptionKey: wrong}); err == nil {
+		t.Fatal("wrong key must fail")
+	}
+
+	// 压缩+加密叠加（先压后加密）
+	big := New()
+	big.Put("blob", TByteArray, bytes.Repeat([]byte{1, 2, 3}, 512))
+	joint, err := EncodeFrameWithOptions(big, FrameOptions{CompressThreshold: 64, EncryptionKey: key})
+	if err != nil {
+		t.Fatalf("encode joint: %v", err)
+	}
+	if joint[0]&CompressionMask == 0 || joint[0]&0x40 == 0 {
+		t.Fatalf("joint frame must set both flags, header %02x", joint[0])
+	}
+	decodedJoint, err := DecodeFrameWithOptions(joint, FrameOptions{EncryptionKey: key})
+	if err != nil {
+		t.Fatalf("decode joint: %v", err)
+	}
+	if blob := decodedJoint.Get("blob").([]byte); len(blob) != 1536 {
+		t.Fatalf("joint roundtrip blob len = %d", len(blob))
+	}
+}
+
+// TestEncryptKeyValidation 钥匙长度校验（必须 16B）。
+func TestEncryptKeyValidation(t *testing.T) {
+	// nil = 不加密；非 nil 但长度不对必须在编码期拒绝
+	for _, bad := range [][]byte{{}, []byte("short"), make([]byte, 15), make([]byte, 17), make([]byte, 32)} {
+		if _, err := EncodeFrameWithOptions(New(), FrameOptions{EncryptionKey: bad}); err == nil {
+			t.Fatalf("key len %d must be rejected on encode", len(bad))
+		}
+	}
+
+	key := make([]byte, 16)
+	frame, err := EncodeFrameWithOptions(New(), FrameOptions{EncryptionKey: key})
+	if err != nil {
+		t.Fatalf("valid key encode: %v", err)
+	}
+	for _, bad := range [][]byte{nil, []byte("short")} {
+		if _, err := DecodeFrameWithOptions(frame, FrameOptions{EncryptionKey: bad}); err == nil {
+			t.Fatalf("key len %d must be rejected on decode", len(bad))
+		}
+	}
+}
+
+// TestCompressionBombCapped 恶意压缩帧的解压输出必须有上限（防解压炸弹）。
+func TestCompressionBombCapped(t *testing.T) {
+	// 手工构造：超出上限的解压输出。zlib 头 + 压缩的零流
+	var buf bytes.Buffer
+	zw := zlib.NewWriter(&buf)
+	zw.Write(make([]byte, 100<<20)) // 100MB 零 → 压得很小
+	zw.Close()
+
+	payload := buf.Bytes()
+	hdr := []byte{Signature | CompressionMask, byte(len(payload) >> 24), byte(len(payload) >> 16), byte(len(payload) >> 8), byte(len(payload))}
+	frame := append(hdr, payload...)
+
+	_, err := DecodeFrame(frame)
+	if err == nil {
+		t.Fatal("decompression bomb must be capped with an error")
 	}
 }

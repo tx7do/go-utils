@@ -83,13 +83,16 @@ msg, err := sfs2x.DecodeFrame(frame)
 | `Decode(data []byte) (*Object, error)` | 从二进制解析（要求 marker）。 |
 | `EncodeFrame(o *Object) []byte` | 封装为帧（签名 + uint16 长度）。 |
 | `DecodeFrame(data []byte) (*Object, error)` | 解析帧；兼容 uint16 与 uint32 两种长度形态。 |
+| `EncodeFrameWithOptions(o *Object, opts FrameOptions) ([]byte, error)` | 可选 zlib 压缩（阈值）与/或 AES-128-CBC 加密封帧（先压后加密）。 |
+| `DecodeFrameWithOptions(data []byte, opts FrameOptions) (*Object, error)` | 可选解密/解压解析帧（先解密后解压）。 |
 
 ## 注意事项
 
 - **确定性编码**：key 在序列化前排序，同内容无论插入序如何都产出逐字节一致的输出（`GetKeys` 仍报告插入序）。
 - **帧形态**：`DecodeFrame` 两种长度形态（header bit `0x08`）都接受。`EncodeFrame` 发短形态，载荷超过 65535 字节时自动切换 BIG_SIZE（uint32），与官方客户端一致。
-- **解码边界安全**：截断或畸形输入返回错误，绝不 panic。`DecodeFrame` 对压缩（0x20）、加密（0x40）、非二进制帧显式报错拒绝，不做误导性硬解。
-- **压缩**：header bit `0x20` 的帧携带 zlib 压缩载荷；本包不做解压——对端若发该形态请在传输层处理。
+- **压缩**：`DecodeFrame` 对 `0x20` 帧透明解压；`EncodeFrameWithOptions` 对超过阈值的载荷 zlib 压缩（官方默认阈值 1024）。
+- **加密**：`EncodeFrameWithOptions` 施加 AES-128-CBC（每帧全新随机 IV + PKCS#7 填充，header `0x40`，16 字节钥匙）；`DecodeFrameWithOptions` 反向解出。钥匙管理（握手/会话密钥交换）不在本包范围——协商好的钥匙由调用方传入。
+- **解码边界安全**：截断或畸形输入返回错误，绝不 panic。无钥匙的加密帧显式报错拒绝。解压输出上限 64 MiB，防解压炸弹。
 - **UTF_STRING 上限**：线格式以 uint16 携带字符串长度，超过 65535 字节的值无法编码（长度字段静默截断——与官方客户端同款上限）；更大载荷请用 BYTE_ARRAY（uint32 长度）。
 - **类型安全**：类型化读取器（`GetInt` 等）使用无检查类型断言，不匹配即 panic。不可信输入请先查 `GetType` 或用 `Get` 安全断言。
 
@@ -105,8 +108,8 @@ msg, err := sfs2x.DecodeFrame(frame)
 | 其他数组/字符串长度字段 | uint16 | uint16 |
 | 嵌套对象/数组 marker | 类型字节兼任 marker（回退一字节） | 一致 |
 | 帧头标志 | `0x80` BINARY、`0x08` BIG_SIZE（解码侧） | 另有 `0x40` ENCRYPTED、`0x10` BLUEBOX |
-| 压缩（header `0x20`） | 未实现；`DecodeFrame` 对该标志显式拒绝 | zlib，阈值 1024 |
-| 加密（header `0x40`） | 未实现；`DecodeFrame` 对该标志显式拒绝 | AES-128-CBC，随机 IV + PKCS#7 |
+| 压缩（header `0x20`） | ✓ zlib，阈值可配（默认 1024） | zlib，阈值 1024 |
+| 加密（header `0x40`） | ✓ AES-128-CBC，随机 IV + PKCS#7，16 字节钥匙 | AES-128-CBC，随机 IV + PKCS#7 |
 | CLASS (19) / TEXT (20) 类型 | 未实现 | CLASS 走服务端注册表序列化 |
 | **对象键序（编码侧）** | **排序**（确定性输出） | **插入序**（OrderedHashMap） |
 

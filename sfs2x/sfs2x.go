@@ -18,10 +18,16 @@
 //	BOOL_ARRAY=9 BYTE_ARRAY=10 SHORT_ARRAY=11 INT_ARRAY=12 LONG_ARRAY=13
 //	FLOAT_ARRAY=14 DOUBLE_ARRAY=15 UTF_STRING_ARRAY=16 SFS_ARRAY=17 SFS_OBJECT=18
 //
-// Scope note: EncodeFrame always emits the short (uint16) length form.
-// DecodeFrame accepts both length forms; zlib-compressed frames (header bit
-// 0x20 set) are not decompressed by this package — callers must handle that
-// variant themselves if peers emit it.
+// Scope note: EncodeFrame always emits the short (uint16) length form
+// without optional transforms; EncodeFrameWithOptions adds zlib
+// compression (header bit 0x20, threshold-configurable — official client
+// default 1024) and AES-128-CBC encryption (header bit 0x40, random IV +
+// PKCS#7, 16-byte key), applied in that order. DecodeFrame decompresses
+// transparently; encrypted frames require DecodeFrameWithOptions with the
+// key. EncodeFrameWithOptions automatically switches to the BIG_SIZE
+// (0x08, uint32) length form for payloads over 65535 bytes, like the
+// official client. The CLASS (19) and TEXT (20) types and the BLUEBOX
+// (HTTP-tunnel) transport are not implemented.
 package sfs2x
 
 import (
@@ -587,6 +593,7 @@ func decodeValue(data []byte, p *pos) (sfsEntry, error) {
 // length, payload. The short (uint16) length form is used for payloads up
 // to 65535 bytes; larger payloads automatically switch to the BIG_SIZE
 // (0x08, uint32) form — matching the official client behavior.
+// Compression and encryption are not applied (see EncodeFrameWithOptions).
 func EncodeFrame(o *Object) []byte {
 	payload := o.Encode()
 	var buf bytes.Buffer
@@ -601,24 +608,75 @@ func EncodeFrame(o *Object) []byte {
 	return buf.Bytes()
 }
 
-// DecodeFrame extracts the payload from an SFS frame and parses it into an
-// Object. Both uint16 and uint32 (header bit 0x08) length forms are
-// accepted. Compressed (0x20), encrypted (0x40), and non-binary frames are
-// rejected with an explicit error instead of garbage decode failures —
-// this package does not implement those variants (see package docs).
-func DecodeFrame(data []byte) (*Object, error) {
+// FrameOptions controls the optional frame transformations applied by
+// EncodeFrameWithOptions / DecodeFrameWithOptions.
+//
+// Transform order mirrors the official client: compress first (0x20), then
+// encrypt (0x40); decoding reverses it.
+type FrameOptions struct {
+	// CompressThreshold zlib-compresses the payload when it exceeds this
+	// many bytes (header 0x20). 0 disables compression. The official
+	// client default is 1024.
+	CompressThreshold int
+
+	// EncryptionKey enables AES-128-CBC encryption of the (optionally
+	// compressed) payload (header 0x40). Must be exactly 16 bytes
+	// (AES-128); every frame carries a fresh random IV.
+	EncryptionKey []byte
+}
+
+// EncodeFrameWithOptions wraps an Object into an SFS frame applying the
+// optional transformations in FrameOptions. Payloads over 65535 bytes
+// automatically use the BIG_SIZE (0x08, uint32) length form.
+//
+// Note: compressed/encrypted frames are non-deterministic by design
+// (zlib output and the random IV vary); byte-stable encoding only holds
+// for plain frames.
+func EncodeFrameWithOptions(o *Object, opts FrameOptions) ([]byte, error) {
+	payload := o.Encode()
+
+	var hdrFlags byte = Signature
+	if opts.CompressThreshold > 0 && len(payload) > opts.CompressThreshold {
+		compressed, err := compressPayload(payload)
+		if err != nil {
+			return nil, err
+		}
+		payload = compressed
+		hdrFlags |= CompressionMask
+	}
+
+	if opts.EncryptionKey != nil {
+		encrypted, err := encryptPayload(payload, opts.EncryptionKey)
+		if err != nil {
+			return nil, err
+		}
+		payload = encrypted
+		hdrFlags |= 0x40
+	}
+
+	var buf bytes.Buffer
+	if len(payload) > 0xFFFF {
+		buf.WriteByte(hdrFlags | LongLenMask)
+		buf.Write(encodeUint32(len(payload)))
+	} else {
+		buf.WriteByte(hdrFlags)
+		buf.Write(encodeUint16(len(payload)))
+	}
+	buf.Write(payload)
+	return buf.Bytes(), nil
+}
+
+// DecodeFrameWithOptions extracts the payload from an SFS frame and parses
+// it into an Object, transparently handling decryption (using
+// opts.EncryptionKey when the frame carries the 0x40 flag) and
+// decompression (0x20). Both uint16 and uint32 length forms are accepted.
+func DecodeFrameWithOptions(data []byte, opts FrameOptions) (*Object, error) {
 	if len(data) < 3 {
 		return nil, fmt.Errorf("frame too short: %d", len(data))
 	}
 	hdr := data[0]
 	if hdr&Signature == 0 {
 		return nil, fmt.Errorf("not a binary SFS frame (header %02x)", hdr)
-	}
-	if hdr&CompressionMask != 0 {
-		return nil, fmt.Errorf("compressed frames not supported (header %02x)", hdr)
-	}
-	if hdr&0x40 != 0 {
-		return nil, fmt.Errorf("encrypted frames not supported (header %02x)", hdr)
 	}
 	off := 1
 	var ln int
@@ -632,7 +690,43 @@ func DecodeFrame(data []byte) (*Object, error) {
 	if off+ln > len(data) {
 		return nil, fmt.Errorf("frame payload truncated")
 	}
-	return Decode(data[off : off+ln])
+	payload := data[off : off+ln]
+
+	if hdr&0x40 != 0 {
+		key := opts.EncryptionKey
+		if key == nil {
+			return nil, fmt.Errorf("encrypted frame but no decryption key provided")
+		}
+		decrypted, err := decryptPayload(payload, key)
+		if err != nil {
+			return nil, err
+		}
+		payload = decrypted
+	}
+
+	if hdr&CompressionMask != 0 {
+		decompressed, err := decompressPayload(payload)
+		if err != nil {
+			return nil, err
+		}
+		payload = decompressed
+	}
+
+	return Decode(payload)
+}
+
+// DecodeFrame extracts the payload from an SFS frame and parses it into an
+// Object. Compressed (0x20) frames are decompressed transparently;
+// encrypted (0x40) frames are rejected with an explicit error — use
+// DecodeFrameWithOptions with a key for those. Both length forms are
+// accepted.
+func DecodeFrame(data []byte) (*Object, error) {
+	if len(data) >= 1 {
+		if hdr := data[0]; hdr&0x40 != 0 {
+			return nil, fmt.Errorf("encrypted frame but no decryption key provided (use DecodeFrameWithOptions)")
+		}
+	}
+	return DecodeFrameWithOptions(data, FrameOptions{})
 }
 
 // ---- Encoding helpers ----
