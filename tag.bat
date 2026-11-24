@@ -92,4 +92,3 @@ git tag currency/v0.0.2
 git tag currency/v0.0.3
 git tag currency/v0.0.4
 git tag currency/v0.0.5
-git tag maputils/v1.1.46
