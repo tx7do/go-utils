@@ -16,6 +16,9 @@
   - `SetTrustedProxies` / `SetTrustedProxiesFromEnvVar` 在启动时一次性指定实际反向代理网段
 - **kratos 上下文助手**（`context.go`）
   - `ClientIPFromContext` / `HeaderFromContext` / `CookieFromContext`：service 层从 kratos context 读取客户端 IP / 请求头 / HttpOnly cookie；非 HTTP 形态返回零值而非 panic
+- **HTTP 客户端/服务端调优**（`httpclient.go` / `httpserver.go`）
+  - `TunedHTTPTransport`：连接池调优的 `http.Transport`，面向同远端主机高 QPS 出站调用（默认 `MaxIdleConnsPerHost=2` 会在流量间歇大量断连、下一波反复重建 TCP+TLS）
+  - `TuneRestServerTimeouts`：为 kratos REST server 补上读头截止（slowloris）与空闲连接回收；刻意不设读写超时，SSE 事件流不会被掐断
 
 ## 安装
 
@@ -189,6 +192,8 @@ func safeDial(ctx context.Context, rawURL string) (net.Conn, error) {
 | `ClientIPFromContext(ctx context.Context) string` | 从 kratos server context 解析客户端真实 IP（等价于对取到的 `*http.Request` 调 `ClientIPFromRequest`）；非 HTTP 传输返回 `""` |
 | `HeaderFromContext(ctx context.Context) http.Header` | 从 kratos server context 提取 HTTP 请求头；非 HTTP 传输返回 `nil` |
 | `CookieFromContext(ctx context.Context, name string) string` | 从 kratos server context 提取具名 cookie 值；非 HTTP 传输或无此 cookie 返回 `""` |
+| `TunedHTTPTransport() *http.Transport` | `http.DefaultTransport` 的调优克隆：`MaxIdleConns=100`、`MaxIdleConnsPerHost=16`、`IdleConnTimeout=90s`，面向同主机高 QPS 出站 |
+| `TuneRestServerTimeouts(srv *khttp.Server)` | 为 kratos REST server 设 `ReadHeaderTimeout=10s`（slowloris）与 `IdleTimeout=120s`；刻意不设 Read/WriteTimeout 以保 SSE 流；nil 安全 |
 
 ## 注意事项
 

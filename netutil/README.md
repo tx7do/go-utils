@@ -17,6 +17,9 @@ English | [简体中文](README.zh-CN.md)
   - `SetTrustedProxies` / `SetTrustedProxiesFromEnvVar` configure your actual reverse-proxy ranges once at startup
 - **Kratos context helpers** (`context.go`)
   - `ClientIPFromContext` / `HeaderFromContext` / `CookieFromContext`: read the client IP / request headers / HttpOnly cookies from a Kratos server context; non-HTTP transports return zero values instead of panicking
+- **HTTP client/server tuning** (`httpclient.go` / `httpserver.go`)
+  - `TunedHTTPTransport`: connection-pool-tuned `http.Transport` for high-QPS traffic against the same remote host (default `MaxIdleConnsPerHost=2` forces repeated TCP+TLS handshakes between bursts)
+  - `TuneRestServerTimeouts`: adds a header-read deadline (slowloris) and idle-connection reclamation to a Kratos REST server; read/write timeouts stay unset so SSE event streams are never cut off
 
 ## Installation
 
@@ -197,6 +200,8 @@ precisely via `SetTrustedProxies` / `SetTrustedProxiesFromEnvVar`.
 | `ClientIPFromContext(ctx context.Context) string` | Resolves the client real IP from a Kratos server context (equivalent to calling `ClientIPFromRequest` on the extracted `*http.Request`); returns `""` for non-HTTP transports |
 | `HeaderFromContext(ctx context.Context) http.Header` | Extracts HTTP request headers from a Kratos server context; returns `nil` for non-HTTP transports |
 | `CookieFromContext(ctx context.Context, name string) string` | Extracts a named cookie value from a Kratos server context; returns `""` for non-HTTP transports or missing cookies |
+| `TunedHTTPTransport() *http.Transport` | Clone of `http.DefaultTransport` tuned for high-QPS same-host traffic: `MaxIdleConns=100`, `MaxIdleConnsPerHost=16`, `IdleConnTimeout=90s` |
+| `TuneRestServerTimeouts(srv *khttp.Server)` | Sets `ReadHeaderTimeout=10s` (slowloris) and `IdleTimeout=120s` on a Kratos REST server; deliberately leaves Read/WriteTimeout unset to keep SSE streams alive; nil-safe |
 
 ## Notes
 
