@@ -101,10 +101,27 @@ msg, err := sfs2x.DecodeFrame(frame)
 - **Compression**: `DecodeFrame` decompresses `0x20` frames transparently;
   `EncodeFrameWithOptions` zlib-compresses payloads over a configurable
   threshold (official default: 1024).
-- **Encryption**: `EncodeFrameWithOptions` applies AES-128-CBC with a fresh
-  random IV per frame and PKCS#7 padding (header `0x40`, 16-byte key);
-  `DecodeFrameWithOptions` reverses it. Key management (handshake/session
-  key exchange) is out of scope — pass the negotiated key in.
+- **Encryption, both official modes**: `EncodeFrameWithOptions` applies
+  AES-128-CBC with PKCS#7 (header `0x40`, 16-byte key):
+  - **official fixed key+IV mode** (`EncryptionKey` + `EncryptionIV`): the
+    server delivers the pair over HTTPS (/BlueBox/CryptoManager, response =
+    Base64(key||iv), parse with `ParseCryptoKeyResponseBase64`); the payload
+    is ciphertext only, deterministic per input — exactly what real SFS2X
+    peers speak;
+  - **self-describing mode** (`EncryptionKey` only): a fresh random IV is
+    prefixed to the payload, so frames stand alone without shared state.
+- **Message envelope**: `Message{Controller, Action, Params}` with the
+  standard `{c: BYTE, a: SHORT, p}` wire shape, system-controller action
+  codes, and handshake request/response builders (`NewHandshakeRequest`,
+  `ParseHandshakeResponse` — session token `tk` drives the crypto-key
+  servlet call).
+- **CLASS (19) recognition**: the wire form of a CLASS value is an ordinary
+  object carrying `$C` (class name) + `$F` (field values); `AsClass`
+  recognizes the convention (full custom-type serde stays with the app —
+  it needs the peer's field registry).
+- **Ordered encoding**: `EncodeOrdered` / `FrameOptions.Ordered` emit keys
+  in insertion order — byte-for-byte compatible with the official client
+  encoder; plain `Encode` stays deterministic (sorted).
 - **Bounds-safe decoding**: truncated or malformed input produces errors,
   never panics. Encrypted frames without a key are rejected with an
   explicit error. Decompressed output is capped at 64 MiB to resist
@@ -132,8 +149,11 @@ port) and interoperability captures from a production peer:
 | Frame header flags | `0x80` BINARY, `0x08` BIG_SIZE (decode) | adds `0x40` ENCRYPTED, `0x10` BLUEBOX |
 | Compression (header `0x20`) | ✓ zlib, threshold-configurable (default 1024) | zlib, threshold 1024 |
 | Encryption (header `0x40`) interop | roundtrip only (offline RSA handshake not implemented) | session key via server RSA token handshake |
-| Encryption (header `0x40`) | ✓ AES-128-CBC, random IV + PKCS#7, 16-byte key | AES-128-CBC, random IV + PKCS#7 |
-| CLASS (19) / TEXT (20) types | not implemented | CLASS uses server-side registry serde |
+| Encryption (header `0x40`) | ✓ AES-128-CBC PKCS#7: official fixed key+IV pair **or** self-describing random-IV prefix | AES-128-CBC with server-issued fixed key+IV pair |
+| TEXT (20) type | ✓ encode + decode (4-byte length) | `writeInt` length |
+| CLASS (19) type | ✓ `$C`/`$F` convention recognized (`AsClass`); custom serde stays app-side | ordinary object with `$C`/`$F` keys |
+| Encryption key delivery | `CryptoKey` parsed from servlet response (HTTPS call is app-side) | `/BlueBox/CryptoManager` servlet |
+| Key ordering on encode | sorted (default) **or** insertion order (`EncodeOrdered`/`FrameOptions.Ordered`) | insertion order |
 | **Object key ordering on encode** | **sorted** (deterministic output) | **insertion order** (OrderedHashMap) |
 
 The one deliberate divergence is key ordering: this package sorts keys so

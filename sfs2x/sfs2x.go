@@ -171,24 +171,6 @@ func (o *Object) Encode() []byte {
 	return append([]byte{byte(TSFSObject)}, o.entriesBin()...)
 }
 
-// entriesBin serializes count+entries (the nested form, without the 0x12
-// marker). Keys are sorted for deterministic output.
-func (o *Object) entriesBin() []byte {
-	var buf bytes.Buffer
-	keys := make([]string, len(o.keys))
-	copy(keys, o.keys)
-	sort.Strings(keys)
-	buf.Write(encodeUint16(len(keys)))
-	for _, key := range keys {
-		e := o.entries[key]
-		buf.Write(encodeUint16(len(key)))
-		buf.WriteString(key)
-		buf.WriteByte(byte(e.typ))
-		encodeValue(&buf, e.typ, e.val)
-	}
-	return buf.Bytes()
-}
-
 func encodeValue(buf *bytes.Buffer, t Type, v interface{}) {
 	switch t {
 	case TNull:
@@ -283,6 +265,77 @@ func writeTypedArray(buf *bytes.Buffer, t Type, n int, get func(int) interface{}
 	for i := 0; i < n; i++ {
 		encodeValue(buf, t, get(i))
 	}
+}
+
+// EncodeOrdered serializes the object preserving key insertion order —
+// byte-for-byte compatible with the official client encoder, which never
+// reorders. Use it when a peer compares bytes or depends on key order;
+// plain Encode remains deterministic (sorted).
+func (o *Object) EncodeOrdered() []byte {
+	return append([]byte{byte(TSFSObject)}, o.entriesBinOrdered()...)
+}
+
+// entriesBin serializes count+entries with SORTED keys (deterministic).
+func (o *Object) entriesBin() []byte {
+	keys := make([]string, len(o.keys))
+	copy(keys, o.keys)
+	sort.Strings(keys)
+	return o.entriesBinWith(keys)
+}
+
+// entriesBinOrdered serializes count+entries in INSERTION order
+// (official-client byte fidelity).
+func (o *Object) entriesBinOrdered() []byte {
+	return o.entriesBinWith(o.keys)
+}
+
+func (o *Object) entriesBinWith(keys []string) []byte {
+	var buf bytes.Buffer
+	buf.Write(encodeUint16(len(keys)))
+	for _, key := range keys {
+		e := o.entries[key]
+		buf.Write(encodeUint16(len(key)))
+		buf.WriteString(key)
+		buf.WriteByte(byte(e.typ))
+		encodeValue(&buf, e.typ, e.val)
+	}
+	return buf.Bytes()
+}
+
+// classMarkerKey / classFieldsKey are the well-known SFSObject keys the
+// official client uses to wrap CLASS (19) values: the wire form of a CLASS
+// is an ordinary SFS_OBJECT carrying "$C" (fully-qualified class name) and
+// "$F" (SFS_ARRAY of field values in registry order).
+const (
+	classMarkerKey = "$C"
+	classFieldsKey = "$F"
+)
+
+// AsClass recognizes the official CLASS convention on a decoded object.
+// A CLASS-typed peer value arrives as a plain SFS_OBJECT carrying "$C"
+// (class full name) and "$F" (field values); ok reports whether the object
+// matches that shape.
+func AsClass(o *Object) (className string, fields []interface{}, ok bool) {
+	if o == nil {
+		return "", nil, false
+	}
+	marker := o.GetUTFString(classMarkerKey)
+	list, isArr := o.entries[classFieldsKey].val.([]interface{})
+	if marker == "" || !isArr {
+		return "", nil, false
+	}
+	return marker, list, true
+}
+
+// validateCryptoKeyIV checks the official key/IV lengths.
+func validateCryptoKeyIV(key, iv []byte) error {
+	if len(key) != aesKeySize {
+		return fmt.Errorf("encryption key must be %d bytes, got %d", aesKeySize, len(key))
+	}
+	if len(iv) != ivSize {
+		return fmt.Errorf("encryption iv must be %d bytes, got %d", ivSize, len(iv))
+	}
+	return nil
 }
 
 // Decode deserializes an SFSObject from binary data (which must start with
@@ -649,8 +702,22 @@ type FrameOptions struct {
 
 	// EncryptionKey enables AES-128-CBC encryption of the (optionally
 	// compressed) payload (header 0x40). Must be exactly 16 bytes
-	// (AES-128); every frame carries a fresh random IV.
+	// (AES-128). Two modes:
+	//   - EncryptionIV set → official mode: fixed server-issued key+IV,
+	//     payload = ciphertext only (no IV prefix);
+	//   - EncryptionIV nil → self-describing mode: fresh random IV
+	//     prefixed to the payload (IV || ciphertext).
 	EncryptionKey []byte
+
+	// EncryptionIV selects the official fixed-IV mode (see EncryptionKey).
+	// Must be exactly 16 bytes when set. The server delivers key+IV over
+	// HTTPS (/BlueBox/CryptoManager); parse with ParseCryptoKeyResponse.
+	EncryptionIV []byte
+
+	// Ordered emits object keys in insertion order instead of the
+	// deterministic sorted order — byte-for-byte compatible with the
+	// official client encoder. Decode side is unaffected either way.
+	Ordered bool
 }
 
 // EncodeFrameWithOptions wraps an Object into an SFS frame applying the
@@ -662,6 +729,9 @@ type FrameOptions struct {
 // for plain frames.
 func EncodeFrameWithOptions(o *Object, opts FrameOptions) ([]byte, error) {
 	payload := o.Encode()
+	if opts.Ordered {
+		payload = o.EncodeOrdered()
+	}
 
 	var hdrFlags byte = Signature
 	if opts.CompressThreshold > 0 && len(payload) > opts.CompressThreshold {
@@ -674,7 +744,18 @@ func EncodeFrameWithOptions(o *Object, opts FrameOptions) ([]byte, error) {
 	}
 
 	if opts.EncryptionKey != nil {
-		encrypted, err := encryptPayload(payload, opts.EncryptionKey)
+		var encrypted []byte
+		var err error
+		if opts.EncryptionIV != nil {
+			if err := validateCryptoKeyIV(opts.EncryptionKey, opts.EncryptionIV); err != nil {
+				return nil, err
+			}
+			// 官方固定 key+IV 模式：载荷只有密文
+			encrypted, err = encryptPayloadFixedIV(payload, opts.EncryptionKey, opts.EncryptionIV)
+		} else {
+			// 自描述模式：随机 IV 前缀
+			encrypted, err = encryptPayload(payload, opts.EncryptionKey)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -728,7 +809,18 @@ func DecodeFrameWithOptions(data []byte, opts FrameOptions) (*Object, error) {
 		if key == nil {
 			return nil, fmt.Errorf("encrypted frame but no decryption key provided")
 		}
-		decrypted, err := decryptPayload(payload, key)
+		var decrypted []byte
+		var err error
+		if opts.EncryptionIV != nil {
+			if err := validateCryptoKeyIV(key, opts.EncryptionIV); err != nil {
+				return nil, err
+			}
+			// 官方固定 key+IV 模式
+			decrypted, err = decryptPayloadFixedIV(payload, key, opts.EncryptionIV)
+		} else {
+			// 自描述模式（IV 前缀）
+			decrypted, err = decryptPayload(payload, key)
+		}
 		if err != nil {
 			return nil, err
 		}

@@ -91,7 +91,12 @@ msg, err := sfs2x.DecodeFrame(frame)
 - **确定性编码**：key 在序列化前排序，同内容无论插入序如何都产出逐字节一致的输出（`GetKeys` 仍报告插入序）。
 - **帧形态**：`DecodeFrame` 两种长度形态（header bit `0x08`）都接受。`EncodeFrame` 发短形态，载荷超过 65535 字节时自动切换 BIG_SIZE（uint32），与官方客户端一致。
 - **压缩**：`DecodeFrame` 对 `0x20` 帧透明解压；`EncodeFrameWithOptions` 对超过阈值的载荷 zlib 压缩（官方默认阈值 1024）。
-- **加密**：`EncodeFrameWithOptions` 施加 AES-128-CBC（每帧全新随机 IV + PKCS#7 填充，header `0x40`，16 字节钥匙）；`DecodeFrameWithOptions` 反向解出。钥匙管理（握手/会话密钥交换）不在本包范围——协商好的钥匙由调用方传入。
+- **加密（双模式）**：`EncodeFrameWithOptions` 施加 AES-128-CBC + PKCS#7（header `0x40`，16 字节钥匙）：
+  - **官方固定 key+IV 模式**（`EncryptionKey` + `EncryptionIV`）：服务端经 HTTPS 下发钥匙对（/BlueBox/CryptoManager，响应 = Base64(key||iv)，用 `ParseCryptoKeyResponseBase64` 解析）；载荷只有密文，同输入同输出——与真实 SFS2X 对端完全一致；
+  - **自描述模式**（仅 `EncryptionKey`）：每帧全新随机 IV 前缀，帧独立可解。
+- **Message 信封**：`Message{Controller, Action, Params}` 标准线形态（`c: BYTE, a: SHORT, p`）、系统控制器动作码、握手请求/响应构造器（`NewHandshakeRequest`、`ParseHandshakeResponse`——响应中的会话令牌 `tk` 用于 HTTPS 钥匙 servlet 调用）。
+- **CLASS (19) 识别**：CLASS 值的线形态是携带 `$C`（类全名）+ `$F`（字段值数组）的普通对象；`AsClass` 识别该约定（自定义类型完整序列化需对端字段注册表，留在应用层）。
+- **有序编码**：`EncodeOrdered` / `FrameOptions.Ordered` 按插入序输出 key——与官方客户端编码器逐字节兼容；默认 `Encode` 保持确定性排序。
 - **解码边界安全**：截断或畸形输入返回错误，绝不 panic。无钥匙的加密帧显式报错拒绝。解压输出上限 64 MiB，防解压炸弹。
 - **UTF_STRING 上限**：线格式以 uint16 携带字符串长度，超过 65535 字节的值无法编码（长度字段静默截断——与官方客户端同款上限）；更大载荷请用 BYTE_ARRAY（uint32 长度）。
 - **类型安全**：类型化读取器（`GetInt` 等）使用无检查类型断言，不匹配即 panic。不可信输入请先查 `GetType` 或用 `Get` 安全断言。
@@ -110,8 +115,11 @@ msg, err := sfs2x.DecodeFrame(frame)
 | 帧头标志 | `0x80` BINARY、`0x08` BIG_SIZE（解码侧） | 另有 `0x40` ENCRYPTED、`0x10` BLUEBOX |
 | 压缩（header `0x20`） | ✓ zlib，阈值可配（默认 1024） | zlib，阈值 1024 |
 | 加密互操作 | 仅回环验证（离线 RSA 握手未实现） | 会话钥匙经服务端 RSA 令牌握手 |
-| 加密（header `0x40`） | ✓ AES-128-CBC，随机 IV + PKCS#7，16 字节钥匙 | AES-128-CBC，随机 IV + PKCS#7 |
-| CLASS (19) / TEXT (20) 类型 | 未实现 | CLASS 走服务端注册表序列化 |
+| 加密（header `0x40`） | ✓ AES-128-CBC PKCS#7：官方固定 key+IV 对 **或** 自描述随机 IV 前缀 | AES-128-CBC，服务端下发的固定 key+IV 对 |
+| TEXT (20) 类型 | ✓ 编码+解码（4 字节长度） | `writeInt` 长度 |
+| CLASS (19) 类型 | ✓ `$C`/`$F` 约定识别（`AsClass`）；自定义类型序列化留在应用层 | 携带 `$C`/`$F` 键的普通对象 |
+| 加密钥匙下发 | `CryptoKey` 从 servlet 响应解析（HTTPS 调用属应用层） | `/BlueBox/CryptoManager` servlet |
+| 编码键序 | 排序（默认）**或**插入序（`EncodeOrdered`/`FrameOptions.Ordered`） | 插入序 |
 | **对象键序（编码侧）** | **排序**（确定性输出） | **插入序**（OrderedHashMap） |
 
 唯一的有意偏离是键序：本包排序使同内容产出逐字节一致编码（测试可复现、载荷可哈希、日志稳定）。任何合规解析器都把 SFSObject 当键值映射处理，解码侧行为不受影响。若需要与官方客户端编码器字节级对齐，请改为按对方的插入序排布——或把 `entriesBin` 里的 `sort.Strings` 换成插入序输出。
