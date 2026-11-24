@@ -12,6 +12,34 @@ import (
 // to two Money values of different currencies.
 var ErrCurrencyMismatch = errors.New("currency: money values of different currencies")
 
+// ErrOverflow is returned when an arithmetic result exceeds int64.
+var ErrOverflow = errors.New("currency: amount overflow")
+
+// MarshalJSON renders the money string ("1,234.56 USD") — self-describing
+// and roundtrip-safe via UnmarshalJSON/ParseMoney.
+func (m Money) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + m.String() + `"`), nil
+}
+
+// UnmarshalJSON parses a money string (see ParseMoney). Null input yields
+// the zero Money (unspecified currency, zero amount).
+func (m *Money) UnmarshalJSON(data []byte) error {
+	s := strings.TrimSpace(string(data))
+	if s == "null" {
+		*m = Money{}
+		return nil
+	}
+	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
+		return fmt.Errorf("currency: money JSON must be a string, got %s", s)
+	}
+	parsed, err := ParseMoney(s[1 : len(s)-1])
+	if err != nil {
+		return err
+	}
+	*m = parsed
+	return nil
+}
+
 // Money is an amount of a single currency stored in ledger units
 // (1 major unit = 10000, see BaseFactor). All arithmetic runs on integers —
 // floats never touch the stored value.
@@ -88,20 +116,30 @@ func sameCurrencyOr(a, b Money) error {
 	return nil
 }
 
-// Add returns a+b. Both values must share one currency.
+// Add returns a+b. Both values must share one currency; int64 overflow
+// returns ErrOverflow instead of wrapping silently.
 func (m Money) Add(o Money) (Money, error) {
 	if err := sameCurrencyOr(m, o); err != nil {
 		return Money{}, err
 	}
-	return Money{code: m.code, base: m.base + o.base}, nil
+	sum := m.base + o.base
+	if (m.base > 0 && o.base > 0 && sum < 0) || (m.base < 0 && o.base < 0 && sum >= 0) {
+		return Money{}, fmt.Errorf("%w: %d + %d overflows int64", ErrOverflow, m.base, o.base)
+	}
+	return Money{code: m.code, base: sum}, nil
 }
 
-// Sub returns a-b. Both values must share one currency.
+// Sub returns a-b. Both values must share one currency; int64 overflow
+// returns ErrOverflow instead of wrapping silently.
 func (m Money) Sub(o Money) (Money, error) {
 	if err := sameCurrencyOr(m, o); err != nil {
 		return Money{}, err
 	}
-	return Money{code: m.code, base: m.base - o.base}, nil
+	diff := m.base - o.base
+	if (m.base >= 0 && o.base < 0 && diff < 0) || (m.base < 0 && o.base > 0 && diff > 0) {
+		return Money{}, fmt.Errorf("%w: %d - %d overflows int64", ErrOverflow, m.base, o.base)
+	}
+	return Money{code: m.code, base: diff}, nil
 }
 
 // Cmp compares two same-currency amounts: -1/0/+1.
@@ -120,8 +158,13 @@ func (m Money) Cmp(o Money) (int, error) {
 }
 
 // Mul scales the amount by an integer factor (e.g. quantity × unit price).
-func (m Money) Mul(factor int64) Money {
-	return Money{code: m.code, base: m.base * factor}
+// int64 overflow returns ErrOverflow instead of wrapping silently.
+func (m Money) Mul(factor int64) (Money, error) {
+	prod := new(big.Int).Mul(big.NewInt(m.base), big.NewInt(factor))
+	if !prod.IsInt64() {
+		return Money{}, fmt.Errorf("%w: %d × %d overflows int64", ErrOverflow, m.base, factor)
+	}
+	return Money{code: m.code, base: prod.Int64()}, nil
 }
 
 // Allocate splits the amount by integer ratios so the parts sum exactly to

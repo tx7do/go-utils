@@ -116,7 +116,13 @@ currency.Symbol("USD")             // "$"
 currency.NumericCode("EUR")        // "978"
 currency.DisplayName("jpy")        // "Japanese Yen"
 currency.IsKnown("XYZ")            // false (conversions still work, 2-decimal fallback)
+currency.CodeFromNumeric("978")    // "EUR"
+currency.CodeFromSymbol("$")       // "USD"
 ```
+
+The metadata tables cover **every active ISO 4217 code** (~160 entries:
+numeric code + English name; display symbols for the common subset).
+Regenerate with `python gen_meta.py` after editing `iso4217_active.txt`.
 
 Rates are explicit floats supplied by the caller — this package never fetches
 or caches them. Treat converted values as settlement estimates; ledger-grade

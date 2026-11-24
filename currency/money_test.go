@@ -68,7 +68,9 @@ func TestMoneyArithmetic(t *testing.T) {
 
 func TestMoneyMul(t *testing.T) {
 	unit := MoneyFromMinor("USD", 399) // 3.99
-	assert.Equal(t, int64(1995), unit.Mul(5).Minor(), "3.99 × 5")
+	mul, err := unit.Mul(5)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1995), mul.Minor(), "3.99 × 5")
 }
 
 // ============================================================
@@ -174,7 +176,7 @@ func TestMeta(t *testing.T) {
 	assert.Equal(t, "XYZ", Symbol("XYZ"), "未知币种符号回退为码")
 	assert.Equal(t, "978", NumericCode("EUR"))
 	assert.Empty(t, NumericCode("XYZ"))
-	assert.Equal(t, "Japanese Yen", DisplayName("jpy"))
+	assert.Equal(t, "Japanese yen", DisplayName("jpy"))
 	assert.True(t, IsKnown("USD"))
 	assert.False(t, IsKnown("XYZ"))
 }

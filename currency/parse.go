@@ -13,8 +13,8 @@ import (
 // code; callers who need a specific currency should pass the explicit code.
 var symbolToCode = func() map[string]string {
 	candidates := make(map[string][]string)
-	for code, info := range metaTable {
-		candidates[info.Symbol] = append(candidates[info.Symbol], code)
+	for code, sym := range symbolTable {
+		candidates[sym] = append(candidates[sym], code)
 	}
 	m := make(map[string]string)
 	for sym, codes := range candidates {
@@ -55,7 +55,7 @@ func splitAmountCode(s string) (amount, code string, err error) {
 		return tok, DefaultCode, nil
 	case 2:
 		code := Normalize(fields[1])
-		if _, known := metaTable[code]; !known {
+		if !IsKnown(code) {
 			// 第二段可能是符号（"$USD" 场景已拆开；这里处理 "12.00 $"）
 			if resolved := CodeFromSymbol(fields[1]); resolved != "" {
 				return fields[0], resolved, nil
