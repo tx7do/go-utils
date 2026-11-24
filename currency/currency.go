@@ -18,6 +18,15 @@
 // tables) fall back to 2 decimal places — the dominant ISO 4217 tier, so a
 // wrong fallback is the least costly one. Add newly supported currencies
 // directly to the exponent tables.
+//
+// Beyond raw conversion the package offers:
+//   - Money: a typed amount (currency + integer ledger units) with
+//     mismatch-safe arithmetic, exact-sum allocation/split and comparison
+//     (money.go);
+//   - display formatting with thousands grouping, symbols and ISO metadata
+//     (format.go / meta.go);
+//   - explicit exchange-rate application (rate.go) and directional
+//     rounding variants for fee/settlement boundaries.
 package currency
 
 import (

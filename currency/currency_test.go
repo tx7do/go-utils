@@ -23,21 +23,21 @@ func TestExponent(t *testing.T) {
 		code string
 		want int
 	}{
-		{"", 2},          // unspecified → 2 (default tier)
-		{"USD", 2},       // mainstream 2-decimal, not in tables → default
-		{"CNY", 2},       //
-		{"EUR", 2},       //
-		{"JPY", 0},       // zero-decimal tier
-		{"KRW", 0},       //
-		{"VND", 0},       //
-		{"CLP", 0},       //
-		{"KWD", 3},       // three-decimal tier
-		{"BHD", 3},       //
-		{"OMR", 3},       //
-		{"usd", 2},       // case normalization
-		{" jpy ", 0},     // whitespace normalization
-		{"XXX", 2},       // unknown code → 2
-		{"CUSTOMCOIN", 2},// unlisted code → 2
+		{"", 2},           // unspecified → 2 (default tier)
+		{"USD", 2},        // mainstream 2-decimal, not in tables → default
+		{"CNY", 2},        //
+		{"EUR", 2},        //
+		{"JPY", 0},        // zero-decimal tier
+		{"KRW", 0},        //
+		{"VND", 0},        //
+		{"CLP", 0},        //
+		{"KWD", 3},        // three-decimal tier
+		{"BHD", 3},        //
+		{"OMR", 3},        //
+		{"usd", 2},        // case normalization
+		{" jpy ", 0},      // whitespace normalization
+		{"XXX", 2},        // unknown code → 2
+		{"CUSTOMCOIN", 2}, // unlisted code → 2
 	}
 	for _, c := range cases {
 		assert.Equal(t, c.want, Exponent(c.code), "Exponent(%q)", c.code)
