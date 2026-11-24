@@ -80,3 +80,4 @@ git tag v1.1.45
 git tag mailer/v0.1.3
 git tag currency/v0.0.1
 git tag netutil/v0.2.1
+git tag sfs2x/v0.0.1
