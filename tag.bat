@@ -78,3 +78,4 @@ git tag translator/baidu/v0.0.2
 git tag totp/v0.0.1
 git tag v1.1.45
 git tag mailer/v0.1.3
+git tag currency/v0.0.1
